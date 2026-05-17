@@ -179,17 +179,18 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
   return (
     <div className="tab-content space-y-4">
       {/* Filters */}
-      <div className="glass p-5 space-y-4">
+      <div className="glass p-5 space-y-3">
         <span className="section-label">Filtros</span>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div className="date-range">
+          <div className="date-range-col">
             <label className="input-label">De</label>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="glass-input" />
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
-          <div>
+          <div className="date-range-sep" />
+          <div className="date-range-col">
             <label className="input-label">Até</label>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="glass-input" />
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
         </div>
 
@@ -352,18 +353,21 @@ function RelatoriosTab() {
 
   return (
     <div className="tab-content space-y-4">
-      <div className="glass p-5 space-y-4">
+      <div className="glass p-5 space-y-3">
         <span className="section-label">Período</span>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+
+        <div className="date-range">
+          <div className="date-range-col">
             <label className="input-label">De</label>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="glass-input" />
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
-          <div>
+          <div className="date-range-sep" />
+          <div className="date-range-col">
             <label className="input-label">Até</label>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="glass-input" />
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
         </div>
+
         <button onClick={load} className="btn-glass w-full">Gerar Relatório</button>
       </div>
 

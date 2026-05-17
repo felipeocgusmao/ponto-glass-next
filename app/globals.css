@@ -580,6 +580,42 @@
     margin-bottom: 16px;
   }
 
+  /* ── Date range — pílula unificada ───────────────── */
+  .date-range {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-top-color: rgba(255,255,255,0.18);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+  .date-range-col {
+    padding: 13px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .date-range-col .input-label { margin-bottom: 0; }
+  .date-range-sep {
+    background: rgba(255,255,255,0.08);
+  }
+  .date-range input[type="date"] {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 0.90rem;
+    font-weight: 500;
+    outline: none;
+    padding: 0;
+    width: 100%;
+    cursor: pointer;
+  }
+  .date-range input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.35);
+    cursor: pointer;
+  }
+
   /* ── Select ───────────────────────────────────────── */
   .glass-select {
     display: block; width: 100%;
