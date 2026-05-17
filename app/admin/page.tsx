@@ -9,12 +9,59 @@ import type { Employee, JWTUser, PunchRecord } from '@/lib/types'
 
 type Tab = 'ponto' | 'registros' | 'funcionarios' | 'relatorios'
 
-const TABS: { id: Tab; icon: string; label: string }[] = [
-  { id: 'ponto',       icon: '🕰',  label: 'Ponto'     },
-  { id: 'registros',   icon: '📋',  label: 'Registros' },
-  { id: 'funcionarios',icon: '👥',  label: 'Equipe'    },
-  { id: 'relatorios',  icon: '📊',  label: 'Relatório' },
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'ponto',        label: 'Ponto'     },
+  { id: 'registros',    label: 'Registros' },
+  { id: 'funcionarios', label: 'Equipe'    },
+  { id: 'relatorios',   label: 'Relatório' },
 ]
+
+function IconClock({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9.5"/>
+      <polyline points="12 7 12 12 15.5 14.5"/>
+    </svg>
+  )
+}
+function IconList({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6"  x2="21" y2="6"/>
+      <line x1="8" y1="12" x2="21" y2="12"/>
+      <line x1="8" y1="18" x2="21" y2="18"/>
+      <circle cx="3.5" cy="6"  r="0.8" fill="currentColor" stroke="none"/>
+      <circle cx="3.5" cy="12" r="0.8" fill="currentColor" stroke="none"/>
+      <circle cx="3.5" cy="18" r="0.8" fill="currentColor" stroke="none"/>
+    </svg>
+  )
+}
+function IconUsers({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  )
+}
+function IconBar({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <line x1="18" y1="20" x2="18" y2="10"/>
+      <line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6"  y1="20" x2="6"  y2="14"/>
+    </svg>
+  )
+}
+
+const TAB_ICONS: Record<Tab, React.ReactNode> = {
+  ponto:        <IconClock />,
+  registros:    <IconList />,
+  funcionarios: <IconUsers />,
+  relatorios:   <IconBar />,
+}
 
 // ─── Punch card (Meu Ponto tab) ───────────────────────────────────────────────
 function PunchCard({ user }: { user: JWTUser }) {
@@ -430,7 +477,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Bottom navigation */}
+      {/* Bottom navigation — liquid glass pill */}
       <nav className="bottom-nav">
         {TABS.map((t) => (
           <button
@@ -438,7 +485,7 @@ export default function AdminPage() {
             onClick={() => setTab(t.id)}
             className={`nav-item ${tab === t.id ? 'nav-item-active' : ''}`}
           >
-            <span className="nav-icon">{t.icon}</span>
+            <span className="nav-icon">{TAB_ICONS[t.id]}</span>
             <span className="nav-label">{t.label}</span>
           </button>
         ))}
