@@ -9,14 +9,14 @@ import type { Employee, JWTUser, PunchRecord } from '@/lib/types'
 
 type Tab = 'ponto' | 'registros' | 'funcionarios' | 'relatorios'
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'ponto', label: '🕰️  Meu Ponto' },
-  { id: 'registros', label: '📋  Registros' },
-  { id: 'funcionarios', label: '👥  Funcionários' },
-  { id: 'relatorios', label: '📊  Relatórios' },
+const TABS: { id: Tab; icon: string; label: string }[] = [
+  { id: 'ponto',       icon: '🕰',  label: 'Ponto'     },
+  { id: 'registros',   icon: '📋',  label: 'Registros' },
+  { id: 'funcionarios',icon: '👥',  label: 'Equipe'    },
+  { id: 'relatorios',  icon: '📊',  label: 'Relatório' },
 ]
 
-// ─── Shared punch card ────────────────────────────────────────────────────────
+// ─── Punch card (Meu Ponto tab) ───────────────────────────────────────────────
 function PunchCard({ user }: { user: JWTUser }) {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -50,15 +50,20 @@ function PunchCard({ user }: { user: JWTUser }) {
   const overtime = calcOvertimeToday(records)
 
   return (
-    <>
-      <div className="glass p-8 mb-4">
+    <div className="tab-content space-y-4">
+      {/* Clock + punch */}
+      <div className="glass p-8">
         <LiveClock />
-        <div className="text-center mb-5">
+        <div className="text-center my-5">
           <span className={isInside ? 'status-in' : 'status-out'}>
             {isInside ? '● Você está dentro' : '● Você está fora'}
           </span>
         </div>
-        {msg && <div className={`mb-4 ${msg.kind === 'success' ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
+        {msg && (
+          <div className={`mb-4 ${msg.kind === 'success' ? 'alert-success' : 'alert-error'}`}>
+            {msg.text}
+          </div>
+        )}
         <button
           onClick={() => handlePunch(isInside ? 'saída' : 'entrada')}
           disabled={loading}
@@ -68,30 +73,34 @@ function PunchCard({ user }: { user: JWTUser }) {
         </button>
       </div>
 
+      {/* Metrics + history */}
       {records.length > 0 && (
         <div className="glass p-6">
-          <div className={`grid gap-3 mb-5 ${overtime !== null ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className={`grid gap-3 mb-6 ${overtime !== null ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div className="metric-box">
               <div className="metric-val">{calcHours(records)}</div>
               <div className="metric-lbl">Horas hoje</div>
             </div>
             <div className="metric-box">
               <div className="metric-val">{records.length}</div>
-              <div className="metric-lbl">Registros hoje</div>
+              <div className="metric-lbl">Registros</div>
             </div>
             {overtime !== null && (
               <div className="metric-box">
-                <div className={`metric-val text-2xl ${overtime >= 0 ? 'text-yellow-300' : 'text-red-400'}`}>
+                <div className={`metric-val text-xl ${overtime >= 0 ? 'text-yellow-300' : 'text-red-400'}`}>
                   {overtime >= 0 ? '+' : '-'}{fmtMinutes(overtime)}
                 </div>
-                <div className="metric-lbl">{overtime >= 0 ? 'Hora extra' : 'A cumprir'}</div>
+                <div className="metric-lbl">{overtime >= 0 ? 'Extra' : 'A cumprir'}</div>
               </div>
             )}
           </div>
-          <span className="section-label">Registros de hoje</span>
+
+          <span className="section-label">Hoje</span>
           {sorted.map((r) => (
             <div key={r.id} className="record-item">
-              <span className="font-semibold text-white">{new Date(r.timestamp).toLocaleTimeString('pt-BR')}</span>
+              <span className="font-semibold text-white text-sm">
+                {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+              </span>
               <span className={r.type === 'entrada' ? 'rec-tag-in' : 'rec-tag-out'}>
                 {r.type === 'entrada' ? 'Entrada' : 'Saída'}
               </span>
@@ -99,7 +108,7 @@ function PunchCard({ user }: { user: JWTUser }) {
           ))}
         </div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -121,46 +130,57 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
   useEffect(() => { load() }, [load])
 
   return (
-    <div className="glass p-6">
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <label className="input-label">De</label>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="glass-input" />
+    <div className="tab-content space-y-4">
+      {/* Filters */}
+      <div className="glass p-5 space-y-4">
+        <span className="section-label">Filtros</span>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="input-label">De</label>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="glass-input" />
+          </div>
+          <div>
+            <label className="input-label">Até</label>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="glass-input" />
+          </div>
         </div>
+
         <div>
-          <label className="input-label">Até</label>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="glass-input" />
+          <label className="input-label">Funcionário</label>
+          <select value={empId} onChange={(e) => setEmpId(e.target.value)} className="glass-select">
+            <option value="all">Todos</option>
+            {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
         </div>
-      </div>
-      <div className="mb-5">
-        <label className="input-label">Funcionário</label>
-        <select value={empId} onChange={(e) => setEmpId(e.target.value)} className="glass-select">
-          <option value="all">Todos</option>
-          {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-        </select>
       </div>
 
-      {records.length === 0
-        ? <div className="alert-info">Nenhum registro para este filtro.</div>
-        : (
-          <>
-            <span className="section-label">{records.length} registro(s)</span>
-            {records.map((r) => (
-              <div key={r.id} className="record-item">
-                <div>
-                  <div className="font-semibold text-white text-sm">{r.employee_name}</div>
-                  <div className="text-white/40 text-xs mt-0.5">
-                    {r.date} · {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+      {/* Results */}
+      <div className="glass p-5">
+        {records.length === 0
+          ? <div className="alert-info">Nenhum registro para este filtro.</div>
+          : (
+            <>
+              <span className="section-label">{records.length} registro(s)</span>
+              {records.map((r) => (
+                <div key={r.id} className="record-item">
+                  <div>
+                    <div className="font-semibold text-white text-sm">{r.employee_name}</div>
+                    <div className="text-white/35 text-xs mt-1">
+                      {new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+                      {' · '}
+                      {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+                    </div>
                   </div>
+                  <span className={r.type === 'entrada' ? 'rec-tag-in' : 'rec-tag-out'}>
+                    {r.type === 'entrada' ? 'Entrada' : 'Saída'}
+                  </span>
                 </div>
-                <span className={r.type === 'entrada' ? 'rec-tag-in' : 'rec-tag-out'}>
-                  {r.type === 'entrada' ? 'Entrada' : 'Saída'}
-                </span>
-              </div>
-            ))}
-          </>
-        )
-      }
+              ))}
+            </>
+          )
+        }
+      </div>
     </div>
   )
 }
@@ -185,7 +205,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
     })
     const data = await res.json()
     if (!res.ok) { setErr(data.error); setLoading(false); return }
-    setOk(`${name} adicionado com sucesso!`)
+    setOk(`${name} adicionado!`)
     setName(''); setUsername(''); setPassword(''); setRole('employee')
     setLoading(false)
     onRefresh()
@@ -198,68 +218,71 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
   }
 
   return (
-    <div className="glass p-6">
-      <span className="section-label">{employees.length} funcionário(s) ativo(s)</span>
-
-      {employees.map((emp) => (
-        <div key={emp.id} className="record-item mb-2">
-          <div className="flex items-center gap-3">
-            <div className="avatar-sm">{avatarInitials(emp.name)}</div>
-            <div>
-              <div className="font-semibold text-white text-sm">
-                {emp.name}
-                {emp.role === 'admin' && <span className="admin-badge ml-2">Admin</span>}
+    <div className="tab-content space-y-4">
+      {/* Employee list */}
+      <div className="glass p-5">
+        <span className="section-label">{employees.length} ativo(s)</span>
+        {employees.map((emp) => (
+          <div key={emp.id} className="record-item">
+            <div className="flex items-center gap-3">
+              <div className="avatar-sm">{avatarInitials(emp.name)}</div>
+              <div>
+                <div className="font-semibold text-white text-sm">
+                  {emp.name}
+                  {emp.role === 'admin' && <span className="admin-badge ml-2">Admin</span>}
+                </div>
+                <div className="text-white/35 text-xs mt-0.5">@{emp.username}</div>
               </div>
-              <div className="text-white/40 text-xs">@{emp.username}</div>
+            </div>
+            {emp.username !== 'admin' && (
+              <button onClick={() => handleRemove(emp.id, emp.name)} className="btn-danger">
+                Remover
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add form */}
+      <div className="glass p-5">
+        <span className="section-label">Novo funcionário</span>
+        <form onSubmit={handleAdd} className="space-y-4 mt-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="input-label">Nome</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Maria Silva" className="glass-input" required />
+            </div>
+            <div>
+              <label className="input-label">Usuário</label>
+              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="maria.silva" className="glass-input" required />
             </div>
           </div>
-          {emp.username !== 'admin' && (
-            <button onClick={() => handleRemove(emp.id, emp.name)} className="btn-danger">
-              Remover
-            </button>
-          )}
-        </div>
-      ))}
-
-      <div className="glass-divider" />
-      <span className="section-label">Adicionar funcionário</span>
-
-      <form onSubmit={handleAdd} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="input-label">Nome completo</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Maria Silva" className="glass-input" required />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="input-label">Senha</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mín. 6 chars" className="glass-input" required />
+            </div>
+            <div>
+              <label className="input-label">Perfil</label>
+              <select value={role} onChange={(e) => setRole(e.target.value as 'employee' | 'admin')} className="glass-select">
+                <option value="employee">Funcionário</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="input-label">Usuário</label>
-            <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Ex: maria.silva" className="glass-input" required />
-          </div>
-          <div>
-            <label className="input-label">Senha</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mín. 6 caracteres" className="glass-input" required />
-          </div>
-          <div>
-            <label className="input-label">Perfil</label>
-            <select value={role} onChange={(e) => setRole(e.target.value as 'employee' | 'admin')} className="glass-select">
-              <option value="employee">Funcionário</option>
-              <option value="admin">Administrador</option>
-            </select>
-          </div>
-        </div>
-
-        {err && <div className="alert-error">{err}</div>}
-        {ok && <div className="alert-success">{ok}</div>}
-
-        <button type="submit" disabled={loading} className="btn-glass w-full">
-          {loading ? 'Adicionando...' : '+ Adicionar Funcionário'}
-        </button>
-      </form>
+          {err && <div className="alert-error">{err}</div>}
+          {ok && <div className="alert-success">{ok}</div>}
+          <button type="submit" disabled={loading} className="btn-glass w-full">
+            {loading ? 'Adicionando...' : '+ Adicionar'}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }
 
 // ─── Relatórios tab ───────────────────────────────────────────────────────────
-function RelatoriosTab({ employees }: { employees: Employee[] }) {
+function RelatoriosTab() {
   const now = new Date()
   const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const todayStr = now.toISOString().split('T')[0]
@@ -281,56 +304,63 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
   })
 
   return (
-    <div className="glass p-6">
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div>
-          <label className="input-label">De</label>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="glass-input" />
+    <div className="tab-content space-y-4">
+      <div className="glass p-5 space-y-4">
+        <span className="section-label">Período</span>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="input-label">De</label>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="glass-input" />
+          </div>
+          <div>
+            <label className="input-label">Até</label>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="glass-input" />
+          </div>
         </div>
-        <div>
-          <label className="input-label">Até</label>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="glass-input" />
-        </div>
+        <button onClick={load} className="btn-glass w-full">Gerar Relatório</button>
       </div>
 
-      <button onClick={load} className="btn-glass w-full mb-5">Gerar Relatório</button>
+      {loaded && (
+        <div className="glass p-5">
+          {records.length === 0
+            ? <div className="alert-info">Nenhum registro no período.</div>
+            : (
+              <>
+                <span className="section-label">
+                  {Object.keys(byEmp).length} pessoa(s) · {records.length} registros
+                </span>
 
-      {loaded && records.length === 0 && <div className="alert-info">Nenhum registro no período.</div>}
+                {Object.values(byEmp).map(({ name, records: recs }) => {
+                  const overtime = calcOvertimePeriod(recs)
+                  return (
+                    <div key={name} className="record-item">
+                      <div>
+                        <div className="font-semibold text-white text-sm">{name}</div>
+                        <div className="text-white/35 text-xs mt-0.5">{recs.length} registros</div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="font-bold text-white text-sm">{calcHours(recs)}</div>
+                        {overtime !== null && (
+                          <span className={overtime >= 0 ? 'overtime-pos' : 'overtime-neg'}>
+                            {overtime >= 0 ? '+' : '-'}{fmtMinutes(overtime)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
 
-      {loaded && records.length > 0 && (
-        <>
-          <span className="section-label">
-            {Object.keys(byEmp).length} funcionário(s) · {records.length} registros
-          </span>
-
-          {Object.values(byEmp).map(({ name, records: recs }) => {
-            const overtime = calcOvertimePeriod(recs)
-            return (
-              <div key={name} className="record-item mb-2">
-                <div>
-                  <div className="font-semibold text-white text-sm">{name}</div>
-                  <div className="text-white/40 text-xs">{recs.length} registros</div>
-                </div>
-                <div className="text-right flex flex-col items-end gap-1">
-                  <div className="font-bold text-white">{calcHours(recs)}</div>
-                  {overtime !== null && (
-                    <span className={overtime >= 0 ? 'overtime-pos' : 'overtime-neg'}>
-                      {overtime >= 0 ? '+' : '-'}{fmtMinutes(overtime)}
-                    </span>
-                  )}
-                </div>
-              </div>
+                <div className="glass-divider" />
+                <button
+                  onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`)}
+                  className="btn-purple w-full"
+                >
+                  ⬇  Exportar CSV
+                </button>
+              </>
             )
-          })}
-
-          <div className="glass-divider" />
-          <button
-            onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`)}
-            className="btn-purple w-full"
-          >
-            ⬇  Exportar CSV
-          </button>
-        </>
+          }
+        </div>
       )}
     </div>
   )
@@ -369,20 +399,20 @@ export default function AdminPage() {
   )
 
   return (
-    <main className="min-h-screen p-4 md:p-8">
+    <main className="min-h-screen p-4 md:p-8 page-pad-nav">
       {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
 
-      <div className="max-w-2xl mx-auto">
-
-        {/* Top bar */}
-        <div className="flex items-center justify-between mb-5">
+      <div className="max-w-xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="avatar">{avatarInitials(user.name)}</div>
             <div>
-              <div className="font-semibold text-sm text-white">
-                {user.name} <span className="admin-badge ml-1">Admin</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm text-white">{user.name}</span>
+                <span className="admin-badge">Admin</span>
               </div>
-              <div className="text-white/40 text-xs">Painel Administrativo</div>
+              <div className="text-white/35 text-xs mt-0.5">Painel Administrativo</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -391,25 +421,28 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="tab-list">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`tab ${tab === t.id ? 'tab-active' : ''}`}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Tab content */}
+        <div key={tab}>
+          {tab === 'ponto'        && <PunchCard user={user} />}
+          {tab === 'registros'    && <RegistrosTab employees={employees} />}
+          {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
+          {tab === 'relatorios'   && <RelatoriosTab />}
         </div>
-
-        {/* Content */}
-        {tab === 'ponto' && <PunchCard user={user} />}
-        {tab === 'registros' && <RegistrosTab employees={employees} />}
-        {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
-        {tab === 'relatorios' && <RelatoriosTab employees={employees} />}
       </div>
+
+      {/* Bottom navigation */}
+      <nav className="bottom-nav">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`nav-item ${tab === t.id ? 'nav-item-active' : ''}`}
+          >
+            <span className="nav-icon">{t.icon}</span>
+            <span className="nav-label">{t.label}</span>
+          </button>
+        ))}
+      </nav>
     </main>
   )
 }
