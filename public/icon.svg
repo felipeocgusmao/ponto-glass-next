@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0e1e"/>
+      <stop offset="100%" stop-color="#070714"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Outer ring -->
+  <circle cx="256" cy="256" r="176" fill="none" stroke="url(#ring)" stroke-width="14" opacity="0.85"/>
+  <!-- Inner ring subtle -->
+  <circle cx="256" cy="256" r="148" fill="none" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+  <!-- Hour marks -->
+  <g stroke="rgba(255,255,255,0.25)" stroke-width="4" stroke-linecap="round">
+    <line x1="256" y1="96" x2="256" y2="116"/>
+    <line x1="416" y1="256" x2="396" y2="256"/>
+    <line x1="256" y1="416" x2="256" y2="396"/>
+    <line x1="96" y1="256" x2="116" y2="256"/>
+  </g>
+  <!-- Minute hand (pointing to 12) -->
+  <line x1="256" y1="256" x2="256" y2="130" stroke="white" stroke-width="10" stroke-linecap="round" filter="url(#glow)"/>
+  <!-- Hour hand (pointing to ~8) -->
+  <line x1="256" y1="256" x2="192" y2="318" stroke="url(#ring)" stroke-width="14" stroke-linecap="round" filter="url(#glow)"/>
+  <!-- Center dot -->
+  <circle cx="256" cy="256" r="10" fill="#c4b5fd" filter="url(#glow)"/>
+</svg>

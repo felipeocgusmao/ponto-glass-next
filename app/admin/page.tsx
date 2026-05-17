@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import LiveClock from '@/components/LiveClock'
-import { calcHours, avatarInitials, exportCSV } from '@/lib/utils'
+import ChangePasswordModal from '@/components/ChangePasswordModal'
+import { calcHours, avatarInitials, exportCSV, calcOvertimeToday, calcOvertimePeriod, fmtMinutes } from '@/lib/utils'
 import type { Employee, JWTUser, PunchRecord } from '@/lib/types'
 
 type Tab = 'ponto' | 'registros' | 'funcionarios' | 'relatorios'
@@ -15,7 +16,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'relatorios', label: '📊  Relatórios' },
 ]
 
-// ─── Shared punch card (reused in Meu Ponto tab) ─────────────────────────────
+// ─── Shared punch card ────────────────────────────────────────────────────────
 function PunchCard({ user }: { user: JWTUser }) {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -46,6 +47,7 @@ function PunchCard({ user }: { user: JWTUser }) {
 
   const sorted = [...records].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   const isInside = sorted[0]?.type === 'entrada'
+  const overtime = calcOvertimeToday(records)
 
   return (
     <>
@@ -68,7 +70,7 @@ function PunchCard({ user }: { user: JWTUser }) {
 
       {records.length > 0 && (
         <div className="glass p-6">
-          <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className={`grid gap-3 mb-5 ${overtime !== null ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div className="metric-box">
               <div className="metric-val">{calcHours(records)}</div>
               <div className="metric-lbl">Horas hoje</div>
@@ -77,6 +79,14 @@ function PunchCard({ user }: { user: JWTUser }) {
               <div className="metric-val">{records.length}</div>
               <div className="metric-lbl">Registros hoje</div>
             </div>
+            {overtime !== null && (
+              <div className="metric-box">
+                <div className={`metric-val text-2xl ${overtime >= 0 ? 'text-yellow-300' : 'text-red-400'}`}>
+                  {overtime >= 0 ? '+' : '-'}{fmtMinutes(overtime)}
+                </div>
+                <div className="metric-lbl">{overtime >= 0 ? 'Hora extra' : 'A cumprir'}</div>
+              </div>
+            )}
           </div>
           <span className="section-label">Registros de hoje</span>
           {sorted.map((r) => (
@@ -96,33 +106,38 @@ function PunchCard({ user }: { user: JWTUser }) {
 // ─── Registros tab ────────────────────────────────────────────────────────────
 function RegistrosTab({ employees }: { employees: Employee[] }) {
   const today = new Date().toISOString().split('T')[0]
-  const [date, setDate] = useState(today)
+  const [from, setFrom] = useState(today)
+  const [to, setTo] = useState(today)
   const [empId, setEmpId] = useState('all')
   const [records, setRecords] = useState<PunchRecord[]>([])
 
   const load = useCallback(async () => {
-    const params = new URLSearchParams({ date })
+    const params = new URLSearchParams({ from, to })
     if (empId !== 'all') params.set('employeeId', empId)
-    const res = await fetch(`/api/records?${params}`)
+    const res = await fetch(`/api/reports?${params}`)
     if (res.ok) setRecords(await res.json())
-  }, [date, empId])
+  }, [from, to, empId])
 
   useEffect(() => { load() }, [load])
 
   return (
     <div className="glass p-6">
-      <div className="grid grid-cols-2 gap-3 mb-5">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label className="input-label">Data</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="glass-input" />
+          <label className="input-label">De</label>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="glass-input" />
         </div>
         <div>
-          <label className="input-label">Funcionário</label>
-          <select value={empId} onChange={(e) => setEmpId(e.target.value)} className="glass-select">
-            <option value="all">Todos</option>
-            {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
+          <label className="input-label">Até</label>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="glass-input" />
         </div>
+      </div>
+      <div className="mb-5">
+        <label className="input-label">Funcionário</label>
+        <select value={empId} onChange={(e) => setEmpId(e.target.value)} className="glass-select">
+          <option value="all">Todos</option>
+          {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+        </select>
       </div>
 
       {records.length === 0
@@ -134,7 +149,9 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
               <div key={r.id} className="record-item">
                 <div>
                   <div className="font-semibold text-white text-sm">{r.employee_name}</div>
-                  <div className="text-white/40 text-xs mt-0.5">{new Date(r.timestamp).toLocaleTimeString('pt-BR')}</div>
+                  <div className="text-white/40 text-xs mt-0.5">
+                    {r.date} · {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+                  </div>
                 </div>
                 <span className={r.type === 'entrada' ? 'rec-tag-in' : 'rec-tag-out'}>
                   {r.type === 'entrada' ? 'Entrada' : 'Saída'}
@@ -257,7 +274,6 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
     if (res.ok) { setRecords(await res.json()); setLoaded(true) }
   }
 
-  // Group by employee
   const byEmp: Record<string, { name: string; records: PunchRecord[] }> = {}
   records.forEach((r) => {
     if (!byEmp[r.employee_id]) byEmp[r.employee_id] = { name: r.employee_name, records: [] }
@@ -287,17 +303,25 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
             {Object.keys(byEmp).length} funcionário(s) · {records.length} registros
           </span>
 
-          {Object.values(byEmp).map(({ name, records: recs }) => (
-            <div key={name} className="record-item mb-2">
-              <div>
-                <div className="font-semibold text-white text-sm">{name}</div>
-                <div className="text-white/40 text-xs">{recs.length} registros</div>
+          {Object.values(byEmp).map(({ name, records: recs }) => {
+            const overtime = calcOvertimePeriod(recs)
+            return (
+              <div key={name} className="record-item mb-2">
+                <div>
+                  <div className="font-semibold text-white text-sm">{name}</div>
+                  <div className="text-white/40 text-xs">{recs.length} registros</div>
+                </div>
+                <div className="text-right flex flex-col items-end gap-1">
+                  <div className="font-bold text-white">{calcHours(recs)}</div>
+                  {overtime !== null && (
+                    <span className={overtime >= 0 ? 'overtime-pos' : 'overtime-neg'}>
+                      {overtime >= 0 ? '+' : '-'}{fmtMinutes(overtime)}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="text-right">
-                <div className="font-bold text-white">{calcHours(recs)}</div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
 
           <div className="glass-divider" />
           <button
@@ -317,6 +341,7 @@ export default function AdminPage() {
   const [user, setUser] = useState<JWTUser | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [tab, setTab] = useState<Tab>('ponto')
+  const [showPwd, setShowPwd] = useState(false)
   const router = useRouter()
 
   const loadUser = useCallback(async () => {
@@ -345,6 +370,8 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen p-4 md:p-8">
+      {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
+
       <div className="max-w-2xl mx-auto">
 
         {/* Top bar */}
@@ -358,7 +385,10 @@ export default function AdminPage() {
               <div className="text-white/40 text-xs">Painel Administrativo</div>
             </div>
           </div>
-          <button onClick={handleLogout} className="btn-logout">Sair</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowPwd(true)} className="btn-settings" title="Trocar senha">⚙</button>
+            <button onClick={handleLogout} className="btn-logout">Sair</button>
+          </div>
         </div>
 
         {/* Tabs */}

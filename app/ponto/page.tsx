@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import LiveClock from '@/components/LiveClock'
-import { calcHours, avatarInitials } from '@/lib/utils'
+import ChangePasswordModal from '@/components/ChangePasswordModal'
+import { calcHours, avatarInitials, calcOvertimeToday, fmtMinutes } from '@/lib/utils'
 import type { JWTUser, PunchRecord } from '@/lib/types'
 
 export default function PontoPage() {
@@ -11,6 +12,7 @@ export default function PontoPage() {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const [showPwd, setShowPwd] = useState(false)
   const router = useRouter()
 
   const fetchData = useCallback(async () => {
@@ -56,9 +58,12 @@ export default function PontoPage() {
   const sorted = [...records].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   const isInside = sorted[0]?.type === 'entrada'
   const initials = avatarInitials(user.name)
+  const overtime = calcOvertimeToday(records)
 
   return (
     <main className="min-h-screen p-4 md:p-8">
+      {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
+
       <div className="max-w-md mx-auto">
 
         {/* Top bar */}
@@ -70,7 +75,10 @@ export default function PontoPage() {
               <div className="text-white/40 text-xs">@{user.username}</div>
             </div>
           </div>
-          <button onClick={handleLogout} className="btn-logout">Sair</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowPwd(true)} className="btn-settings" title="Trocar senha">⚙</button>
+            <button onClick={handleLogout} className="btn-logout">Sair</button>
+          </div>
         </div>
 
         {/* Punch card */}
@@ -97,7 +105,7 @@ export default function PontoPage() {
         {/* Today's records */}
         {records.length > 0 && (
           <div className="glass p-6">
-            <div className="grid grid-cols-2 gap-3 mb-5">
+            <div className={`grid gap-3 mb-5 ${overtime !== null ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <div className="metric-box">
                 <div className="metric-val">{calcHours(records)}</div>
                 <div className="metric-lbl">Horas hoje</div>
@@ -106,6 +114,14 @@ export default function PontoPage() {
                 <div className="metric-val">{records.length}</div>
                 <div className="metric-lbl">Registros hoje</div>
               </div>
+              {overtime !== null && (
+                <div className="metric-box">
+                  <div className={`metric-val text-2xl ${overtime >= 0 ? 'text-yellow-300' : 'text-red-400'}`}>
+                    {overtime >= 0 ? '+' : '-'}{fmtMinutes(overtime)}
+                  </div>
+                  <div className="metric-lbl">{overtime >= 0 ? 'Hora extra' : 'A cumprir'}</div>
+                </div>
+              )}
             </div>
 
             <span className="section-label">Registros de hoje</span>

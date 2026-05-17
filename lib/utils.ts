@@ -1,27 +1,49 @@
 import type { PunchRecord } from './types'
 
-export function calcHours(records: PunchRecord[]): string {
+export const WORKDAY_MINUTES = 8 * 60
+
+function pairMinutes(records: PunchRecord[]): number {
   const ins = records
     .filter((r) => r.type === 'entrada')
     .map((r) => new Date(r.timestamp))
     .sort((a, b) => a.getTime() - b.getTime())
-
   const outs = records
     .filter((r) => r.type === 'saída')
     .map((r) => new Date(r.timestamp))
     .sort((a, b) => a.getTime() - b.getTime())
-
   let totalMs = 0
   ins.forEach((t, i) => {
-    if (outs[i] && outs[i] > t) {
-      totalMs += outs[i].getTime() - t.getTime()
-    }
+    if (outs[i] && outs[i] > t) totalMs += outs[i].getTime() - t.getTime()
   })
+  return Math.round(totalMs / 60_000)
+}
 
-  if (!totalMs) return '—'
-  const h = Math.floor(totalMs / 3_600_000)
-  const m = Math.floor((totalMs % 3_600_000) / 60_000)
+export function calcHours(records: PunchRecord[]): string {
+  const min = pairMinutes(records)
+  if (!min) return '—'
+  const h = Math.floor(min / 60)
+  const m = min % 60
   return `${h}h ${m.toString().padStart(2, '0')}m`
+}
+
+export function fmtMinutes(min: number): string {
+  const abs = Math.abs(min)
+  const h = Math.floor(abs / 60)
+  const m = abs % 60
+  return h > 0 ? `${h}h ${m.toString().padStart(2, '0')}m` : `${m}m`
+}
+
+export function calcOvertimeToday(records: PunchRecord[]): number | null {
+  const min = pairMinutes(records)
+  if (!min) return null
+  return min - WORKDAY_MINUTES
+}
+
+export function calcOvertimePeriod(records: PunchRecord[]): number | null {
+  const min = pairMinutes(records)
+  if (!min) return null
+  const days = new Set(records.map((r) => r.date)).size
+  return min - WORKDAY_MINUTES * days
 }
 
 export function avatarInitials(name: string): string {

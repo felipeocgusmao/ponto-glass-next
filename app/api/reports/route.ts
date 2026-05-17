@@ -20,12 +20,18 @@ export async function GET(request: NextRequest) {
   if (!from || !to)
     return NextResponse.json({ error: 'Parâmetros from e to são obrigatórios' }, { status: 400 })
 
-  const { data, error } = await supabase
+  const employeeId = searchParams.get('employeeId')
+
+  let query = supabase
     .from('records')
     .select('*')
     .gte('date', from)
     .lte('date', to)
     .order('timestamp', { ascending: true })
+
+  if (employeeId) query = query.eq('employee_id', employeeId)
+
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
