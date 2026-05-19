@@ -30,6 +30,20 @@ CREATE INDEX IF NOT EXISTS idx_records_employee ON records(employee_id);
 CREATE INDEX IF NOT EXISTS idx_records_date     ON records(date);
 CREATE INDEX IF NOT EXISTS idx_records_emp_date ON records(employee_id, date);
 
+-- ═══════════════════════════════════════════════════════
+--  Row Level Security (RLS)
+--
+--  O app usa a service_role key no servidor, que já bypassa
+--  o RLS. As políticas abaixo bloqueiam acesso direto via
+--  anon key (conexões externas ao app).
+-- ═══════════════════════════════════════════════════════
+
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE records   ENABLE ROW LEVEL SECURITY;
+
+-- Sem políticas para anon = acesso negado por padrão.
+-- O service_role (usado pelo app) ignora o RLS e tem acesso total.
+
 -- ⚠️  O usuário admin padrão (admin / admin123) é criado
 --     automaticamente pelo app no primeiro login.
 --     Troque a senha logo após o primeiro acesso.
