@@ -114,16 +114,19 @@ Cada peça foi escolhida com intenção:
   FUNCIONÁRIO                          GERENTE                              ADMINISTRADOR
   ───────────                          ───────                              ─────────────
   ● Relógio ao vivo                    ● Painel de status ao vivo           ● Tudo do Gerente
-  ● Status: dentro / fora              ● Ver quem está em serviço agora     ● Cadastrar e remover funcionários
-  ● Registrar entrada / saída          ● Registrar ponto por funcionário    ● Configurar jornada (4–10h)
-  ● Horas trabalhadas ao vivo (30s)    ● Histórico de registros             ● Configurar desconto de almoço
-  ● Ganhos do dia em tempo real        ● Relatórios por período             ● Definir valor/hora em €
-  ● Desconto de almoço automático      ● Exportar CSV                       ● Redefinir senha de qualquer usuário
+  ● Status: dentro / pausa / fora      ● Ver quem está em serviço agora     ● Cadastrar e remover funcionários
+  ● Registrar entrada / saída          ● Ver ganhos de cada funcionário      ● Configurar jornada (4–10h)
+  ● Pausas: Almoço / Café / Retorno    ● Registrar ponto por funcionário    ● Configurar desconto de almoço
+  ● Horas trabalhadas ao vivo (30s)    ● Histórico de registros             ● Definir valor/hora em €
+  ● Ganhos do dia em tempo real        ● Relatórios por período             ● Redefinir senha de qualquer usuário
+  ● Desconto de almoço automático*     ● Exportar CSV profissional          ● Alterar nome de usuário
   ● Horas extras acumuladas                                                 ● Criar usuários (funcionário/gerente/admin)
   ● Notificações de fim de jornada
   ● Troca de senha
   ● Histórico do dia
 ```
+
+*\*desconto automático só se aplica quando pausas explícitas não foram registradas (fallback legado)*
 
 **Auto-seed:** no primeiro login, o sistema cria o usuário `admin` automaticamente.  
 Nenhuma configuração manual de banco necessária.
@@ -282,7 +285,7 @@ records (
   id            UUID  PRIMARY KEY,
   employee_id   UUID  → employees.id,
   employee_name TEXT,           ← desnormalizado para relatórios
-  type          TEXT,           ← 'entrada' | 'saída'
+  type          TEXT,           ← 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
   timestamp     TIMESTAMPTZ,
   date          DATE            ← índice de busca por dia
 )
@@ -325,9 +328,16 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
   ✓  Layout responsivo mobile + desktop
   ✓  Admin registra ponto por funcionário
   ✓  Papel "gerente" (acesso intermediário)
+  ✓  Pausas explícitas: Almoço / Pausa Café / Retorno
+  ✓  Ganhos por funcionário no painel de status
+  ✓  CSV profissional (resumo diário com pausas e ganhos)
+  ✓  Admin altera nome de usuário dos funcionários
   ☐  Inbox de alertas (funcionário sem saída registrada)   → issue #4
   ☐  Domínio personalizado                                 → issue #5
   ☐  Multi-empresa (tenancy)                               → issue #6
+  ☐  Dashboard com gráficos mensais de horas/ganhos        → issue #8
+  ☐  Relatório mensal automático por e-mail                → issue #9
+  ☐  Audit log de alterações administrativas               → issue #10
 ```
 
 <br/>
