@@ -2,8 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { createJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { rateLimit } from '@/lib/rateLimit'
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+  if (!rateLimit(`login:${ip}`, 5, 15 * 60 * 1000)) {
+    return NextResponse.json(
+      { error: 'Muitas tentativas. Tente novamente em 15 minutos.' },
+      { status: 429 }
+    )
+  }
+
   const { username, password } = await request.json()
 
   if (!username || !password) {

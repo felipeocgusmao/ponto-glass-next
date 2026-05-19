@@ -17,6 +17,29 @@ export async function DELETE(
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (params.id === user.id) return NextResponse.json({ error: 'Não é possível desativar sua própria conta' }, { status: 400 })
 
+  const { data: target } = await supabase
+    .from('employees')
+    .select('role')
+    .eq('id', params.id)
+    .single()
+
+  if (!target) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
+
+  if (target.role === 'admin') {
+    const { count } = await supabase
+      .from('employees')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'admin')
+      .eq('active', true)
+
+    if ((count ?? 0) <= 1) {
+      return NextResponse.json(
+        { error: 'Não é possível remover o último administrador' },
+        { status: 400 }
+      )
+    }
+  }
+
   const { error } = await supabase
     .from('employees')
     .update({ active: false })
