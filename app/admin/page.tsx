@@ -286,6 +286,7 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
 
 // ─── Funcionários tab ─────────────────────────────────────────────────────────
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
+  const [username, setUsername] = useState(emp.username)
   const [workdayHours, setWorkdayHours] = useState(String(emp.workday_hours))
   const [lunchMin, setLunchMin] = useState(String(emp.lunch_break_minutes))
   const [rate, setRate] = useState(emp.hourly_rate != null ? String(emp.hourly_rate) : '')
@@ -301,6 +302,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
       lunch_break_minutes: lunchMin,
       hourly_rate: rate,
     }
+    if (username !== emp.username) body.username = username
     if (newPassword) body.new_password = newPassword
 
     const res = await fetch(`/api/employees/${emp.id}`, {
@@ -318,6 +320,13 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
 
   return (
     <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+      <div>
+        <label className="input-label">Nome de usuário</label>
+        <input
+          value={username} onChange={(e) => setUsername(e.target.value)}
+          placeholder="ex: maria.silva" className="glass-input"
+        />
+      </div>
       <div className="grid grid-cols-3 gap-3">
         <div>
           <label className="input-label">Jornada</label>

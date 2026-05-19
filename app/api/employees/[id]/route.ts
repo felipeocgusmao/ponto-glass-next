@@ -17,9 +17,22 @@ export async function PATCH(
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { workday_hours, lunch_break_minutes, hourly_rate, new_password } = await request.json()
+  const { username: new_username, workday_hours, lunch_break_minutes, hourly_rate, new_password } = await request.json()
 
   const updates: Record<string, unknown> = {}
+
+  if (new_username !== undefined) {
+    const trimmed = String(new_username).trim().toLowerCase()
+    if (trimmed.length < 3 || trimmed.length > 50)
+      return NextResponse.json({ error: 'Usuário deve ter entre 3 e 50 caracteres' }, { status: 400 })
+    if (!/^[a-z0-9._-]+$/.test(trimmed))
+      return NextResponse.json({ error: 'Usuário só pode conter letras, números, ponto, hífen e underscore' }, { status: 400 })
+    const { data: existing } = await supabase
+      .from('employees').select('id').eq('username', trimmed).single()
+    if (existing && existing.id !== params.id)
+      return NextResponse.json({ error: 'Usuário já está em uso' }, { status: 400 })
+    updates.username = trimmed
+  }
 
   if (new_password !== undefined) {
     if (typeof new_password !== 'string' || new_password.length < 6 || new_password.length > 100)
