@@ -8,12 +8,14 @@ import type { Employee, EmployeeProfile, PunchRecord } from '@/lib/types'
 
 type Tab = 'status' | 'registros' | 'funcionarios' | 'relatorios'
 
-const TABS: { id: Tab; label: string }[] = [
+const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'status',        label: 'Status'    },
   { id: 'registros',    label: 'Registros' },
   { id: 'funcionarios', label: 'Equipe'    },
   { id: 'relatorios',   label: 'Relatório' },
 ]
+
+const MANAGER_TAB_IDS: Tab[] = ['status', 'registros', 'relatorios']
 
 function IconList({ size = 22 }: { size?: number }) {
   return (
@@ -368,7 +370,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<'employee' | 'admin'>('employee')
+  const [role, setRole] = useState<'employee' | 'manager' | 'admin'>('employee')
   const [workdayHours, setWorkdayHours] = useState('8')
   const [lunchMin, setLunchMin] = useState('60')
   const [rate, setRate] = useState('')
@@ -425,6 +427,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
                   <div className="font-semibold text-white text-sm">
                     {emp.name}
                     {emp.role === 'admin' && <span className="admin-badge ml-2">Admin</span>}
+                    {emp.role === 'manager' && <span className="admin-badge ml-2">Gerente</span>}
                   </div>
                   <div className="text-white/35 text-xs mt-0.5">
                     @{emp.username} · {emp.workday_hours}h ·{' '}
@@ -477,8 +480,9 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
             </div>
             <div>
               <label className="input-label">Perfil</label>
-              <select value={role} onChange={(e) => setRole(e.target.value as 'employee' | 'admin')} className="glass-select">
+              <select value={role} onChange={(e) => setRole(e.target.value as 'employee' | 'manager' | 'admin')} className="glass-select">
                 <option value="employee">Funcionário</option>
+                <option value="manager">Gerente</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -643,6 +647,8 @@ export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [tab, setTab] = useState<Tab>('status')
+  const isManager = user?.role === 'manager'
+  const visibleTabs = isManager ? ALL_TABS.filter(t => MANAGER_TAB_IDS.includes(t.id)) : ALL_TABS
   const [showPwd, setShowPwd] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const router = useRouter()
@@ -704,9 +710,9 @@ export default function AdminPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-sm text-white">{user.name}</span>
-                <span className="admin-badge">Admin</span>
+                <span className="admin-badge">{isManager ? 'Gerente' : 'Admin'}</span>
               </div>
-              <div className="text-white/35 text-xs mt-0.5">Painel Administrativo</div>
+              <div className="text-white/35 text-xs mt-0.5">{isManager ? 'Painel de Gestão' : 'Painel Administrativo'}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -717,7 +723,7 @@ export default function AdminPage() {
 
         {/* Desktop tab navigation — hidden on mobile */}
         <div className="hidden md:flex tab-list mb-6">
-          {TABS.map(t => (
+          {visibleTabs.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -740,7 +746,7 @@ export default function AdminPage() {
 
       {/* Bottom navigation — mobile only */}
       <nav className="bottom-nav md:hidden">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}

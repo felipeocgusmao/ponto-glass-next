@@ -14,7 +14,7 @@ export async function middleware(request: NextRequest) {
         try {
           const user = await verifyJWT(token)
           return NextResponse.redirect(
-            new URL(user.role === 'admin' ? '/admin' : '/ponto', request.url)
+            new URL(['admin', 'manager'].includes(user.role) ? '/admin' : '/ponto', request.url)
           )
         } catch {}
       }
@@ -37,12 +37,12 @@ export async function middleware(request: NextRequest) {
     return res
   }
 
-  const isAdminRoute =
+  const isPrivilegedRoute =
     pathname.startsWith('/admin') ||
     pathname.startsWith('/api/employees') ||
     pathname.startsWith('/api/reports')
 
-  if (isAdminRoute && user.role !== 'admin') {
+  if (isPrivilegedRoute && !['admin', 'manager'].includes(user.role)) {
     return NextResponse.redirect(new URL('/ponto', request.url))
   }
 
