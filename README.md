@@ -232,6 +232,8 @@ RECOVERY_SECRET=chave-de-recuperacao-de-emergencia
 
 Execute `supabase/schema.sql` no SQL Editor do seu projeto Supabase.
 
+> **Banco já existente?** O arquivo inclui blocos de migração comentados (v1→v2, v2→v3, v3→v4) — execute apenas os blocos correspondentes à versão que você já tem.
+
 **5. Rode**
 ```bash
 npm run dev
@@ -284,12 +286,16 @@ employees (
 records (
   id            UUID  PRIMARY KEY,
   employee_id   UUID  → employees.id,
-  employee_name TEXT,           ← desnormalizado para relatórios
-  type          TEXT,           ← 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
+  employee_name TEXT,              ← desnormalizado para relatórios
+  type          TEXT,              ← 'entrada' | 'saída'
+                                      'inicio_almoco' | 'fim_almoco'
+                                      'pausa_cafe'    | 'retorno_cafe'
   timestamp     TIMESTAMPTZ,
-  date          DATE            ← índice de busca por dia
+  date          DATE               ← índice de busca por dia
 )
 ```
+
+> O arquivo `supabase/schema.sql` inclui os scripts de migração para bancos existentes.
 
 RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servidor.
 
