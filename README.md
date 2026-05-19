@@ -111,18 +111,24 @@ Cada peça foi escolhida com intenção:
 ## ◈ funcionalidades
 
 ```
-  FUNCIONÁRIO                        ADMINISTRADOR
-  ───────────                        ─────────────
-  ● Relógio ao vivo                  ● Tudo que o funcionário tem
-  ● Status: dentro / fora            ● Registros por data e por pessoa
-  ● Registrar entrada                ● Cadastrar e remover funcionários
-  ● Registrar saída                  ● Relatórios por período
-  ● Horas trabalhadas hoje           ● Exportar CSV
-  ● Histórico do dia                 ● Painel com 4 abas
+  FUNCIONÁRIO                          ADMINISTRADOR
+  ───────────                          ─────────────
+  ● Relógio ao vivo                    ● Painel de status em tempo real
+  ● Status: dentro / fora              ● Ver quem está em serviço agora
+  ● Registrar entrada / saída          ● Registrar ponto por qualquer funcionário
+  ● Horas trabalhadas ao vivo (30s)    ● Cadastrar e remover funcionários
+  ● Ganhos do dia em tempo real        ● Configurar jornada por funcionário (4–10h)
+  ● Desconto de almoço automático      ● Configurar desconto de almoço (0–60min)
+  ● Horas extras acumuladas            ● Definir valor/hora por funcionário
+  ● Notificações de fim de jornada     ● Redefinir senha de qualquer funcionário
+  ● Troca de senha                     ● Relatórios por período com exportação CSV
+  ● Histórico do dia                   ● Layout responsivo (mobile + desktop)
 ```
 
 **Auto-seed:** no primeiro login, o sistema cria o usuário `admin` automaticamente.  
 Nenhuma configuração manual de banco necessária.
+
+**Recuperação de emergência:** rota `/api/auth/recover` com `RECOVERY_SECRET` para quando o admin perde o acesso.
 
 <br/>
 
@@ -159,29 +165,34 @@ ponto_glass_next/
 │   ├── page.tsx              ← redirect inteligente (admin | ponto)
 │   ├── login/page.tsx        ← autenticação
 │   ├── ponto/page.tsx        ← painel do funcionário
-│   ├── admin/page.tsx        ← painel admin (4 abas)
+│   ├── admin/page.tsx        ← painel admin (Status / Registros / Equipe / Relatório)
 │   │
 │   └── api/
 │       ├── auth/
-│       │   ├── login/        ← bcrypt + JWT + cookie
-│       │   └── logout/       ← limpa cookie
-│       ├── me/               ← quem está logado
-│       ├── punch/            ← registra entrada/saída
-│       ├── records/          ← lista registros (filtros)
-│       ├── employees/        ← CRUD funcionários
-│       └── reports/          ← relatório por período
+│       │   ├── login/        ← bcrypt + JWT + cookie + rate limit
+│       │   ├── logout/       ← limpa cookie
+│       │   └── recover/      ← reset de emergência via RECOVERY_SECRET
+│       ├── me/               ← perfil completo do usuário logado
+│       ├── punch/            ← registra entrada/saída (admin pode registrar por outros)
+│       ├── records/          ← lista registros (filtros por data / funcionário)
+│       ├── employees/        ← CRUD funcionários + configurações individuais
+│       │   └── [id]/         ← PATCH (jornada, almoço, valor/hora, senha) / DELETE
+│       └── reports/          ← relatório por período (máx 366 dias / 2000 registros)
 │
 ├── components/
-│   └── LiveClock.tsx         ← relógio em tempo real
+│   ├── PunchCard.tsx         ← card de ponto com métricas ao vivo (30s)
+│   ├── LiveClock.tsx         ← relógio em tempo real
+│   └── ChangePasswordModal.tsx
 │
 ├── lib/
 │   ├── auth.ts               ← createJWT / verifyJWT
 │   ├── supabase.ts           ← cliente Supabase (service_role)
-│   ├── types.ts              ← Employee, PunchRecord, JWTUser
-│   └── utils.ts              ← calcHours, avatarInitials, exportCSV
+│   ├── rateLimit.ts          ← rate limiter em memória (login / recover)
+│   ├── types.ts              ← Employee, EmployeeProfile, PunchRecord, JWTUser
+│   └── utils.ts              ← calcHours, calcNetMinutes, calcEarnings, fmtMinutes…
 │
 ├── middleware.ts              ← RBAC: protege rotas por role
-└── supabase/schema.sql        ← schema do banco
+└── supabase/schema.sql        ← schema do banco com RLS habilitado
 ```
 
 <br/>
@@ -211,6 +222,7 @@ Edite `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key
 JWT_SECRET=sua-chave-secreta-minimo-32-caracteres
+RECOVERY_SECRET=chave-de-recuperacao-de-emergencia
 ```
 
 **4. Crie o banco**
@@ -241,7 +253,7 @@ npm i -g vercel
 vercel --prod
 ```
 
-Configure as três variáveis de ambiente no painel da Vercel e pronto.  
+Configure as variáveis de ambiente no painel da Vercel e pronto.  
 A aplicação roda no Edge Network global — latência mínima de qualquer país.
 
 <br/>
@@ -253,13 +265,16 @@ A aplicação roda no Edge Network global — latência mínima de qualquer paí
 ```sql
 -- funcionários
 employees (
-  id            UUID  PRIMARY KEY,
-  name          TEXT,
-  username      TEXT  UNIQUE,
-  password_hash TEXT,          ← bcrypt, nunca texto puro
-  role          TEXT,          ← 'admin' | 'employee'
-  active        BOOLEAN,       ← soft delete
-  created_at    TIMESTAMPTZ
+  id                  UUID  PRIMARY KEY,
+  name                TEXT,
+  username            TEXT  UNIQUE,
+  password_hash       TEXT,           ← bcrypt, nunca texto puro
+  role                TEXT,           ← 'admin' | 'employee'
+  active              BOOLEAN,        ← soft delete
+  workday_hours       DECIMAL(4,2),   ← jornada configurável (padrão 8h)
+  lunch_break_minutes INT,            ← desconto de almoço (padrão 60min)
+  hourly_rate         DECIMAL(10,2),  ← valor/hora em € (opcional)
+  created_at          TIMESTAMPTZ
 )
 
 -- registros de ponto
@@ -273,6 +288,8 @@ records (
 )
 ```
 
+RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servidor.
+
 <br/>
 
 ---
@@ -284,8 +301,12 @@ records (
   ✓  JWT assinado com HS256 em httpOnly cookie (inatingível por JS)
   ✓  Middleware de RBAC em todas as rotas sensíveis
   ✓  Service role key nunca exposta ao cliente
+  ✓  Rate limiting: 5 tentativas/15min no login e na recuperação
+  ✓  Row Level Security habilitado no Supabase
   ✓  Funcionários só enxergam os próprios registros
   ✓  Soft delete — nenhum dado é apagado permanentemente
+  ✓  Proteção ao último administrador (não pode ser removido)
+  ✓  Recuperação de emergência via RECOVERY_SECRET
 ```
 
 <br/>
@@ -295,13 +316,17 @@ records (
 ## ◈ roadmap
 
 ```
-  ☐  Trocar senha dentro do sistema
-  ☐  Notificação de saída não registrada
+  ✓  Trocar senha dentro do sistema
+  ✓  Horas extras calculadas automaticamente
+  ✓  Notificações de fim de jornada e hora extra
+  ✓  Histórico e relatórios por período
+  ✓  Ganhos do dia em tempo real
+  ✓  PWA — ícone na tela inicial do celular
+  ✓  Layout responsivo mobile + desktop
+  ✓  Admin registra ponto por funcionário
+  ☐  Papel "gerente" (acesso intermediário)
+  ☐  Inbox de alertas (funcionário sem saída registrada)
   ☐  Domínio personalizado
-  ☐  Histórico completo por funcionário
-  ☐  Horas extras calculadas automaticamente
-  ☐  PWA — ícone na tela inicial do celular
-  ☐  Dark / light mode
   ☐  Multi-empresa (tenancy)
 ```
 
