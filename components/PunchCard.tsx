@@ -150,7 +150,7 @@ export default function PunchCard({
   const liveOvertime = liveRawMin > 0 ? liveNetMin - workdayMinutes : null
   const liveHours = liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '—'
   const liveEarnings = hourlyRate && liveNetMin > 0
-    ? ((liveNetMin / 60) * hourlyRate).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    ? ((liveNetMin / 60) * hourlyRate).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
     : null
 
   return (

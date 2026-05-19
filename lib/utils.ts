@@ -72,9 +72,9 @@ export function calcEarnings(
   lunchBreakMinutes = 0,
 ): string {
   const min = calcNetMinutes(records, lunchBreakMinutes)
-  return ((min / 60) * hourlyRate).toLocaleString('pt-BR', {
+  return ((min / 60) * hourlyRate).toLocaleString('pt-PT', {
     style: 'currency',
-    currency: 'BRL',
+    currency: 'EUR',
   })
 }
 
