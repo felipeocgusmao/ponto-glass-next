@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import PunchCard from '@/components/PunchCard'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
 import { avatarInitials } from '@/lib/utils'
-import type { JWTUser } from '@/lib/types'
+import type { EmployeeProfile } from '@/lib/types'
 
 export default function PontoPage() {
-  const [user, setUser] = useState<JWTUser | null>(null)
+  const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [showPwd, setShowPwd] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const router = useRouter()
@@ -67,7 +67,11 @@ export default function PontoPage() {
           </div>
         </div>
 
-        <PunchCard />
+        <PunchCard
+          workdayMinutes={Math.round(user.workday_hours * 60)}
+          lunchBreakMinutes={user.lunch_break_minutes}
+          hourlyRate={user.hourly_rate}
+        />
       </div>
     </main>
   )

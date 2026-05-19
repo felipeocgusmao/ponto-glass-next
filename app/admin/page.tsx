@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import PunchCard from '@/components/PunchCard'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
 import { avatarInitials, exportCSV, calcOvertimePeriod, calcHours, fmtMinutes } from '@/lib/utils'
-import type { Employee, JWTUser, PunchRecord } from '@/lib/types'
+import type { Employee, EmployeeProfile, PunchRecord } from '@/lib/types'
 
 type Tab = 'ponto' | 'registros' | 'funcionarios' | 'relatorios'
 
@@ -154,14 +154,79 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
 }
 
 // ─── Funcionários tab ─────────────────────────────────────────────────────────
+function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
+  const [workdayHours, setWorkdayHours] = useState(String(emp.workday_hours))
+  const [lunchMin, setLunchMin] = useState(String(emp.lunch_break_minutes))
+  const [rate, setRate] = useState(emp.hourly_rate != null ? String(emp.hourly_rate) : '')
+  const [err, setErr] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true); setErr('')
+    const res = await fetch(`/api/employees/${emp.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workday_hours: workdayHours, lunch_break_minutes: lunchMin, hourly_rate: rate }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setErr(data.error ?? 'Erro ao salvar.'); setSaving(false); return }
+    setSaving(false)
+    onDone()
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="input-label">Jornada</label>
+          <select value={workdayHours} onChange={(e) => setWorkdayHours(e.target.value)} className="glass-select">
+            {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => (
+              <option key={h} value={h}>{h}h</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="input-label">Almoço</label>
+          <select value={lunchMin} onChange={(e) => setLunchMin(e.target.value)} className="glass-select">
+            <option value="0">Sem desconto</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">1 hora</option>
+          </select>
+        </div>
+        <div>
+          <label className="input-label">R$/hora</label>
+          <input
+            type="number" min="0" step="0.01"
+            value={rate} onChange={(e) => setRate(e.target.value)}
+            placeholder="0,00" className="glass-input"
+          />
+        </div>
+      </div>
+      {err && <div className="alert-error">{err}</div>}
+      <div className="flex gap-2">
+        <button onClick={handleSave} disabled={saving} className="btn-glass flex-1">
+          {saving ? 'Salvando...' : 'Salvar'}
+        </button>
+        <button onClick={onDone} className="btn-danger">Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
 function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRefresh: () => void }) {
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'employee' | 'admin'>('employee')
+  const [workdayHours, setWorkdayHours] = useState('8')
+  const [lunchMin, setLunchMin] = useState('60')
+  const [rate, setRate] = useState('')
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
   const [loading, setLoading] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -169,12 +234,18 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
     const res = await fetch('/api/employees', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, username, password, role }),
+      body: JSON.stringify({
+        name, username, password, role,
+        workday_hours: workdayHours,
+        lunch_break_minutes: lunchMin,
+        hourly_rate: rate || null,
+      }),
     })
     const data = await res.json()
     if (!res.ok) { setErr(data.error); setLoading(false); return }
     setOk(`${name} adicionado!`)
     setName(''); setUsername(''); setPassword(''); setRole('employee')
+    setWorkdayHours('8'); setLunchMin('60'); setRate('')
     setLoading(false)
     onRefresh()
   }
@@ -195,22 +266,42 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
       {/* Employee list */}
       <div className="glass p-5">
         <span className="section-label">{employees.length} ativo(s)</span>
+        {err && <div className="alert-error mb-3">{err}</div>}
         {employees.map((emp) => (
-          <div key={emp.id} className="record-item">
-            <div className="flex items-center gap-3">
-              <div className="avatar-sm">{avatarInitials(emp.name)}</div>
-              <div>
-                <div className="font-semibold text-white text-sm">
-                  {emp.name}
-                  {emp.role === 'admin' && <span className="admin-badge ml-2">Admin</span>}
+          <div key={emp.id} className="py-2 border-b border-white/5 last:border-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="avatar-sm">{avatarInitials(emp.name)}</div>
+                <div>
+                  <div className="font-semibold text-white text-sm">
+                    {emp.name}
+                    {emp.role === 'admin' && <span className="admin-badge ml-2">Admin</span>}
+                  </div>
+                  <div className="text-white/35 text-xs mt-0.5">
+                    @{emp.username} · {emp.workday_hours}h ·{' '}
+                    {emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min almoço` : 'sem desconto'}
+                    {emp.hourly_rate != null && ` · R$${Number(emp.hourly_rate).toFixed(2)}/h`}
+                  </div>
                 </div>
-                <div className="text-white/35 text-xs mt-0.5">@{emp.username}</div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEditingId(editingId === emp.id ? null : emp.id)}
+                  className="btn-settings text-xs px-2"
+                  title="Configurações"
+                >⚙</button>
+                {emp.username !== 'admin' && (
+                  <button onClick={() => handleRemove(emp.id, emp.name)} className="btn-danger">
+                    Remover
+                  </button>
+                )}
               </div>
             </div>
-            {emp.username !== 'admin' && (
-              <button onClick={() => handleRemove(emp.id, emp.name)} className="btn-danger">
-                Remover
-              </button>
+            {editingId === emp.id && (
+              <EmployeeSettings
+                emp={emp}
+                onDone={() => { setEditingId(null); onRefresh() }}
+              />
             )}
           </div>
         ))}
@@ -241,6 +332,34 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
                 <option value="employee">Funcionário</option>
                 <option value="admin">Admin</option>
               </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="input-label">Jornada</label>
+              <select value={workdayHours} onChange={(e) => setWorkdayHours(e.target.value)} className="glass-select">
+                {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => (
+                  <option key={h} value={h}>{h}h</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="input-label">Almoço</label>
+              <select value={lunchMin} onChange={(e) => setLunchMin(e.target.value)} className="glass-select">
+                <option value="0">Sem desconto</option>
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="45">45 min</option>
+                <option value="60">1 hora</option>
+              </select>
+            </div>
+            <div>
+              <label className="input-label">R$/hora</label>
+              <input
+                type="number" min="0" step="0.01"
+                value={rate} onChange={(e) => setRate(e.target.value)}
+                placeholder="Opcional" className="glass-input"
+              />
             </div>
           </div>
           {err && <div className="alert-error">{err}</div>}
@@ -372,7 +491,7 @@ function RelatoriosTab() {
 
 // ─── Admin page ───────────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const [user, setUser] = useState<JWTUser | null>(null)
+  const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [tab, setTab] = useState<Tab>('ponto')
   const [showPwd, setShowPwd] = useState(false)
@@ -449,7 +568,13 @@ export default function AdminPage() {
 
         {/* Tab content */}
         <div key={tab}>
-          {tab === 'ponto'        && <PunchCard />}
+          {tab === 'ponto'        && (
+            <PunchCard
+              workdayMinutes={Math.round(user.workday_hours * 60)}
+              lunchBreakMinutes={user.lunch_break_minutes}
+              hourlyRate={user.hourly_rate}
+            />
+          )}
           {tab === 'registros'    && <RegistrosTab employees={employees} />}
           {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
           {tab === 'relatorios'   && <RelatoriosTab />}
