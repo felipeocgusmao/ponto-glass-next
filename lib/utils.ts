@@ -151,7 +151,7 @@ export function exportCSV(
     'Almoço (min)', 'Café (min)', 'Total Horas', 'Valor/h (€)', 'Ganhos (€)',
   ]
 
-  const rows: string[][] = [...byEmpDay.keys()].sort().map(key => {
+  const rows: string[][] = Array.from(byEmpDay.keys()).sort().map(key => {
     const day = byEmpDay.get(key)!.sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     )
