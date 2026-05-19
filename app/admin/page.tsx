@@ -158,20 +158,31 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
   const [workdayHours, setWorkdayHours] = useState(String(emp.workday_hours))
   const [lunchMin, setLunchMin] = useState(String(emp.lunch_break_minutes))
   const [rate, setRate] = useState(emp.hourly_rate != null ? String(emp.hourly_rate) : '')
+  const [newPassword, setNewPassword] = useState('')
   const [err, setErr] = useState('')
+  const [ok, setOk] = useState('')
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
-    setSaving(true); setErr('')
+    setSaving(true); setErr(''); setOk('')
+    const body: Record<string, unknown> = {
+      workday_hours: workdayHours,
+      lunch_break_minutes: lunchMin,
+      hourly_rate: rate,
+    }
+    if (newPassword) body.new_password = newPassword
+
     const res = await fetch(`/api/employees/${emp.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workday_hours: workdayHours, lunch_break_minutes: lunchMin, hourly_rate: rate }),
+      body: JSON.stringify(body),
     })
     const data = await res.json()
     if (!res.ok) { setErr(data.error ?? 'Erro ao salvar.'); setSaving(false); return }
+    setOk(newPassword ? 'Configurações e senha atualizadas!' : 'Configurações salvas!')
+    setNewPassword('')
     setSaving(false)
-    onDone()
+    setTimeout(() => onDone(), 1200)
   }
 
   return (
@@ -204,7 +215,16 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
           />
         </div>
       </div>
+      <div>
+        <label className="input-label">Nova senha (deixe em branco para não alterar)</label>
+        <input
+          type="password"
+          value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+          placeholder="Mín. 6 caracteres" className="glass-input"
+        />
+      </div>
       {err && <div className="alert-error">{err}</div>}
+      {ok && <div className="alert-success">{ok}</div>}
       <div className="flex gap-2">
         <button onClick={handleSave} disabled={saving} className="btn-glass flex-1">
           {saving ? 'Salvando...' : 'Salvar'}

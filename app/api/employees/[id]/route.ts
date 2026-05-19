@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import bcrypt from 'bcryptjs'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
@@ -16,22 +17,43 @@ export async function PATCH(
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { workday_hours, lunch_break_minutes, hourly_rate } = await request.json()
+  const { workday_hours, lunch_break_minutes, hourly_rate, new_password } = await request.json()
 
-  const parsedWorkday = Number(workday_hours)
-  const parsedLunch   = Number(lunch_break_minutes)
-  const parsedRate    = hourly_rate != null && hourly_rate !== '' ? Number(hourly_rate) : null
+  const updates: Record<string, unknown> = {}
 
-  if (isNaN(parsedWorkday) || parsedWorkday < 1 || parsedWorkday > 24)
-    return NextResponse.json({ error: 'Jornada inválida' }, { status: 400 })
-  if (isNaN(parsedLunch) || parsedLunch < 0 || parsedLunch > 120)
-    return NextResponse.json({ error: 'Desconto de almoço inválido' }, { status: 400 })
-  if (parsedRate !== null && (isNaN(parsedRate) || parsedRate < 0))
-    return NextResponse.json({ error: 'Valor da hora inválido' }, { status: 400 })
+  if (new_password !== undefined) {
+    if (typeof new_password !== 'string' || new_password.length < 6 || new_password.length > 100)
+      return NextResponse.json({ error: 'Senha deve ter entre 6 e 100 caracteres' }, { status: 400 })
+    updates.password_hash = await bcrypt.hash(new_password, 10)
+  }
+
+  if (workday_hours !== undefined) {
+    const parsedWorkday = Number(workday_hours)
+    if (isNaN(parsedWorkday) || parsedWorkday < 1 || parsedWorkday > 24)
+      return NextResponse.json({ error: 'Jornada inválida' }, { status: 400 })
+    updates.workday_hours = parsedWorkday
+  }
+
+  if (lunch_break_minutes !== undefined) {
+    const parsedLunch = Number(lunch_break_minutes)
+    if (isNaN(parsedLunch) || parsedLunch < 0 || parsedLunch > 120)
+      return NextResponse.json({ error: 'Desconto de almoço inválido' }, { status: 400 })
+    updates.lunch_break_minutes = parsedLunch
+  }
+
+  if (hourly_rate !== undefined) {
+    const parsedRate = hourly_rate !== '' && hourly_rate !== null ? Number(hourly_rate) : null
+    if (parsedRate !== null && (isNaN(parsedRate) || parsedRate < 0))
+      return NextResponse.json({ error: 'Valor da hora inválido' }, { status: 400 })
+    updates.hourly_rate = parsedRate
+  }
+
+  if (Object.keys(updates).length === 0)
+    return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('employees')
-    .update({ workday_hours: parsedWorkday, lunch_break_minutes: parsedLunch, hourly_rate: parsedRate })
+    .update(updates)
     .eq('id', params.id)
     .select('id, name, username, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate')
     .single()
