@@ -579,9 +579,7 @@
     color: #c4b5fd;
     text-shadow: 0 0 12px rgba(196,181,253,0.50);
   }
-  .page-pad-nav {
-    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
-  }
+  /* page-pad-nav moved to @layer utilities below to override Tailwind's p-4 */
 
   /* ── Tab content animation ────────────────────────── */
   .tab-content { animation: tabFadeIn 0.20s ease; }
@@ -658,5 +656,12 @@
     border-color: rgba(139,92,246,0.60);
     box-shadow: 0 0 0 3px rgba(139,92,246,0.16);
     background-color: rgba(255,255,255,0.10);
+  }
+}
+
+/* Must be @layer utilities so it overrides Tailwind's p-4 (which is also utilities) */
+@layer utilities {
+  .page-pad-nav {
+    padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
   }
 }
