@@ -13,8 +13,17 @@ async function requireAdmin() {
   } catch { return null }
 }
 
+async function requirePrivileged() {
+  const token = cookies().get('ponto_token')?.value
+  if (!token) return null
+  try {
+    const user = await verifyJWT(token)
+    return ['admin', 'manager'].includes(user.role) ? user : null
+  } catch { return null }
+}
+
 export async function GET() {
-  if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!await requirePrivileged()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data, error } = await supabase
     .from('employees')
@@ -49,7 +58,7 @@ export async function POST(request: NextRequest) {
   if (password.length < 6 || password.length > 100)
     return NextResponse.json({ error: 'Senha deve ter entre 6 e 100 caracteres' }, { status: 400 })
 
-  if (!['admin', 'employee'].includes(role))
+  if (!['admin', 'manager', 'employee'].includes(role))
     return NextResponse.json({ error: 'Perfil inválido' }, { status: 400 })
 
   const parsedWorkday = Number(workday_hours ?? 8)

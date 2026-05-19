@@ -2,7 +2,7 @@ export interface Employee {
   id: string
   name: string
   username: string
-  role: 'admin' | 'employee'
+  role: 'admin' | 'manager' | 'employee'
   active: boolean
   created_at: string
   workday_hours: number
@@ -23,7 +23,7 @@ export interface JWTUser {
   id: string
   name: string
   username: string
-  role: 'admin' | 'employee'
+  role: 'admin' | 'manager' | 'employee'
 }
 
 export interface EmployeeProfile extends JWTUser {

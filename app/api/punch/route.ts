@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   let empName = user.name
 
   if (targetId && targetId !== user.id) {
-    if (user.role !== 'admin')
+    if (!['admin', 'manager'].includes(user.role))
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const { data: emp } = await supabase
       .from('employees')
