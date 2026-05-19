@@ -70,12 +70,25 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
   const [to, setTo] = useState(today)
   const [empId, setEmpId] = useState('all')
   const [records, setRecords] = useState<PunchRecord[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleFromChange = (val: string) => { setFrom(val); if (val > to) setTo(val) }
+  const handleToChange   = (val: string) => { setTo(val);   if (val < from) setFrom(val) }
 
   const load = useCallback(async () => {
-    const params = new URLSearchParams({ from, to })
-    if (empId !== 'all') params.set('employeeId', empId)
-    const res = await fetch(`/api/reports?${params}`)
-    if (res.ok) setRecords(await res.json())
+    setLoading(true); setError('')
+    try {
+      const params = new URLSearchParams({ from, to })
+      if (empId !== 'all') params.set('employeeId', empId)
+      const res = await fetch(`/api/reports?${params}`)
+      if (res.ok) setRecords(await res.json())
+      else { const d = await res.json(); setError(d.error ?? 'Erro ao carregar registros.') }
+    } catch {
+      setError('Erro ao conectar. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
   }, [from, to, empId])
 
   useEffect(() => { load() }, [load])
@@ -89,12 +102,12 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
         <div className="date-range">
           <div className="date-range-col">
             <label className="input-label">De</label>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <input type="date" value={from} onChange={(e) => handleFromChange(e.target.value)} />
           </div>
           <div className="date-range-sep" />
           <div className="date-range-col">
             <label className="input-label">Até</label>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <input type="date" value={to} onChange={(e) => handleToChange(e.target.value)} />
           </div>
         </div>
 
@@ -109,28 +122,31 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
 
       {/* Results */}
       <div className="glass p-5">
-        {records.length === 0
-          ? <div className="alert-info">Nenhum registro para este filtro.</div>
-          : (
-            <>
-              <span className="section-label">{records.length} registro(s)</span>
-              {records.map((r) => (
-                <div key={r.id} className="record-item">
-                  <div>
-                    <div className="font-semibold text-white text-sm">{r.employee_name}</div>
-                    <div className="text-white/35 text-xs mt-1">
-                      {new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
-                      {' · '}
-                      {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+        {error && <div className="alert-error mb-3">{error}</div>}
+        {loading
+          ? <div className="alert-info">Carregando...</div>
+          : records.length === 0
+            ? <div className="alert-info">Nenhum registro para este filtro.</div>
+            : (
+              <>
+                <span className="section-label">{records.length} registro(s)</span>
+                {records.map((r) => (
+                  <div key={r.id} className="record-item">
+                    <div>
+                      <div className="font-semibold text-white text-sm">{r.employee_name}</div>
+                      <div className="text-white/35 text-xs mt-1">
+                        {new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+                        {' · '}
+                        {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+                      </div>
                     </div>
+                    <span className={r.type === 'entrada' ? 'rec-tag-in' : 'rec-tag-out'}>
+                      {r.type === 'entrada' ? 'Entrada' : 'Saída'}
+                    </span>
                   </div>
-                  <span className={r.type === 'entrada' ? 'rec-tag-in' : 'rec-tag-out'}>
-                    {r.type === 'entrada' ? 'Entrada' : 'Saída'}
-                  </span>
-                </div>
-              ))}
-            </>
-          )
+                ))}
+              </>
+            )
         }
       </div>
     </div>
@@ -165,7 +181,12 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
 
   const handleRemove = async (id: string, empName: string) => {
     if (!confirm(`Desativar ${empName}?`)) return
-    await fetch(`/api/employees/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json()
+      setErr(data.error ?? 'Erro ao remover funcionário.')
+      return
+    }
     onRefresh()
   }
 
@@ -243,10 +264,30 @@ function RelatoriosTab() {
   const [to, setTo] = useState(todayStr)
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [truncated, setTruncated] = useState(false)
+
+  const handleFromChange = (val: string) => { setFrom(val); if (val > to) setTo(val) }
+  const handleToChange   = (val: string) => { setTo(val);   if (val < from) setFrom(val) }
 
   const load = async () => {
-    const res = await fetch(`/api/reports?from=${from}&to=${to}`)
-    if (res.ok) { setRecords(await res.json()); setLoaded(true) }
+    setError(''); setTruncated(false); setLoading(true)
+    try {
+      const res = await fetch(`/api/reports?from=${from}&to=${to}`)
+      if (res.ok) {
+        setRecords(await res.json())
+        setLoaded(true)
+        setTruncated(res.headers.get('X-Truncated') === 'true')
+      } else {
+        const data = await res.json()
+        setError(data.error ?? 'Erro ao gerar relatório.')
+      }
+    } catch {
+      setError('Erro ao conectar. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const byEmp: Record<string, { name: string; records: PunchRecord[] }> = {}
@@ -263,20 +304,28 @@ function RelatoriosTab() {
         <div className="date-range">
           <div className="date-range-col">
             <label className="input-label">De</label>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <input type="date" value={from} onChange={(e) => handleFromChange(e.target.value)} />
           </div>
           <div className="date-range-sep" />
           <div className="date-range-col">
             <label className="input-label">Até</label>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <input type="date" value={to} onChange={(e) => handleToChange(e.target.value)} />
           </div>
         </div>
 
-        <button onClick={load} className="btn-glass w-full">Gerar Relatório</button>
+        {error && <div className="alert-error">{error}</div>}
+        <button onClick={load} disabled={loading} className="btn-glass w-full">
+          {loading ? 'Gerando...' : 'Gerar Relatório'}
+        </button>
       </div>
 
-      {loaded && (
+      {loaded && !loading && (
         <div className="glass p-5">
+          {truncated && (
+            <div className="alert-error mb-3">
+              Resultado limitado a 2000 registros. Refine o período para ver todos os dados.
+            </div>
+          )}
           {records.length === 0
             ? <div className="alert-info">Nenhum registro no período.</div>
             : (
