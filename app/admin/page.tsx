@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
-import { avatarInitials, exportCSV, calcOvertimePeriod, calcHours, fmtMinutes, calcNetMinutes } from '@/lib/utils'
+import { avatarInitials, exportCSV, calcOvertimePeriod, calcHours, fmtMinutes, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES } from '@/lib/utils'
 import type { Employee, EmployeeProfile, PunchRecord } from '@/lib/types'
 
 type Tab = 'status' | 'registros' | 'funcionarios' | 'relatorios'
@@ -66,6 +66,8 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   relatorios:   <IconBar />,
 }
 
+const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
+
 // ─── Status tab ───────────────────────────────────────────────────────────────
 function StatusTab({ employees, currentUserId }: { employees: Employee[]; currentUserId: string }) {
   const [records, setRecords] = useState<PunchRecord[]>([])
@@ -127,15 +129,39 @@ function StatusTab({ employees, currentUserId }: { employees: Employee[]; curren
   const statuses = workers.map(emp => {
     const empRecords = recordsByEmp.get(emp.id) ?? []
     const sortedAsc = [...empRecords].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    const isInside = sortedAsc.at(-1)?.type === 'entrada'
-    const lastEntry = isInside ? sortedAsc.slice().reverse().find(r => r.type === 'entrada') : undefined
-    const currentSessionMin = isInside && lastEntry
-      ? (liveMs - new Date(lastEntry.timestamp).getTime()) / 60_000 : 0
-    const liveNetMin = Math.max(0, calcNetMinutes(empRecords, 0) + currentSessionMin - emp.lunch_break_minutes)
-    return { emp, isInside, liveNetMin }
+    const lastType = sortedAsc.at(-1)?.type
+    const isWorking  = lastType != null && WORKING_TYPES.includes(lastType)
+    const isOnLunch  = lastType === 'inicio_almoco'
+    const isOnCafe   = lastType === 'pausa_cafe'
+    const isIn       = isWorking || isOnLunch || isOnCafe
+
+    const hasBreaks = empRecords.some(r => EXPLICIT_BREAK_TYPES.includes(r.type))
+    let liveNetMin = 0
+    if (hasBreaks) {
+      const bd = calcTimeBreakdown(empRecords)
+      const lastWorkStart = isWorking
+        ? sortedAsc.slice().reverse().find(r => WORKING_TYPES.includes(r.type))
+        : undefined
+      const ongoingMin = lastWorkStart
+        ? (liveMs - new Date(lastWorkStart.timestamp).getTime()) / 60_000 : 0
+      liveNetMin = Math.max(0, bd.workedMin + ongoingMin)
+    } else {
+      const lastEntry = isWorking
+        ? sortedAsc.slice().reverse().find(r => r.type === 'entrada')
+        : undefined
+      const currentSessionMin = lastEntry
+        ? (liveMs - new Date(lastEntry.timestamp).getTime()) / 60_000 : 0
+      liveNetMin = Math.max(0, calcNetMinutes(empRecords, 0) + currentSessionMin - emp.lunch_break_minutes)
+    }
+
+    const liveEarnings = emp.hourly_rate && liveNetMin > 0
+      ? ((liveNetMin / 60) * emp.hourly_rate).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
+      : null
+
+    return { emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings }
   })
 
-  const onlineCount = statuses.filter(s => s.isInside).length
+  const onlineCount   = statuses.filter(s => s.isIn).length
   const totalMinToday = statuses.reduce((sum, s) => sum + s.liveNetMin, 0)
 
   return (
@@ -158,21 +184,28 @@ function StatusTab({ employees, currentUserId }: { employees: Employee[]; curren
         {workers.length === 0 && (
           <div className="alert-info mt-2">Nenhum funcionário cadastrado.</div>
         )}
-        {statuses.map(({ emp, isInside, liveNetMin }) => (
+        {statuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings }) => (
           <div key={emp.id} className="worker-status-item">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="relative flex-shrink-0">
                 <div className="avatar-sm">{avatarInitials(emp.name)}</div>
-                <span className={`status-dot ${isInside ? 'status-dot-in' : 'status-dot-out'}`} />
+                <span className={`status-dot ${isWorking ? 'status-dot-in' : (isOnLunch || isOnCafe) ? 'status-dot-break' : 'status-dot-out'}`} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-semibold text-white text-sm truncate">{emp.name}</div>
                 <div className="text-xs mt-0.5">
-                  {isInside
+                  {isWorking
                     ? <span className="text-green-400">● Em serviço · {liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}</span>
+                    : isOnLunch
+                    ? <span className="text-yellow-300">🍽 No almoço</span>
+                    : isOnCafe
+                    ? <span className="text-yellow-300">☕ Pausa café</span>
                     : <span className="text-white/40">{liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) + ' hoje' : 'Sem registro hoje'}</span>
                   }
                 </div>
+                {liveEarnings && (
+                  <div className="text-xs text-green-300/70 mt-0.5">{liveEarnings} hoje</div>
+                )}
                 {msg?.id === emp.id && (
                   <div className={`text-xs mt-1 ${msg.kind === 'success' ? 'text-green-400' : 'text-red-400'}`}>
                     {msg.text}
@@ -181,11 +214,11 @@ function StatusTab({ employees, currentUserId }: { employees: Employee[]; curren
               </div>
             </div>
             <button
-              onClick={() => handlePunch(emp, isInside ? 'saída' : 'entrada')}
+              onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
               disabled={punching === emp.id}
-              className={isInside ? 'punch-mini-out' : 'punch-mini-in'}
+              className={isIn ? 'punch-mini-out' : 'punch-mini-in'}
             >
-              {punching === emp.id ? '...' : isInside ? '⏹ Saída' : '▶ Entrada'}
+              {punching === emp.id ? '...' : isIn ? '⏹ Saída' : '▶ Entrada'}
             </button>
           </div>
         ))}
@@ -261,21 +294,27 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
             : (
               <>
                 <span className="section-label">{records.length} registro(s)</span>
-                {records.map((r) => (
-                  <div key={r.id} className="record-item">
-                    <div>
-                      <div className="font-semibold text-white text-sm">{r.employee_name}</div>
-                      <div className="text-white/35 text-xs mt-1">
-                        {new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
-                        {' · '}
-                        {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+                {records.map((r) => {
+                  const tagClass = r.type === 'entrada' ? 'rec-tag-in' : r.type === 'saída' ? 'rec-tag-out' : 'rec-tag-break'
+                  const tagLabel: Record<string, string> = {
+                    entrada: 'Entrada', saída: 'Saída',
+                    inicio_almoco: 'Almoço', fim_almoco: 'Ret. Almoço',
+                    pausa_cafe: 'Café', retorno_cafe: 'Ret. Café',
+                  }
+                  return (
+                    <div key={r.id} className="record-item">
+                      <div>
+                        <div className="font-semibold text-white text-sm">{r.employee_name}</div>
+                        <div className="text-white/35 text-xs mt-1">
+                          {new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+                          {' · '}
+                          {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+                        </div>
                       </div>
+                      <span className={tagClass}>{tagLabel[r.type] ?? r.type}</span>
                     </div>
-                    <span className={r.type === 'entrada' ? 'rec-tag-in' : 'rec-tag-out'}>
-                      {r.type === 'entrada' ? 'Entrada' : 'Saída'}
-                    </span>
-                  </div>
-                ))}
+                  )
+                })}
               </>
             )
         }
@@ -536,7 +575,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
 }
 
 // ─── Relatórios tab ───────────────────────────────────────────────────────────
-function RelatoriosTab() {
+function RelatoriosTab({ employees }: { employees: Employee[] }) {
   const now = new Date()
   const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const todayStr = now.toISOString().split('T')[0]
@@ -637,7 +676,7 @@ function RelatoriosTab() {
 
                 <div className="glass-divider" />
                 <button
-                  onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`)}
+                  onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })))}
                   className="btn-purple w-full"
                 >
                   ⬇  Exportar CSV
@@ -656,6 +695,8 @@ export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [tab, setTab] = useState<Tab>('status')
+  const isManager = user?.role === 'manager'
+  const visibleTabs = isManager ? ALL_TABS.filter(t => MANAGER_TAB_IDS.includes(t.id)) : ALL_TABS
   const [showPwd, setShowPwd] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const router = useRouter()
@@ -750,7 +791,7 @@ export default function AdminPage() {
           {tab === 'status'       && <StatusTab employees={employees} currentUserId={user.id} />}
           {tab === 'registros'    && <RegistrosTab employees={employees} />}
           {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
-          {tab === 'relatorios'   && <RelatoriosTab />}
+          {tab === 'relatorios'   && <RelatoriosTab employees={employees} />}
         </div>
       </div>
 

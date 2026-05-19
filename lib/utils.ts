@@ -2,6 +2,10 @@ import type { PunchRecord } from './types'
 
 export const WORKDAY_MINUTES = 8 * 60
 
+const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
+export const WORKING_TYPES  = ['entrada', 'fim_almoco', 'retorno_cafe']
+
+// ─── Legacy pair-based (entrada/saída only) ────────────────────────────────────
 function pairMinutes(records: PunchRecord[]): number {
   const ins = records
     .filter((r) => r.type === 'entrada')
@@ -18,7 +22,53 @@ function pairMinutes(records: PunchRecord[]): number {
   return Math.round(totalMs / 60_000)
 }
 
+// ─── State-machine breakdown (supports explicit break types) ───────────────────
+export interface TimeBreakdown {
+  workedMin: number
+  lunchMin: number
+  coffeeMin: number
+}
+
+export function calcTimeBreakdown(records: PunchRecord[]): TimeBreakdown {
+  const sorted = [...records].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )
+  type State = 'out' | 'working' | 'lunch' | 'coffee'
+  let state: State = 'out'
+  let lastT: number | null = null
+  let workedMs = 0, lunchMs = 0, coffeeMs = 0
+
+  for (const r of sorted) {
+    const t = new Date(r.timestamp).getTime()
+    if (lastT !== null) {
+      const delta = t - lastT
+      if (state === 'working')      workedMs += delta
+      else if (state === 'lunch')   lunchMs  += delta
+      else if (state === 'coffee')  coffeeMs += delta
+    }
+    switch (r.type) {
+      case 'entrada':
+      case 'fim_almoco':
+      case 'retorno_cafe': state = 'working'; break
+      case 'saída':        state = 'out';     break
+      case 'inicio_almoco': state = 'lunch';  break
+      case 'pausa_cafe':   state = 'coffee';  break
+    }
+    lastT = t
+  }
+  return {
+    workedMin: Math.round(workedMs / 60_000),
+    lunchMin:  Math.round(lunchMs  / 60_000),
+    coffeeMin: Math.round(coffeeMs / 60_000),
+  }
+}
+
+function hasExplicitBreaks(records: PunchRecord[]): boolean {
+  return records.some(r => EXPLICIT_BREAK_TYPES.includes(r.type))
+}
+
 export function calcNetMinutes(records: PunchRecord[], lunchBreakMinutes = 0): number {
+  if (hasExplicitBreaks(records)) return Math.max(0, calcTimeBreakdown(records).workedMin)
   return Math.max(0, pairMinutes(records) - lunchBreakMinutes)
 }
 
@@ -42,9 +92,9 @@ export function calcOvertimeToday(
   workdayMinutes = WORKDAY_MINUTES,
   lunchBreakMinutes = 0,
 ): number | null {
-  const worked = pairMinutes(records)
+  const worked = calcNetMinutes(records, lunchBreakMinutes)
   if (!worked) return null
-  return Math.max(0, worked - lunchBreakMinutes) - workdayMinutes
+  return worked - workdayMinutes
 }
 
 export function calcOvertimePeriod(
@@ -59,9 +109,7 @@ export function calcOvertimePeriod(
   })
   if (byDay.size === 0) return null
   let totalNet = 0
-  byDay.forEach((dayRecs) => {
-    totalNet += Math.max(0, pairMinutes(dayRecs) - lunchBreakMinutes)
-  })
+  byDay.forEach((dayRecs) => { totalNet += calcNetMinutes(dayRecs, lunchBreakMinutes) })
   if (!totalNet) return null
   return totalNet - workdayMinutes * byDay.size
 }
@@ -72,36 +120,75 @@ export function calcEarnings(
   lunchBreakMinutes = 0,
 ): string {
   const min = calcNetMinutes(records, lunchBreakMinutes)
-  return ((min / 60) * hourlyRate).toLocaleString('pt-PT', {
-    style: 'currency',
-    currency: 'EUR',
-  })
+  return ((min / 60) * hourlyRate).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
 }
 
 export function avatarInitials(name: string): string {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('')
+  return name.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('')
 }
 
 export function todayISO(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-export function exportCSV(records: PunchRecord[], filename: string): void {
-  const header = ['Data', 'Hora', 'Funcionário', 'Tipo']
-  const rows = records.map((r) => [
-    r.date,
-    new Date(r.timestamp).toLocaleTimeString('pt-BR'),
-    r.employee_name,
-    r.type,
-  ])
-  const csv = [header, ...rows].map((row) => row.join(',')).join('\n')
+export function exportCSV(
+  records: PunchRecord[],
+  filename: string,
+  employees: { id: string; hourly_rate: number | null; lunch_break_minutes: number }[] = [],
+): void {
+  const empMap = new Map(employees.map(e => [e.id, e]))
+
+  // Group by date + employee
+  const byEmpDay = new Map<string, PunchRecord[]>()
+  records.forEach(r => {
+    const key = `${r.date}__${r.employee_id}`
+    if (!byEmpDay.has(key)) byEmpDay.set(key, [])
+    byEmpDay.get(key)!.push(r)
+  })
+
+  const header = [
+    'Data', 'Funcionário', 'Entrada', 'Saída',
+    'Almoço (min)', 'Café (min)', 'Total Horas', 'Valor/h (€)', 'Ganhos (€)',
+  ]
+
+  const rows: string[][] = Array.from(byEmpDay.keys()).sort().map(key => {
+    const day = byEmpDay.get(key)!.sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+    const first = day[0]
+    const emp   = empMap.get(first.employee_id)
+    const explicit = hasExplicitBreaks(day)
+    const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
+    const autoLunch = emp?.lunch_break_minutes ?? 0
+    const netMin    = explicit ? workedMin : Math.max(0, pairMinutes(day) - autoLunch)
+    const dispLunch = explicit ? lunchMin : autoLunch
+    const dispCoffee = explicit ? coffeeMin : 0
+
+    const entries = day.filter(r => r.type === 'entrada')
+      .map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+    const exits = day.filter(r => r.type === 'saída')
+      .map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+
+    const rate     = emp?.hourly_rate ?? null
+    const earnings = rate && netMin > 0 ? (netMin / 60 * rate).toFixed(2) : '—'
+
+    return [
+      first.date,
+      first.employee_name,
+      entries.join(' / ') || '—',
+      exits.join(' / ') || '—',
+      String(dispLunch),
+      String(dispCoffee),
+      fmtMinutes(netMin),
+      rate != null ? String(rate) : '—',
+      earnings,
+    ]
+  })
+
+  const csv = [header, ...rows].map(row => row.map(c => `"${c}"`).join(',')).join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
   a.href = url
   a.download = filename
   a.click()
