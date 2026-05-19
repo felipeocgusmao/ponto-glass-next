@@ -11,43 +11,75 @@ export default function PontoPage() {
   const [user, setUser] = useState<JWTUser | null>(null)
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
+  const [punching, setPunching] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const [showPwd, setShowPwd] = useState(false)
+  const [fetchError, setFetchError] = useState(false)
   const router = useRouter()
 
   const fetchData = useCallback(async () => {
-    const [userRes, recRes] = await Promise.all([
-      fetch('/api/me'),
-      fetch('/api/records?today=true'),
-    ])
-    if (!userRes.ok) { router.push('/login'); return }
-    setUser(await userRes.json())
-    if (recRes.ok) setRecords(await recRes.json())
+    setFetchError(false)
+    try {
+      const [userRes, recRes] = await Promise.all([
+        fetch('/api/me'),
+        fetch('/api/records?today=true'),
+      ])
+      if (!userRes.ok) { router.push('/login'); return }
+      setUser(await userRes.json())
+      if (recRes.ok) setRecords(await recRes.json())
+    } catch {
+      setFetchError(true)
+    }
   }, [router])
 
   useEffect(() => { fetchData() }, [fetchData])
 
   const handlePunch = async (type: 'entrada' | 'saída') => {
+    if (punching) return
+    setPunching(true)
     setLoading(true)
     setMsg(null)
-    const res = await fetch('/api/punch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type }),
-    })
-    setMsg(res.ok
-      ? { kind: 'success', text: type === 'entrada' ? '✅ Entrada registrada!' : '✅ Saída registrada!' }
-      : { kind: 'error', text: 'Erro ao registrar ponto.' }
-    )
-    if (res.ok) await fetchData()
-    setLoading(false)
-    setTimeout(() => setMsg(null), 3000)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8_000)
+
+    try {
+      const res = await fetch('/api/punch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type }),
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      setMsg(res.ok
+        ? { kind: 'success', text: type === 'entrada' ? '✅ Entrada registrada!' : '✅ Saída registrada!' }
+        : { kind: 'error', text: 'Erro ao registrar ponto.' }
+      )
+      if (res.ok) await fetchData()
+    } catch (err) {
+      clearTimeout(timeout)
+      const isAbort = err instanceof Error && err.name === 'AbortError'
+      setMsg({ kind: 'error', text: isAbort ? 'Tempo limite excedido. Tente novamente.' : 'Erro ao registrar ponto.' })
+    } finally {
+      setLoading(false)
+      setPunching(false)
+      setTimeout(() => setMsg(null), 3_000)
+    }
   }
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
   }
+
+  if (fetchError) return (
+    <main className="min-h-screen flex items-center justify-center p-4">
+      <div className="glass p-8 text-center max-w-sm w-full">
+        <div className="text-white/50 mb-4">Erro ao conectar. Verifique sua conexão.</div>
+        <button onClick={fetchData} className="btn-glass w-full">Tentar novamente</button>
+      </div>
+    </main>
+  )
 
   if (!user) return (
     <main className="min-h-screen flex items-center justify-center">

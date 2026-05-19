@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import LiveClock from '@/components/LiveClock'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
@@ -64,32 +64,52 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
 }
 
 // ─── Punch card (Meu Ponto tab) ───────────────────────────────────────────────
-function PunchCard({ user }: { user: JWTUser }) {
+function PunchCard({ user: _user }: { user: JWTUser }) {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const punching = useRef(false)
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/records?today=true')
-    if (res.ok) setRecords(await res.json())
+    try {
+      const res = await fetch('/api/records?today=true')
+      if (res.ok) setRecords(await res.json())
+    } catch { /* mantém registros atuais */ }
   }, [])
 
   useEffect(() => { load() }, [load])
 
   const handlePunch = async (type: 'entrada' | 'saída') => {
-    setLoading(true); setMsg(null)
-    const res = await fetch('/api/punch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type }),
-    })
-    setMsg(res.ok
-      ? { kind: 'success', text: type === 'entrada' ? '✅ Entrada registrada!' : '✅ Saída registrada!' }
-      : { kind: 'error', text: 'Erro ao registrar.' }
-    )
-    if (res.ok) await load()
-    setLoading(false)
-    setTimeout(() => setMsg(null), 3000)
+    if (punching.current) return
+    punching.current = true
+    setLoading(true)
+    setMsg(null)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8_000)
+
+    try {
+      const res = await fetch('/api/punch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type }),
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      setMsg(res.ok
+        ? { kind: 'success', text: type === 'entrada' ? '✅ Entrada registrada!' : '✅ Saída registrada!' }
+        : { kind: 'error', text: 'Erro ao registrar.' }
+      )
+      if (res.ok) await load()
+    } catch (err) {
+      clearTimeout(timeout)
+      const isAbort = err instanceof Error && err.name === 'AbortError'
+      setMsg({ kind: 'error', text: isAbort ? 'Tempo limite excedido. Tente novamente.' : 'Erro ao registrar.' })
+    } finally {
+      setLoading(false)
+      punching.current = false
+      setTimeout(() => setMsg(null), 3_000)
+    }
   }
 
   const sorted = [...records].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -423,25 +443,47 @@ export default function AdminPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [tab, setTab] = useState<Tab>('ponto')
   const [showPwd, setShowPwd] = useState(false)
+  const [fetchError, setFetchError] = useState(false)
   const router = useRouter()
 
   const loadUser = useCallback(async () => {
-    const res = await fetch('/api/me')
-    if (!res.ok) { router.push('/login'); return }
-    setUser(await res.json())
+    try {
+      const res = await fetch('/api/me')
+      if (!res.ok) { router.push('/login'); return }
+      setUser(await res.json())
+    } catch {
+      setFetchError(true)
+    }
   }, [router])
 
   const loadEmployees = useCallback(async () => {
-    const res = await fetch('/api/employees')
-    if (res.ok) setEmployees(await res.json())
+    try {
+      const res = await fetch('/api/employees')
+      if (res.ok) setEmployees(await res.json())
+    } catch { /* employees ficam como estão */ }
   }, [])
 
-  useEffect(() => { loadUser(); loadEmployees() }, [loadUser, loadEmployees])
+  useEffect(() => {
+    setFetchError(false)
+    loadUser()
+    loadEmployees()
+  }, [loadUser, loadEmployees])
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
   }
+
+  if (fetchError) return (
+    <main className="min-h-screen flex items-center justify-center p-4">
+      <div className="glass p-8 text-center max-w-sm w-full">
+        <div className="text-white/50 mb-4">Erro ao conectar. Verifique sua conexão.</div>
+        <button onClick={() => { setFetchError(false); loadUser(); loadEmployees() }} className="btn-glass w-full">
+          Tentar novamente
+        </button>
+      </div>
+    </main>
+  )
 
   if (!user) return (
     <main className="min-h-screen flex items-center justify-center">
