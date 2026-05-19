@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import LiveClock from '@/components/LiveClock'
-import { calcHours, calcNetMinutes, calcOvertimeToday, calcEarnings, fmtMinutes } from '@/lib/utils'
+import { calcNetMinutes, fmtMinutes } from '@/lib/utils'
 import type { PunchRecord } from '@/lib/types'
 
 interface Props {
@@ -24,6 +24,7 @@ export default function PunchCard({
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const [liveMs, setLiveMs] = useState(() => Date.now())
   const punching = useRef(false)
   const notified = useRef(new Set<string>())
   const notifiedDate = useRef('')
@@ -42,6 +43,12 @@ export default function PunchCard({
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission()
     }
+  }, [])
+
+  // Live metrics tick — update every 30s
+  useEffect(() => {
+    const interval = setInterval(() => setLiveMs(Date.now()), 30_000)
+    return () => clearInterval(interval)
   }, [])
 
   // Notification checker — runs every minute
@@ -128,10 +135,23 @@ export default function PunchCard({
     }
   }
 
-  const sorted = [...records].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  const sortedAsc = [...records].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  const sorted = [...sortedAsc].reverse()
   const isInside = sorted[0]?.type === 'entrada'
-  const overtime = calcOvertimeToday(records, workdayMinutes, lunchBreakMinutes)
-  const earnings = hourlyRate ? calcEarnings(records, hourlyRate, lunchBreakMinutes) : null
+
+  // Live metrics — includes current ongoing session, updated every 30s via liveMs
+  const lastEntry = isInside ? sortedAsc.slice().reverse().find(r => r.type === 'entrada') : undefined
+  const currentSessionMin = isInside && lastEntry
+    ? (liveMs - new Date(lastEntry.timestamp).getTime()) / 60_000
+    : 0
+  const rawPairedMin = calcNetMinutes(records, 0)
+  const liveRawMin = rawPairedMin + currentSessionMin
+  const liveNetMin = Math.max(0, liveRawMin - lunchBreakMinutes)
+  const liveOvertime = liveRawMin > 0 ? liveNetMin - workdayMinutes : null
+  const liveHours = liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '—'
+  const liveEarnings = hourlyRate && liveNetMin > 0
+    ? ((liveNetMin / 60) * hourlyRate).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    : null
 
   return (
     <div className="space-y-4">
@@ -158,26 +178,26 @@ export default function PunchCard({
 
       {records.length > 0 && (
         <div className="glass p-6">
-          <div className={`grid gap-3 mb-6 ${overtime !== null ? (earnings ? 'grid-cols-4' : 'grid-cols-3') : (earnings ? 'grid-cols-3' : 'grid-cols-2')}`}>
+          <div className={`grid gap-3 mb-6 ${liveOvertime !== null ? (liveEarnings ? 'grid-cols-4' : 'grid-cols-3') : (liveEarnings ? 'grid-cols-3' : 'grid-cols-2')}`}>
             <div className="metric-box">
-              <div className="metric-val">{calcHours(records, lunchBreakMinutes)}</div>
+              <div className="metric-val">{liveHours}</div>
               <div className="metric-lbl">Horas hoje</div>
             </div>
             <div className="metric-box">
               <div className="metric-val">{records.length}</div>
               <div className="metric-lbl">Registros</div>
             </div>
-            {overtime !== null && (
+            {liveOvertime !== null && (
               <div className="metric-box">
-                <div className={`metric-val text-xl ${overtime >= 0 ? 'text-yellow-300' : 'text-red-400'}`}>
-                  {overtime >= 0 ? '+' : '-'}{fmtMinutes(overtime)}
+                <div className={`metric-val text-xl ${liveOvertime >= 0 ? 'text-yellow-300' : 'text-red-400'}`}>
+                  {liveOvertime >= 0 ? '+' : '-'}{fmtMinutes(liveOvertime)}
                 </div>
-                <div className="metric-lbl">{overtime >= 0 ? 'Extra' : 'A cumprir'}</div>
+                <div className="metric-lbl">{liveOvertime >= 0 ? 'Extra' : 'A cumprir'}</div>
               </div>
             )}
-            {earnings && (
+            {liveEarnings && (
               <div className="metric-box">
-                <div className="metric-val text-green-300 text-lg">{earnings}</div>
+                <div className="metric-val text-green-300 text-lg">{liveEarnings}</div>
                 <div className="metric-lbl">Ganhos hoje</div>
               </div>
             )}
