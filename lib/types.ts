@@ -14,7 +14,7 @@ export interface PunchRecord {
   id: string
   employee_id: string
   employee_name: string
-  type: 'entrada' | 'saída'
+  type: 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
   timestamp: string
   date: string
 }

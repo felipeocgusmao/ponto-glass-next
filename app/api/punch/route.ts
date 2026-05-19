@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
   const { type, employeeId: targetId } = await request.json()
-  if (!['entrada', 'saída'].includes(type))
+  if (!['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe'].includes(type))
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
 
   let empId = user.id

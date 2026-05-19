@@ -2,8 +2,30 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import LiveClock from '@/components/LiveClock'
-import { calcNetMinutes, fmtMinutes } from '@/lib/utils'
+import { calcNetMinutes, calcTimeBreakdown, fmtMinutes, WORKING_TYPES } from '@/lib/utils'
 import type { PunchRecord } from '@/lib/types'
+
+type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
+
+const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
+
+const TYPE_SUCCESS: Record<PunchType, string> = {
+  entrada:       '✅ Entrada registrada!',
+  saída:         '✅ Saída registrada!',
+  inicio_almoco: '🍽 Almoço iniciado!',
+  fim_almoco:    '✅ Retorno do almoço registrado!',
+  pausa_cafe:    '☕ Pausa para café iniciada!',
+  retorno_cafe:  '✅ Retorno do café registrado!',
+}
+
+const RECORD_LABEL: Record<PunchType, string> = {
+  entrada:       'Entrada',
+  saída:         'Saída',
+  inicio_almoco: 'Almoço',
+  fim_almoco:    'Ret. Almoço',
+  pausa_cafe:    'Café',
+  retorno_cafe:  'Ret. Café',
+}
 
 interface Props {
   workdayMinutes?: number
@@ -38,20 +60,17 @@ export default function PunchCard({
 
   useEffect(() => { load() }, [load])
 
-  // Request notification permission once
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission()
     }
   }, [])
 
-  // Live metrics tick — update every 30s
   useEffect(() => {
     const interval = setInterval(() => setLiveMs(Date.now()), 30_000)
     return () => clearInterval(interval)
   }, [])
 
-  // Notification checker — runs every minute
   useEffect(() => {
     const check = () => {
       const today = new Date().toISOString().split('T')[0]
@@ -61,15 +80,18 @@ export default function PunchCard({
       }
 
       const sorted = [...records].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      const isInside = sorted[sorted.length - 1]?.type === 'entrada'
-      if (!isInside) return // só notifica quando dentro
+      const lastType = sorted[sorted.length - 1]?.type
+      const isWorking = lastType != null && WORKING_TYPES.includes(lastType)
+      if (!isWorking) return
 
-      // Inclui sessão atual no cálculo
-      const lastEntry = [...sorted].reverse().find(r => r.type === 'entrada')
-      const currentMs = lastEntry ? Date.now() - new Date(lastEntry.timestamp).getTime() : 0
+      const lastWorkStart = [...sorted].reverse().find(r => WORKING_TYPES.includes(r.type))
+      const currentMs = lastWorkStart ? Date.now() - new Date(lastWorkStart.timestamp).getTime() : 0
       const currentMin = currentMs / 60_000
 
-      const completedMin = calcNetMinutes(records, lunchBreakMinutes)
+      const hasBreaks = records.some(r => EXPLICIT_BREAK_TYPES.includes(r.type))
+      const completedMin = hasBreaks
+        ? calcTimeBreakdown(records).workedMin
+        : calcNetMinutes(records, lunchBreakMinutes)
       const totalNet = completedMin + currentMin
 
       const remaining = Math.round(workdayMinutes - totalNet)
@@ -102,7 +124,7 @@ export default function PunchCard({
     return () => clearInterval(interval)
   }, [records, workdayMinutes, lunchBreakMinutes])
 
-  const handlePunch = async (type: 'entrada' | 'saída') => {
+  const handlePunch = async (type: PunchType) => {
     if (punching.current) return
     punching.current = true
     setLoading(true)
@@ -120,7 +142,7 @@ export default function PunchCard({
       })
       clearTimeout(timeout)
       setMsg(res.ok
-        ? { kind: 'success', text: type === 'entrada' ? '✅ Entrada registrada!' : '✅ Saída registrada!' }
+        ? { kind: 'success', text: TYPE_SUCCESS[type] }
         : { kind: 'error', text: 'Erro ao registrar ponto.' }
       )
       if (res.ok) await load()
@@ -137,48 +159,107 @@ export default function PunchCard({
 
   const sortedAsc = [...records].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   const sorted = [...sortedAsc].reverse()
-  const isInside = sorted[0]?.type === 'entrada'
+  const lastType = sorted[0]?.type as PunchType | undefined
+  const isWorking = lastType != null && WORKING_TYPES.includes(lastType)
+  const isOnLunch = lastType === 'inicio_almoco'
+  const isOnCafe  = lastType === 'pausa_cafe'
+  const isOut     = !lastType || lastType === 'saída'
 
-  // Live metrics — includes current ongoing session, updated every 30s via liveMs
-  const lastEntry = isInside ? sortedAsc.slice().reverse().find(r => r.type === 'entrada') : undefined
-  const currentSessionMin = isInside && lastEntry
-    ? (liveMs - new Date(lastEntry.timestamp).getTime()) / 60_000
-    : 0
-  const rawPairedMin = calcNetMinutes(records, 0)
-  const liveRawMin = rawPairedMin + currentSessionMin
-  const liveNetMin = Math.max(0, liveRawMin - lunchBreakMinutes)
-  const liveOvertime = liveRawMin > 0 ? liveNetMin - workdayMinutes : null
-  const liveHours = liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '—'
-  const liveEarnings = hourlyRate && liveNetMin > 0
+  // Live metrics
+  const hasBreaks = records.some(r => EXPLICIT_BREAK_TYPES.includes(r.type))
+  let liveNetMin = 0
+  if (hasBreaks) {
+    const bd = calcTimeBreakdown(records)
+    const lastWorkStart = isWorking
+      ? sortedAsc.slice().reverse().find(r => WORKING_TYPES.includes(r.type))
+      : undefined
+    const ongoingMin = lastWorkStart
+      ? (liveMs - new Date(lastWorkStart.timestamp).getTime()) / 60_000
+      : 0
+    liveNetMin = Math.max(0, bd.workedMin + ongoingMin)
+  } else {
+    const lastEntry = isWorking
+      ? sortedAsc.slice().reverse().find(r => r.type === 'entrada')
+      : undefined
+    const currentSessionMin = lastEntry
+      ? (liveMs - new Date(lastEntry.timestamp).getTime()) / 60_000
+      : 0
+    liveNetMin = Math.max(0, calcNetMinutes(records, 0) + currentSessionMin - lunchBreakMinutes)
+  }
+
+  const liveOvertime  = liveNetMin > 0 ? liveNetMin - workdayMinutes : null
+  const liveHours     = liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '—'
+  const liveEarnings  = hourlyRate && liveNetMin > 0
     ? ((liveNetMin / 60) * hourlyRate).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
     : null
+
+  const metricsCount  = 2 + (liveOvertime !== null ? 1 : 0) + (liveEarnings ? 1 : 0)
+  const gridCols      = metricsCount <= 2 ? 'grid-cols-2' : metricsCount === 3 ? 'grid-cols-3' : 'grid-cols-2'
+
+  function statusBadge() {
+    if (isWorking)  return <span className="status-in">● Você está dentro</span>
+    if (isOnLunch)  return <span className="status-break">🍽 No almoço</span>
+    if (isOnCafe)   return <span className="status-break">☕ Pausa café</span>
+    return <span className="status-out">● Você está fora</span>
+  }
+
+  function recTagClass(type: PunchType) {
+    if (type === 'entrada') return 'rec-tag-in'
+    if (type === 'saída')   return 'rec-tag-out'
+    return 'rec-tag-break'
+  }
 
   return (
     <div className="space-y-4">
       <div className="glass p-8">
         <LiveClock />
         <div className="text-center my-5">
-          <span className={isInside ? 'status-in' : 'status-out'}>
-            {isInside ? '● Você está dentro' : '● Você está fora'}
-          </span>
+          {statusBadge()}
         </div>
         {msg && (
           <div className={`mb-4 ${msg.kind === 'success' ? 'alert-success' : 'alert-error'}`}>
             {msg.text}
           </div>
         )}
-        <button
-          onClick={() => handlePunch(isInside ? 'saída' : 'entrada')}
-          disabled={loading}
-          className={`w-full ${isInside ? 'btn-saida' : 'btn-entrada'}`}
-        >
-          {loading ? '...' : isInside ? '⏹  Registrar Saída' : '▶  Registrar Entrada'}
-        </button>
+
+        {isOut && (
+          <button onClick={() => handlePunch('entrada')} disabled={loading} className="w-full btn-entrada">
+            {loading ? '...' : '▶  Registrar Entrada'}
+          </button>
+        )}
+
+        {isWorking && (
+          <div className="space-y-3">
+            <button onClick={() => handlePunch('saída')} disabled={loading} className="w-full btn-saida">
+              {loading ? '...' : '⏹  Registrar Saída'}
+            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => handlePunch('inicio_almoco')} disabled={loading} className="btn-break">
+                {loading ? '...' : '🍽  Almoço'}
+              </button>
+              <button onClick={() => handlePunch('pausa_cafe')} disabled={loading} className="btn-break">
+                {loading ? '...' : '☕  Pausa Café'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isOnLunch && (
+          <button onClick={() => handlePunch('fim_almoco')} disabled={loading} className="w-full btn-entrada">
+            {loading ? '...' : '↩  Retorno do Almoço'}
+          </button>
+        )}
+
+        {isOnCafe && (
+          <button onClick={() => handlePunch('retorno_cafe')} disabled={loading} className="w-full btn-entrada">
+            {loading ? '...' : '↩  Retorno do Café'}
+          </button>
+        )}
       </div>
 
       {records.length > 0 && (
         <div className="glass p-6">
-          <div className={`grid gap-3 mb-6 ${(liveOvertime !== null && liveEarnings) ? 'grid-cols-2' : (liveOvertime !== null || liveEarnings) ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className={`grid gap-3 mb-6 ${gridCols}`}>
             <div className="metric-box">
               <div className="metric-val">{liveHours}</div>
               <div className="metric-lbl">Horas hoje</div>
@@ -190,7 +271,7 @@ export default function PunchCard({
             {liveOvertime !== null && (
               <div className="metric-box">
                 <div className={`metric-val text-xl ${liveOvertime >= 0 ? 'text-yellow-300' : 'text-red-400'}`}>
-                  {liveOvertime >= 0 ? '+' : '-'}{fmtMinutes(liveOvertime)}
+                  {liveOvertime >= 0 ? '+' : '-'}{fmtMinutes(Math.abs(liveOvertime))}
                 </div>
                 <div className="metric-lbl">{liveOvertime >= 0 ? 'Extra' : 'A cumprir'}</div>
               </div>
@@ -203,7 +284,7 @@ export default function PunchCard({
             )}
           </div>
 
-          {lunchBreakMinutes > 0 && (
+          {!hasBreaks && lunchBreakMinutes > 0 && (
             <div className="text-white/30 text-xs text-center mb-4">
               Desconto de almoço ({lunchBreakMinutes}min) aplicado automaticamente
             </div>
@@ -215,8 +296,8 @@ export default function PunchCard({
               <span className="font-semibold text-white text-sm">
                 {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
               </span>
-              <span className={r.type === 'entrada' ? 'rec-tag-in' : 'rec-tag-out'}>
-                {r.type === 'entrada' ? 'Entrada' : 'Saída'}
+              <span className={recTagClass(r.type as PunchType)}>
+                {RECORD_LABEL[r.type as PunchType] ?? r.type}
               </span>
             </div>
           ))}
