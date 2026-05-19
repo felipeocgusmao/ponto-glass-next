@@ -11,17 +11,33 @@ export async function POST(request: NextRequest) {
   try { user = await verifyJWT(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
-  const { type } = await request.json()
-  if (!['entrada', 'saída'].includes(type)) {
+  const { type, employeeId: targetId } = await request.json()
+  if (!['entrada', 'saída'].includes(type))
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
+
+  let empId = user.id
+  let empName = user.name
+
+  if (targetId && targetId !== user.id) {
+    if (user.role !== 'admin')
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('id, name')
+      .eq('id', targetId)
+      .eq('active', true)
+      .single()
+    if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
+    empId = emp.id
+    empName = emp.name
   }
 
   const now = new Date()
   const { data, error } = await supabase
     .from('records')
     .insert({
-      employee_id: user.id,
-      employee_name: user.name,
+      employee_id: empId,
+      employee_name: empName,
       type,
       timestamp: now.toISOString(),
       date: now.toISOString().split('T')[0],

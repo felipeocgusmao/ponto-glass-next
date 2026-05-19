@@ -657,11 +657,66 @@
     box-shadow: 0 0 0 3px rgba(139,92,246,0.16);
     background-color: rgba(255,255,255,0.10);
   }
+
+  /* ── Worker status ─────────────────────────────── */
+  .worker-status-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .worker-status-item:last-child { border-bottom: none; }
+
+  .status-dot {
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    border: 2px solid #0b0e1e;
+  }
+  .status-dot-in  { background: #34d399; box-shadow: 0 0 6px rgba(52,211,153,0.70); }
+  .status-dot-out { background: rgba(255,255,255,0.18); }
+
+  .punch-mini-in {
+    background: linear-gradient(135deg, rgba(16,185,129,0.20), rgba(5,150,105,0.12));
+    border: 1px solid rgba(16,185,129,0.38);
+    color: #6ee7b7;
+    font-size: 0.74rem; font-weight: 700;
+    padding: 7px 13px; border-radius: 10px;
+    cursor: pointer; white-space: nowrap;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .punch-mini-in:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(16,185,129,0.32), rgba(5,150,105,0.22));
+  }
+  .punch-mini-out {
+    background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(220,38,38,0.10));
+    border: 1px solid rgba(239,68,68,0.35);
+    color: #fca5a5;
+    font-size: 0.74rem; font-weight: 700;
+    padding: 7px 13px; border-radius: 10px;
+    cursor: pointer; white-space: nowrap;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .punch-mini-out:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(239,68,68,0.30), rgba(220,38,38,0.20));
+  }
+  .punch-mini-in:disabled,
+  .punch-mini-out:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Desktop: hide bottom nav ───────────────────── */
+  @media (min-width: 768px) {
+    .bottom-nav { display: none !important; }
+  }
 }
 
 /* Must be @layer utilities so it overrides Tailwind's p-4 (which is also utilities) */
 @layer utilities {
   .page-pad-nav {
     padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+  }
+  @media (min-width: 768px) {
+    .page-pad-nav { padding-bottom: 2rem; }
   }
 }
