@@ -178,7 +178,7 @@ export default function PunchCard({
 
       {records.length > 0 && (
         <div className="glass p-6">
-          <div className={`grid gap-3 mb-6 ${liveOvertime !== null ? (liveEarnings ? 'grid-cols-4' : 'grid-cols-3') : (liveEarnings ? 'grid-cols-3' : 'grid-cols-2')}`}>
+          <div className={`grid gap-3 mb-6 ${(liveOvertime !== null && liveEarnings) ? 'grid-cols-2' : (liveOvertime !== null || liveEarnings) ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div className="metric-box">
               <div className="metric-val">{liveHours}</div>
               <div className="metric-lbl">Horas hoje</div>

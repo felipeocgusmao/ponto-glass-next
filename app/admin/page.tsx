@@ -207,7 +207,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
           </select>
         </div>
         <div>
-          <label className="input-label">R$/hora</label>
+          <label className="input-label">€/hora</label>
           <input
             type="number" min="0" step="0.01"
             value={rate} onChange={(e) => setRate(e.target.value)}
@@ -300,7 +300,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
                   <div className="text-white/35 text-xs mt-0.5">
                     @{emp.username} · {emp.workday_hours}h ·{' '}
                     {emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min almoço` : 'sem desconto'}
-                    {emp.hourly_rate != null && ` · R$${Number(emp.hourly_rate).toFixed(2)}/h`}
+                    {emp.hourly_rate != null && ` · €${Number(emp.hourly_rate).toFixed(2)}/h`}
                   </div>
                 </div>
               </div>
@@ -374,7 +374,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
               </select>
             </div>
             <div>
-              <label className="input-label">R$/hora</label>
+              <label className="input-label">€/hora</label>
               <input
                 type="number" min="0" step="0.01"
                 value={rate} onChange={(e) => setRate(e.target.value)}
