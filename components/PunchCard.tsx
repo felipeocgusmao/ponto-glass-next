@@ -2,14 +2,31 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import LiveClock from '@/components/LiveClock'
-import { calcHours, calcOvertimeToday, fmtMinutes } from '@/lib/utils'
+import { calcHours, calcNetMinutes, calcOvertimeToday, calcEarnings, fmtMinutes } from '@/lib/utils'
 import type { PunchRecord } from '@/lib/types'
 
-export default function PunchCard() {
+interface Props {
+  workdayMinutes?: number
+  lunchBreakMinutes?: number
+  hourlyRate?: number | null
+}
+
+function sendNotification(title: string, body: string) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  new Notification(title, { body, icon: '/icon.png' })
+}
+
+export default function PunchCard({
+  workdayMinutes = 480,
+  lunchBreakMinutes = 60,
+  hourlyRate = null,
+}: Props) {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const punching = useRef(false)
+  const notified = useRef(new Set<string>())
+  const notifiedDate = useRef('')
 
   const load = useCallback(async () => {
     try {
@@ -19,6 +36,64 @@ export default function PunchCard() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Request notification permission once
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
+
+  // Notification checker — runs every minute
+  useEffect(() => {
+    const check = () => {
+      const today = new Date().toISOString().split('T')[0]
+      if (notifiedDate.current !== today) {
+        notified.current.clear()
+        notifiedDate.current = today
+      }
+
+      const sorted = [...records].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      const isInside = sorted[sorted.length - 1]?.type === 'entrada'
+      if (!isInside) return // só notifica quando dentro
+
+      // Inclui sessão atual no cálculo
+      const lastEntry = [...sorted].reverse().find(r => r.type === 'entrada')
+      const currentMs = lastEntry ? Date.now() - new Date(lastEntry.timestamp).getTime() : 0
+      const currentMin = currentMs / 60_000
+
+      const completedMin = calcNetMinutes(records, lunchBreakMinutes)
+      const totalNet = completedMin + currentMin
+
+      const remaining = Math.round(workdayMinutes - totalNet)
+
+      if (remaining <= 15 && remaining > 0 && !notified.current.has('warn15')) {
+        notified.current.add('warn15')
+        sendNotification('⏰ Quase lá!', `Faltam ${remaining} minutos para o fim da jornada.`)
+      }
+
+      if (remaining <= 0 && remaining > -2 && !notified.current.has('end')) {
+        notified.current.add('end')
+        sendNotification('✅ Jornada concluída!', 'Você atingiu sua carga horária. Bom trabalho!')
+      }
+
+      if (remaining < 0) {
+        const overtimeMin = Math.abs(remaining)
+        const step = Math.floor(overtimeMin / 30) * 30
+        if (step > 0) {
+          const key = `overtime_${step}`
+          if (!notified.current.has(key)) {
+            notified.current.add(key)
+            sendNotification('🕐 Hora extra', `+${fmtMinutes(step)} de hora extra. Lembre-se de registrar a saída!`)
+          }
+        }
+      }
+    }
+
+    check()
+    const interval = setInterval(check, 60_000)
+    return () => clearInterval(interval)
+  }, [records, workdayMinutes, lunchBreakMinutes])
 
   const handlePunch = async (type: 'entrada' | 'saída') => {
     if (punching.current) return
@@ -55,7 +130,8 @@ export default function PunchCard() {
 
   const sorted = [...records].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   const isInside = sorted[0]?.type === 'entrada'
-  const overtime = calcOvertimeToday(records)
+  const overtime = calcOvertimeToday(records, workdayMinutes, lunchBreakMinutes)
+  const earnings = hourlyRate ? calcEarnings(records, hourlyRate, lunchBreakMinutes) : null
 
   return (
     <div className="space-y-4">
@@ -82,9 +158,9 @@ export default function PunchCard() {
 
       {records.length > 0 && (
         <div className="glass p-6">
-          <div className={`grid gap-3 mb-6 ${overtime !== null ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className={`grid gap-3 mb-6 ${overtime !== null ? (earnings ? 'grid-cols-4' : 'grid-cols-3') : (earnings ? 'grid-cols-3' : 'grid-cols-2')}`}>
             <div className="metric-box">
-              <div className="metric-val">{calcHours(records)}</div>
+              <div className="metric-val">{calcHours(records, lunchBreakMinutes)}</div>
               <div className="metric-lbl">Horas hoje</div>
             </div>
             <div className="metric-box">
@@ -99,7 +175,19 @@ export default function PunchCard() {
                 <div className="metric-lbl">{overtime >= 0 ? 'Extra' : 'A cumprir'}</div>
               </div>
             )}
+            {earnings && (
+              <div className="metric-box">
+                <div className="metric-val text-green-300 text-lg">{earnings}</div>
+                <div className="metric-lbl">Ganhos hoje</div>
+              </div>
+            )}
           </div>
+
+          {lunchBreakMinutes > 0 && (
+            <div className="text-white/30 text-xs text-center mb-4">
+              Desconto de almoço ({lunchBreakMinutes}min) aplicado automaticamente
+            </div>
+          )}
 
           <span className="section-label">Hoje</span>
           {sorted.map((r) => (
