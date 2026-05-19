@@ -5,6 +5,9 @@ export interface Employee {
   role: 'admin' | 'employee'
   active: boolean
   created_at: string
+  workday_hours: number
+  lunch_break_minutes: number
+  hourly_rate: number | null
 }
 
 export interface PunchRecord {
@@ -21,4 +24,10 @@ export interface JWTUser {
   name: string
   username: string
   role: 'admin' | 'employee'
+}
+
+export interface EmployeeProfile extends JWTUser {
+  workday_hours: number
+  lunch_break_minutes: number
+  hourly_rate: number | null
 }

@@ -18,8 +18,12 @@ function pairMinutes(records: PunchRecord[]): number {
   return Math.round(totalMs / 60_000)
 }
 
-export function calcHours(records: PunchRecord[]): string {
-  const min = pairMinutes(records)
+export function calcNetMinutes(records: PunchRecord[], lunchBreakMinutes = 0): number {
+  return Math.max(0, pairMinutes(records) - lunchBreakMinutes)
+}
+
+export function calcHours(records: PunchRecord[], lunchBreakMinutes = 0): string {
+  const min = calcNetMinutes(records, lunchBreakMinutes)
   if (!min) return '—'
   const h = Math.floor(min / 60)
   const m = min % 60
@@ -33,17 +37,45 @@ export function fmtMinutes(min: number): string {
   return h > 0 ? `${h}h ${m.toString().padStart(2, '0')}m` : `${m}m`
 }
 
-export function calcOvertimeToday(records: PunchRecord[]): number | null {
-  const min = pairMinutes(records)
-  if (!min) return null
-  return min - WORKDAY_MINUTES
+export function calcOvertimeToday(
+  records: PunchRecord[],
+  workdayMinutes = WORKDAY_MINUTES,
+  lunchBreakMinutes = 0,
+): number | null {
+  const worked = pairMinutes(records)
+  if (!worked) return null
+  return Math.max(0, worked - lunchBreakMinutes) - workdayMinutes
 }
 
-export function calcOvertimePeriod(records: PunchRecord[]): number | null {
-  const min = pairMinutes(records)
-  if (!min) return null
-  const days = new Set(records.map((r) => r.date)).size
-  return min - WORKDAY_MINUTES * days
+export function calcOvertimePeriod(
+  records: PunchRecord[],
+  workdayMinutes = WORKDAY_MINUTES,
+  lunchBreakMinutes = 0,
+): number | null {
+  const byDay = new Map<string, PunchRecord[]>()
+  records.forEach((r) => {
+    if (!byDay.has(r.date)) byDay.set(r.date, [])
+    byDay.get(r.date)!.push(r)
+  })
+  if (byDay.size === 0) return null
+  let totalNet = 0
+  byDay.forEach((dayRecs) => {
+    totalNet += Math.max(0, pairMinutes(dayRecs) - lunchBreakMinutes)
+  })
+  if (!totalNet) return null
+  return totalNet - workdayMinutes * byDay.size
+}
+
+export function calcEarnings(
+  records: PunchRecord[],
+  hourlyRate: number,
+  lunchBreakMinutes = 0,
+): string {
+  const min = calcNetMinutes(records, lunchBreakMinutes)
+  return ((min / 60) * hourlyRate).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  })
 }
 
 export function avatarInitials(name: string): string {
