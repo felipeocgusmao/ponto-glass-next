@@ -10,7 +10,7 @@ export default async function HomePage() {
 
   try {
     const user = await verifyJWT(token)
-    redirect(user.role === 'admin' ? '/admin' : '/ponto')
+    redirect(['admin', 'manager'].includes(user.role) ? '/admin' : '/ponto')
   } catch {
     redirect('/login')
   }
