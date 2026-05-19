@@ -2,28 +2,19 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import PunchCard from '@/components/PunchCard'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
-import { avatarInitials, exportCSV, calcOvertimePeriod, calcHours, fmtMinutes } from '@/lib/utils'
+import { avatarInitials, exportCSV, calcOvertimePeriod, calcHours, fmtMinutes, calcNetMinutes } from '@/lib/utils'
 import type { Employee, EmployeeProfile, PunchRecord } from '@/lib/types'
 
-type Tab = 'ponto' | 'registros' | 'funcionarios' | 'relatorios'
+type Tab = 'status' | 'registros' | 'funcionarios' | 'relatorios'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'ponto',        label: 'Ponto'     },
+  { id: 'status',        label: 'Status'    },
   { id: 'registros',    label: 'Registros' },
   { id: 'funcionarios', label: 'Equipe'    },
   { id: 'relatorios',   label: 'Relatório' },
 ]
 
-function IconClock({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9.5"/>
-      <polyline points="12 7 12 12 15.5 14.5"/>
-    </svg>
-  )
-}
 function IconList({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -55,12 +46,150 @@ function IconBar({ size = 22 }: { size?: number }) {
     </svg>
   )
 }
+function IconStatus({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/>
+      <rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/>
+      <rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  )
+}
 
 const TAB_ICONS: Record<Tab, React.ReactNode> = {
-  ponto:        <IconClock />,
+  status:       <IconStatus />,
   registros:    <IconList />,
   funcionarios: <IconUsers />,
   relatorios:   <IconBar />,
+}
+
+// ─── Status tab ───────────────────────────────────────────────────────────────
+function StatusTab({ employees, currentUserId }: { employees: Employee[]; currentUserId: string }) {
+  const [records, setRecords] = useState<PunchRecord[]>([])
+  const [liveMs, setLiveMs] = useState(() => Date.now())
+  const [punching, setPunching] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ id: string; kind: 'success' | 'error'; text: string } | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/records?today=true')
+      if (res.ok) setRecords(await res.json())
+    } catch { /* keep current */ }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const iv = setInterval(() => setLiveMs(Date.now()), 30_000)
+    return () => clearInterval(iv)
+  }, [])
+
+  useEffect(() => {
+    const iv = setInterval(load, 60_000)
+    return () => clearInterval(iv)
+  }, [load])
+
+  const handlePunch = async (emp: Employee, type: 'entrada' | 'saída') => {
+    setPunching(emp.id)
+    setMsg(null)
+    try {
+      const res = await fetch('/api/punch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, employeeId: emp.id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMsg({ id: emp.id, kind: 'success', text: type === 'entrada' ? '✅ Entrada registrada!' : '✅ Saída registrada!' })
+        await load()
+      } else {
+        setMsg({ id: emp.id, kind: 'error', text: data.error ?? 'Erro ao registrar.' })
+      }
+    } catch {
+      setMsg({ id: emp.id, kind: 'error', text: 'Erro de conexão.' })
+    } finally {
+      setPunching(null)
+      setTimeout(() => setMsg(m => m?.id === emp.id ? null : m), 3_000)
+    }
+  }
+
+  const recordsByEmp = new Map<string, PunchRecord[]>()
+  records.forEach(r => {
+    if (!recordsByEmp.has(r.employee_id)) recordsByEmp.set(r.employee_id, [])
+    recordsByEmp.get(r.employee_id)!.push(r)
+  })
+
+  const workers = employees.filter(e => e.id !== currentUserId)
+
+  const statuses = workers.map(emp => {
+    const empRecords = recordsByEmp.get(emp.id) ?? []
+    const sortedAsc = [...empRecords].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    const isInside = sortedAsc.at(-1)?.type === 'entrada'
+    const lastEntry = isInside ? sortedAsc.slice().reverse().find(r => r.type === 'entrada') : undefined
+    const currentSessionMin = isInside && lastEntry
+      ? (liveMs - new Date(lastEntry.timestamp).getTime()) / 60_000 : 0
+    const liveNetMin = Math.max(0, calcNetMinutes(empRecords, 0) + currentSessionMin - emp.lunch_break_minutes)
+    return { emp, isInside, liveNetMin }
+  })
+
+  const onlineCount = statuses.filter(s => s.isInside).length
+  const totalMinToday = statuses.reduce((sum, s) => sum + s.liveNetMin, 0)
+
+  return (
+    <div className="tab-content space-y-4">
+      <div className="glass p-5">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="metric-box">
+            <div className="metric-val text-green-300">{onlineCount}</div>
+            <div className="metric-lbl">Em serviço agora</div>
+          </div>
+          <div className="metric-box">
+            <div className="metric-val">{totalMinToday > 0 ? fmtMinutes(Math.round(totalMinToday)) : '—'}</div>
+            <div className="metric-lbl">Horas hoje (total)</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass p-5">
+        <span className="section-label">{workers.length} funcionário(s)</span>
+        {workers.length === 0 && (
+          <div className="alert-info mt-2">Nenhum funcionário cadastrado.</div>
+        )}
+        {statuses.map(({ emp, isInside, liveNetMin }) => (
+          <div key={emp.id} className="worker-status-item">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="relative flex-shrink-0">
+                <div className="avatar-sm">{avatarInitials(emp.name)}</div>
+                <span className={`status-dot ${isInside ? 'status-dot-in' : 'status-dot-out'}`} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-white text-sm truncate">{emp.name}</div>
+                <div className="text-xs mt-0.5">
+                  {isInside
+                    ? <span className="text-green-400">● Em serviço · {liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}</span>
+                    : <span className="text-white/40">{liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) + ' hoje' : 'Sem registro hoje'}</span>
+                  }
+                </div>
+                {msg?.id === emp.id && (
+                  <div className={`text-xs mt-1 ${msg.kind === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                    {msg.text}
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => handlePunch(emp, isInside ? 'saída' : 'entrada')}
+              disabled={punching === emp.id}
+              className={isInside ? 'punch-mini-out' : 'punch-mini-in'}
+            >
+              {punching === emp.id ? '...' : isInside ? '⏹ Saída' : '▶ Entrada'}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // ─── Registros tab ────────────────────────────────────────────────────────────
@@ -207,7 +336,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
           </select>
         </div>
         <div>
-          <label className="input-label">R$/hora</label>
+          <label className="input-label">€/hora</label>
           <input
             type="number" min="0" step="0.01"
             value={rate} onChange={(e) => setRate(e.target.value)}
@@ -300,7 +429,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
                   <div className="text-white/35 text-xs mt-0.5">
                     @{emp.username} · {emp.workday_hours}h ·{' '}
                     {emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min almoço` : 'sem desconto'}
-                    {emp.hourly_rate != null && ` · R$${Number(emp.hourly_rate).toFixed(2)}/h`}
+                    {emp.hourly_rate != null && ` · €${Number(emp.hourly_rate).toFixed(2)}/h`}
                   </div>
                 </div>
               </div>
@@ -374,7 +503,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
               </select>
             </div>
             <div>
-              <label className="input-label">R$/hora</label>
+              <label className="input-label">€/hora</label>
               <input
                 type="number" min="0" step="0.01"
                 value={rate} onChange={(e) => setRate(e.target.value)}
@@ -513,7 +642,7 @@ function RelatoriosTab() {
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [tab, setTab] = useState<Tab>('ponto')
+  const [tab, setTab] = useState<Tab>('status')
   const [showPwd, setShowPwd] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const router = useRouter()
@@ -567,7 +696,7 @@ export default function AdminPage() {
     <main className="min-h-screen p-4 md:p-8 page-pad-nav">
       {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
 
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-xl md:max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -586,23 +715,31 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* Desktop tab navigation — hidden on mobile */}
+        <div className="hidden md:flex tab-list mb-6">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`tab flex items-center gap-2 ${tab === t.id ? 'tab-active' : ''}`}
+            >
+              <span className="opacity-70">{TAB_ICONS[t.id]}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         {/* Tab content */}
         <div key={tab}>
-          {tab === 'ponto'        && (
-            <PunchCard
-              workdayMinutes={Math.round(user.workday_hours * 60)}
-              lunchBreakMinutes={user.lunch_break_minutes}
-              hourlyRate={user.hourly_rate}
-            />
-          )}
+          {tab === 'status'       && <StatusTab employees={employees} currentUserId={user.id} />}
           {tab === 'registros'    && <RegistrosTab employees={employees} />}
           {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
           {tab === 'relatorios'   && <RelatoriosTab />}
         </div>
       </div>
 
-      {/* Bottom navigation — liquid glass pill */}
-      <nav className="bottom-nav">
+      {/* Bottom navigation — mobile only */}
+      <nav className="bottom-nav md:hidden">
         {TABS.map((t) => (
           <button
             key={t.id}
