@@ -137,55 +137,107 @@ export function exportCSV(
   employees: { id: string; hourly_rate: number | null; lunch_break_minutes: number }[] = [],
 ): void {
   const empMap = new Map(employees.map(e => [e.id, e]))
+  const q = (s: string) => `"${s.replace(/"/g, '""')}"`
+  const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
-  // Group by date + employee
-  const byEmpDay = new Map<string, PunchRecord[]>()
+  // Group records: employee → date → records[]
+  const byEmp = new Map<string, Map<string, PunchRecord[]>>()
   records.forEach(r => {
-    const key = `${r.date}__${r.employee_id}`
-    if (!byEmpDay.has(key)) byEmpDay.set(key, [])
-    byEmpDay.get(key)!.push(r)
+    if (!byEmp.has(r.employee_id)) byEmp.set(r.employee_id, new Map())
+    const empDays = byEmp.get(r.employee_id)!
+    if (!empDays.has(r.date)) empDays.set(r.date, [])
+    empDays.get(r.date)!.push(r)
   })
 
-  const header = [
-    'Data', 'Funcionário', 'Entrada', 'Saída',
-    'Almoço (min)', 'Café (min)', 'Total Horas', 'Valor/h (€)', 'Ganhos (€)',
-  ]
+  const COL_HEADERS = ['Data', 'Entrada', 'Saída', 'Almoço (min)', 'Café (min)', 'Total Horas', 'Valor/h (€)', 'Ganhos (€)']
+  const NCOLS = COL_HEADERS.length
 
-  const rows: string[][] = Array.from(byEmpDay.keys()).sort().map(key => {
-    const day = byEmpDay.get(key)!.sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    )
-    const first = day[0]
-    const emp   = empMap.get(first.employee_id)
-    const explicit = hasExplicitBreaks(day)
-    const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
+  const lines: string[] = []
+  const row = (...cells: string[]) => lines.push(cells.map(q).join(','))
+  const blankRow = () => lines.push(Array(NCOLS).fill('""').join(','))
+  const spanRow = (text: string) => {
+    const cells = Array(NCOLS).fill('""')
+    cells[0] = q(text)
+    lines.push(cells.join(','))
+  }
+
+  row('RELATÓRIO DE PONTO', ...Array(NCOLS - 1).fill(''))
+  blankRow()
+
+  let grandTotalMin = 0
+  let grandTotalEarnings = 0
+
+  Array.from(byEmp.keys()).sort((a, b) => {
+    const nameA = Array.from(byEmp.get(a)!.values())[0]?.[0]?.employee_name ?? ''
+    const nameB = Array.from(byEmp.get(b)!.values())[0]?.[0]?.employee_name ?? ''
+    return nameA.localeCompare(nameB, 'pt')
+  }).forEach(empId => {
+    const empDays = byEmp.get(empId)!
+    const sampleRec = Array.from(empDays.values())[0]?.[0]
+    const empName = sampleRec?.employee_name ?? empId
+    const emp = empMap.get(empId)
+    const rate = emp?.hourly_rate ?? null
     const autoLunch = emp?.lunch_break_minutes ?? 0
-    const netMin    = explicit ? workedMin : Math.max(0, pairMinutes(day) - autoLunch)
-    const dispLunch = explicit ? lunchMin : autoLunch
-    const dispCoffee = explicit ? coffeeMin : 0
 
-    const entries = day.filter(r => r.type === 'entrada')
-      .map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
-    const exits = day.filter(r => r.type === 'saída')
-      .map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+    spanRow(`── ${empName.toUpperCase()} ──`)
+    row(...COL_HEADERS)
 
-    const rate     = emp?.hourly_rate ?? null
-    const earnings = rate && netMin > 0 ? (netMin / 60 * rate).toFixed(2) : '—'
+    let empTotalMin = 0
+    let empTotalEarnings = 0
 
-    return [
-      first.date,
-      first.employee_name,
-      entries.join(' / ') || '—',
-      exits.join(' / ') || '—',
-      String(dispLunch),
-      String(dispCoffee),
-      fmtMinutes(netMin),
-      rate != null ? String(rate) : '—',
-      earnings,
-    ]
+    Array.from(empDays.keys()).sort().forEach(date => {
+      const day = empDays.get(date)!.sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )
+      const explicit = hasExplicitBreaks(day)
+      const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
+      const netMin     = explicit ? workedMin : Math.max(0, pairMinutes(day) - autoLunch)
+      const dispLunch  = explicit ? lunchMin  : autoLunch
+      const dispCoffee = explicit ? coffeeMin : 0
+
+      const [year, month, dayNum] = date.split('-').map(Number)
+      const dow = DAYS_PT[new Date(year, month - 1, dayNum).getDay()]
+      const dateLabel = `${String(dayNum).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year} (${dow})`
+
+      const entries = day.filter(r => r.type === 'entrada')
+        .map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+      const exits = day.filter(r => r.type === 'saída')
+        .map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+
+      const dayEarnings = rate && netMin > 0 ? netMin / 60 * rate : 0
+      const earningsStr = rate != null ? dayEarnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' }) : '—'
+
+      row(
+        dateLabel,
+        entries.join(' / ') || '—',
+        exits.join(' / ')   || '—',
+        String(dispLunch),
+        String(dispCoffee),
+        netMin > 0 ? fmtMinutes(netMin) : '—',
+        rate != null ? `€ ${rate.toFixed(2)}` : '—',
+        earningsStr,
+      )
+
+      empTotalMin += netMin
+      empTotalEarnings += dayEarnings
+    })
+
+    const empEarningsStr = rate != null
+      ? empTotalEarnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
+      : '—'
+    row(`SUBTOTAL ${empName.toUpperCase()}`, '', '', '', '', fmtMinutes(empTotalMin), '', empEarningsStr)
+    blankRow()
+
+    grandTotalMin += empTotalMin
+    grandTotalEarnings += empTotalEarnings
   })
 
-  const csv = [header, ...rows].map(row => row.map(c => `"${c}"`).join(',')).join('\n')
+  const grandEarningsStr = grandTotalEarnings > 0
+    ? grandTotalEarnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
+    : '—'
+  row('TOTAL GERAL', '', '', '', '', fmtMinutes(grandTotalMin), '', grandEarningsStr)
+
+  const csv = lines.join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')

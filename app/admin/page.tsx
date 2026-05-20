@@ -711,12 +711,11 @@ export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [tab, setTab] = useState<Tab>('status')
+  const isManager = user?.role === 'manager'
+  const visibleTabs = isManager ? MANAGER_TABS : ALL_TABS
   const [showPwd, setShowPwd] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const router = useRouter()
-
-  const isManager = user?.role === 'manager'
-  const visibleTabs = isManager ? MANAGER_TABS : ALL_TABS
 
   const loadUser = useCallback(async () => {
     try {
