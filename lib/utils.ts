@@ -137,6 +137,7 @@ export function exportCSV(
   employees: { id: string; hourly_rate: number | null; lunch_break_minutes: number }[] = [],
 ): void {
   const empMap = new Map(employees.map(e => [e.id, e]))
+  const SEP = ';'
   const q = (s: string) => `"${s.replace(/"/g, '""')}"`
   const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -153,12 +154,12 @@ export function exportCSV(
   const NCOLS = COL_HEADERS.length
 
   const lines: string[] = []
-  const row = (...cells: string[]) => lines.push(cells.map(q).join(','))
-  const blankRow = () => lines.push(Array(NCOLS).fill('""').join(','))
+  const row = (...cells: string[]) => lines.push(cells.map(q).join(SEP))
+  const blankRow = () => lines.push(Array(NCOLS).fill('""').join(SEP))
   const spanRow = (text: string) => {
     const cells = Array(NCOLS).fill('""')
     cells[0] = q(text)
-    lines.push(cells.join(','))
+    lines.push(cells.join(SEP))
   }
 
   row('RELATÓRIO DE PONTO', ...Array(NCOLS - 1).fill(''))
@@ -237,7 +238,7 @@ export function exportCSV(
     : '—'
   row('TOTAL GERAL', '', '', '', '', fmtMinutes(grandTotalMin), '', grandEarningsStr)
 
-  const csv = lines.join('\n')
+  const csv = `sep=${SEP}\n` + lines.join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
