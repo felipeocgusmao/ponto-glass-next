@@ -150,8 +150,9 @@ export function exportCSV(
     empDays.get(r.date)!.push(r)
   })
 
-  const COL_HEADERS = ['Data', 'Entrada', 'Saída', 'Almoço (min)', 'Café (min)', 'Total Horas', 'Valor/h (€)', 'Ganhos (€)']
+  const COL_HEADERS = ['Data', 'Entrada', 'Saida', 'Almoco (min)', 'Cafe (min)', 'Total Horas', 'Valor/h (EUR)', 'Ganhos (EUR)']
   const NCOLS = COL_HEADERS.length
+  const fmtEur = (val: number) => val.toFixed(2).replace('.', ',')
 
   const lines: string[] = []
   const row = (...cells: string[]) => lines.push(cells.map(q).join(SEP))
@@ -162,7 +163,7 @@ export function exportCSV(
     lines.push(cells.join(SEP))
   }
 
-  row('RELATÓRIO DE PONTO', ...Array(NCOLS - 1).fill(''))
+  row('RELATORIO DE PONTO', ...Array(NCOLS - 1).fill(''))
   blankRow()
 
   let grandTotalMin = 0
@@ -180,7 +181,7 @@ export function exportCSV(
     const rate = emp?.hourly_rate ?? null
     const autoLunch = emp?.lunch_break_minutes ?? 0
 
-    spanRow(`── ${empName.toUpperCase()} ──`)
+    spanRow(`=== ${empName.toUpperCase()} ===`)
     row(...COL_HEADERS)
 
     let empTotalMin = 0
@@ -206,45 +207,35 @@ export function exportCSV(
         .map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
 
       const dayEarnings = rate && netMin > 0 ? netMin / 60 * rate : 0
-      const earningsStr = rate != null ? dayEarnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' }) : '—'
 
       row(
         dateLabel,
-        entries.join(' / ') || '—',
-        exits.join(' / ')   || '—',
+        entries.join(' / ') || '-',
+        exits.join(' / ')   || '-',
         String(dispLunch),
         String(dispCoffee),
-        netMin > 0 ? fmtMinutes(netMin) : '—',
-        rate != null ? `€ ${rate.toFixed(2)}` : '—',
-        earningsStr,
+        netMin > 0 ? fmtMinutes(netMin) : '-',
+        rate != null ? rate.toFixed(2).replace('.', ',') : '-',
+        rate != null ? fmtEur(dayEarnings) : '-',
       )
 
       empTotalMin += netMin
       empTotalEarnings += dayEarnings
     })
 
-    const empEarningsStr = rate != null
-      ? empTotalEarnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
-      : '—'
-    row(`SUBTOTAL ${empName.toUpperCase()}`, '', '', '', '', fmtMinutes(empTotalMin), '', empEarningsStr)
+    row(`SUBTOTAL ${empName.toUpperCase()}`, '', '', '', '', fmtMinutes(empTotalMin), '', rate != null ? fmtEur(empTotalEarnings) : '-')
     blankRow()
 
     grandTotalMin += empTotalMin
     grandTotalEarnings += empTotalEarnings
   })
 
-  const grandEarningsStr = grandTotalEarnings > 0
-    ? grandTotalEarnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
-    : '—'
-  row('TOTAL GERAL', '', '', '', '', fmtMinutes(grandTotalMin), '', grandEarningsStr)
+  row('TOTAL GERAL', '', '', '', '', fmtMinutes(grandTotalMin), '', fmtEur(grandTotalEarnings))
 
   const csv = `sep=${SEP}\n` + lines.join('\n')
-  // UTF-16 LE with BOM — Excel always recognises this encoding correctly
-  const buf = new ArrayBuffer((csv.length + 1) * 2)
-  const view = new Uint16Array(buf)
-  view[0] = 0xFEFF
-  for (let i = 0; i < csv.length; i++) view[i + 1] = csv.charCodeAt(i)
-  const blob = new Blob([buf], { type: 'text/csv;charset=utf-16le' })
+  const encoder = new TextEncoder()
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF])
+  const blob = new Blob([bom, encoder.encode(csv)], { type: 'text/csv;charset=utf-8' })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href = url
