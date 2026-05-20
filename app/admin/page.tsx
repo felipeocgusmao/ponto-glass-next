@@ -760,6 +760,70 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
   )
 }
 
+// ─── Missing-exit alert banner ────────────────────────────────────────────────
+function MissingExitBanner() {
+  const [alerts, setAlerts] = useState<{ name: string; date: string }[]>([])
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    const check = async () => {
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1)
+      const weekAgo   = new Date(now); weekAgo.setDate(now.getDate() - 7)
+      try {
+        const res = await fetch(`/api/reports?from=${fmt(weekAgo)}&to=${fmt(yesterday)}`)
+        if (!res.ok) return
+        const records: PunchRecord[] = await res.json()
+        const byEmpDate = new Map<string, Map<string, PunchRecord[]>>()
+        records.forEach(r => {
+          if (!byEmpDate.has(r.employee_id)) byEmpDate.set(r.employee_id, new Map())
+          const dm = byEmpDate.get(r.employee_id)!
+          if (!dm.has(r.date)) dm.set(r.date, [])
+          dm.get(r.date)!.push(r)
+        })
+        const missing: { name: string; date: string }[] = []
+        byEmpDate.forEach((dm, empId) => {
+          const empName = records.find(r => r.employee_id === empId)?.employee_name ?? empId
+          dm.forEach((dayRecs, date) => {
+            const last = [...dayRecs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).at(-1)
+            if (last && WORKING_TYPES.includes(last.type)) missing.push({ name: empName, date })
+          })
+        })
+        setAlerts(missing)
+      } catch { /* silent */ }
+    }
+    check()
+  }, [])
+
+  if (dismissed || alerts.length === 0) return null
+
+  return (
+    <div className="glass p-4 mb-4 border border-amber-400/30 bg-amber-400/5 rounded-xl">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <div className="text-amber-300 font-semibold text-sm mb-2">
+            ⚠ {alerts.length} dia(s) sem saída registrada
+          </div>
+          <div className="space-y-0.5">
+            {alerts.map((a, i) => (
+              <div key={i} className="text-white/55 text-xs">
+                {a.name} — {new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+              </div>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-white/30 hover:text-white/60 transition-colors text-sm leading-none"
+          title="Fechar"
+        >✕</button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Admin page ───────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
@@ -854,6 +918,9 @@ export default function AdminPage() {
             </button>
           ))}
         </div>
+
+        {/* Missing-exit alerts */}
+        <MissingExitBanner />
 
         {/* Tab content */}
         <div key={tab}>
