@@ -72,6 +72,7 @@ export default function PontoPage() {
           lunchBreakMinutes={user.lunch_break_minutes}
           hourlyRate={user.hourly_rate}
           userId={user.id}
+          geoMode={user.geo_mode}
         />
       </div>
     </main>

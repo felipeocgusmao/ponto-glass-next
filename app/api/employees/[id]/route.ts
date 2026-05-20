@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { logAudit } from '@/lib/audit'
 
 export async function PATCH(
   request: NextRequest,
@@ -17,7 +18,7 @@ export async function PATCH(
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { name: new_name, username: new_username, role, workday_hours, lunch_break_minutes, hourly_rate, new_password } = await request.json()
+  const { name: new_name, username: new_username, role, workday_hours, lunch_break_minutes, hourly_rate, new_password, geo_mode } = await request.json()
 
   const updates: Record<string, unknown> = {}
 
@@ -83,6 +84,12 @@ export async function PATCH(
     updates.hourly_rate = parsedRate
   }
 
+  if (geo_mode !== undefined) {
+    if (!['required', 'optional', 'disabled'].includes(geo_mode))
+      return NextResponse.json({ error: 'Modo de geolocalização inválido' }, { status: 400 })
+    updates.geo_mode = geo_mode
+  }
+
   if (Object.keys(updates).length === 0)
     return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 })
 
@@ -90,10 +97,15 @@ export async function PATCH(
     .from('employees')
     .update(updates)
     .eq('id', params.id)
-    .select('id, name, username, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate')
+    .select('id, name, username, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await logAudit(user, 'employee_update', { id: params.id, name: data.name }, {
+    fields: Object.keys(updates).filter(k => k !== 'password_hash'),
+  })
+
   return NextResponse.json(data)
 }
 
@@ -134,11 +146,16 @@ export async function DELETE(
     }
   }
 
+  const { data: emp } = await supabase.from('employees').select('name').eq('id', params.id).single()
+
   const { error } = await supabase
     .from('employees')
     .update({ active: false })
     .eq('id', params.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (emp) await logAudit(user, 'employee_delete', { id: params.id, name: emp.name })
+
   return NextResponse.json({ success: true })
 }
