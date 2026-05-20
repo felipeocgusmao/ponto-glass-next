@@ -28,7 +28,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('employees')
-    .select('id, name, username, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode')
+    .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode')
     .eq('active', true)
     .order('created_at', { ascending: true })
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   const actor = await requireAdmin()
   if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { name, username, password, role, workday_hours, lunch_break_minutes, hourly_rate } = await request.json()
+  const { name, username, email, password, role, workday_hours, lunch_break_minutes, hourly_rate } = await request.json()
 
   if (!name || !username || !password)
     return NextResponse.json({ error: 'Campos obrigatórios faltando' }, { status: 400 })
@@ -74,6 +74,10 @@ export async function POST(request: NextRequest) {
   if (parsedRate !== null && (isNaN(parsedRate) || parsedRate < 0))
     return NextResponse.json({ error: 'Valor da hora inválido' }, { status: 400 })
 
+  const trimmedEmail = email ? String(email).trim().toLowerCase() : null
+  if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail))
+    return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
+
   const { data: existing } = await supabase
     .from('employees').select('id').eq('username', trimmedUsername).single()
 
@@ -84,10 +88,10 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from('employees')
     .insert({
-      name: trimmedName, username: trimmedUsername, password_hash: hash, role,
+      name: trimmedName, username: trimmedUsername, email: trimmedEmail, password_hash: hash, role,
       workday_hours: parsedWorkday, lunch_break_minutes: parsedLunch, hourly_rate: parsedRate,
     })
-    .select('id, name, username, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate')
+    .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

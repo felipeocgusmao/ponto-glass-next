@@ -5,15 +5,17 @@ import { useRouter } from 'next/navigation'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
 import PunchCard from '@/components/PunchCard'
 import { avatarInitials, exportCSV, calcOvertimePeriod, calcHours, fmtMinutes, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES } from '@/lib/utils'
-import type { Employee, EmployeeProfile, PunchRecord, AuditLog } from '@/lib/types'
+import type { Employee, EmployeeProfile, PunchRecord, AuditLog, HourBankAdjustment, DayException } from '@/lib/types'
 
-type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria'
+type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados'
 
 const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard',    label: 'Dashboard' },
   { id: 'status',       label: 'Status'    },
   { id: 'registros',   label: 'Registros' },
   { id: 'funcionarios', label: 'Equipe'    },
+  { id: 'banco',        label: 'Banco'     },
+  { id: 'feriados',     label: 'Feriados'  },
   { id: 'relatorios',  label: 'Relatório' },
   { id: 'auditoria',   label: 'Auditoria' },
 ]
@@ -23,6 +25,8 @@ const MANAGER_TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard',  label: 'Dashboard' },
   { id: 'status',     label: 'Status'    },
   { id: 'registros',  label: 'Registros' },
+  { id: 'banco',      label: 'Banco'     },
+  { id: 'feriados',   label: 'Feriados'  },
   { id: 'relatorios', label: 'Relatório' },
 ]
 
@@ -93,6 +97,26 @@ function IconAudit({ size = 22 }: { size?: number }) {
     </svg>
   )
 }
+function IconBank({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2"/>
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+      <line x1="12" y1="12" x2="12" y2="16"/>
+      <line x1="10" y1="14" x2="14" y2="14"/>
+    </svg>
+  )
+}
+function IconCalendar({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+      <line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8"  y1="2" x2="8"  y2="6"/>
+      <line x1="3"  y1="10" x2="21" y2="10"/>
+    </svg>
+  )
+}
 
 const TAB_ICONS: Record<Tab, React.ReactNode> = {
   meu_ponto:    <IconClock />,
@@ -100,6 +124,8 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   status:       <IconStatus />,
   registros:    <IconList />,
   funcionarios: <IconUsers />,
+  banco:        <IconBank />,
+  feriados:     <IconCalendar />,
   relatorios:   <IconBar />,
   auditoria:    <IconAudit />,
 }
@@ -543,6 +569,7 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
   const [name, setName] = useState(emp.name)
   const [username, setUsername] = useState(emp.username)
+  const [email, setEmail] = useState(emp.email ?? '')
   const [role, setRole] = useState<'employee' | 'manager' | 'admin'>(emp.role as 'employee' | 'manager' | 'admin')
   const [workdayHours, setWorkdayHours] = useState(String(emp.workday_hours))
   const [lunchMin, setLunchMin] = useState(String(emp.lunch_break_minutes))
@@ -562,6 +589,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
     }
     if (name !== emp.name) body.name = name
     if (username !== emp.username) body.username = username
+    if (email !== (emp.email ?? '')) body.email = email || null
     if (role !== emp.role) body.role = role
     if (geoMode !== (emp.geo_mode ?? 'optional')) body.geo_mode = geoMode
     if (newPassword) body.new_password = newPassword
@@ -604,6 +632,14 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
             <option value="admin">Admin</option>
           </select>
         </div>
+      </div>
+      <div>
+        <label className="input-label">Email (opcional)</label>
+        <input
+          type="email"
+          value={email} onChange={(e) => setEmail(e.target.value)}
+          placeholder="maria@empresa.com" className="glass-input"
+        />
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div>
@@ -664,6 +700,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
 function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRefresh: () => void }) {
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'employee' | 'manager' | 'admin'>('employee')
   const [workdayHours, setWorkdayHours] = useState('8')
@@ -681,7 +718,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name, username, password, role,
+        name, username, email: email || null, password, role,
         workday_hours: workdayHours,
         lunch_break_minutes: lunchMin,
         hourly_rate: rate || null,
@@ -690,7 +727,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
     const data = await res.json()
     if (!res.ok) { setErr(data.error); setLoading(false); return }
     setOk(`${name} adicionado!`)
-    setName(''); setUsername(''); setPassword(''); setRole('employee')
+    setName(''); setUsername(''); setEmail(''); setPassword(''); setRole('employee')
     setWorkdayHours('8'); setLunchMin('60'); setRate('')
     setLoading(false)
     onRefresh()
@@ -728,6 +765,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
                     @{emp.username} · {emp.workday_hours}h ·{' '}
                     {emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min almoço` : 'sem desconto'}
                     {emp.hourly_rate != null && ` · €${Number(emp.hourly_rate).toFixed(2)}/h`}
+                    {emp.email && ` · ${emp.email}`}
                   </div>
                 </div>
               </div>
@@ -767,6 +805,10 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
               <label className="input-label">Usuário</label>
               <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="maria.silva" className="glass-input" required />
             </div>
+          </div>
+          <div>
+            <label className="input-label">Email (opcional)</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@empresa.com" className="glass-input" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1272,16 +1314,260 @@ function DashboardTab({ employees }: { employees: Employee[] }) {
   )
 }
 
+// ─── Banco de horas tab ───────────────────────────────────────────────────────
+function BancoHorasTab({ employees }: { employees: Employee[] }) {
+  const [balances, setBalances] = useState<Map<string, { balanceMin: number; adjustments: HourBankAdjustment[] }>>(new Map())
+  const [selectedEmp, setSelectedEmp] = useState('')
+  const [minutes, setMinutes] = useState('')
+  const [reason, setReason] = useState('')
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [err, setErr] = useState('')
+  const [ok, setOk] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const loadAll = useCallback(async () => {
+    const map = new Map<string, { balanceMin: number; adjustments: HourBankAdjustment[] }>()
+    await Promise.all(employees.map(async emp => {
+      try {
+        const res = await fetch(`/api/hour-bank?employeeId=${emp.id}`)
+        if (res.ok) { const d = await res.json(); map.set(emp.id, d) }
+      } catch { /* silent */ }
+    }))
+    setBalances(new Map(map))
+  }, [employees])
+
+  useEffect(() => { loadAll() }, [loadAll])
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setErr(''); setOk(''); setSaving(true)
+    const mins = Number(minutes)
+    if (!selectedEmp) { setErr('Selecione um funcionário.'); setSaving(false); return }
+    if (isNaN(mins) || mins === 0) { setErr('Minutos inválidos.'); setSaving(false); return }
+    if (!reason.trim()) { setErr('Motivo obrigatório.'); setSaving(false); return }
+    const res = await fetch('/api/hour-bank', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeId: selectedEmp, minutes: mins, reason: reason.trim(), date }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setErr(data.error ?? 'Erro ao salvar.'); setSaving(false); return }
+    setOk('Ajuste registado!')
+    setMinutes(''); setReason('')
+    setSaving(false)
+    await loadAll()
+    setTimeout(() => setOk(''), 3000)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Remover este ajuste?')) return
+    const res = await fetch(`/api/hour-bank/${id}`, { method: 'DELETE' })
+    if (!res.ok) { const d = await res.json(); setErr(d.error ?? 'Erro ao remover.'); return }
+    await loadAll()
+  }
+
+  return (
+    <div className="tab-content space-y-4">
+      <div className="glass p-5">
+        <span className="section-label">Saldos actuais</span>
+        {employees.length === 0 && <div className="alert-info mt-2">Nenhum funcionário.</div>}
+        {employees.map(emp => {
+          const info = balances.get(emp.id)
+          const bal = info?.balanceMin
+          return (
+            <div key={emp.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+              <span className="text-white text-sm">{emp.name}</span>
+              {bal !== undefined
+                ? <span className={`text-sm font-semibold ${bal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {bal >= 0 ? '+' : '-'}{Math.floor(Math.abs(bal) / 60)}h{String(Math.abs(bal) % 60).padStart(2, '0')}m
+                  </span>
+                : <span className="text-white/30 text-xs">—</span>
+              }
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="glass p-5">
+        <span className="section-label">Novo ajuste manual</span>
+        <form onSubmit={handleAdd} className="space-y-3 mt-3">
+          <div>
+            <label className="input-label">Funcionário</label>
+            <select value={selectedEmp} onChange={e => setSelectedEmp(e.target.value)} className="glass-select">
+              <option value="">Selecionar...</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="input-label">Minutos (positivo = crédito)</label>
+              <input
+                type="number" value={minutes} onChange={e => setMinutes(e.target.value)}
+                placeholder="ex: 60 ou -30" className="glass-input"
+              />
+            </div>
+            <div>
+              <label className="input-label">Data</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="glass-input" />
+            </div>
+          </div>
+          <div>
+            <label className="input-label">Motivo</label>
+            <input value={reason} onChange={e => setReason(e.target.value)} placeholder="ex: Banco de horas acordado" className="glass-input" />
+          </div>
+          {err && <div className="alert-error">{err}</div>}
+          {ok  && <div className="alert-success">{ok}</div>}
+          <button type="submit" disabled={saving} className="btn-glass w-full">
+            {saving ? 'Salvando...' : '+ Registar ajuste'}
+          </button>
+        </form>
+      </div>
+
+      {selectedEmp && (() => {
+        const adjs = balances.get(selectedEmp)?.adjustments ?? []
+        if (adjs.length === 0) return null
+        const empName = employees.find(e => e.id === selectedEmp)?.name ?? ''
+        return (
+          <div className="glass p-5">
+            <span className="section-label">Ajustes de {empName}</span>
+            {adjs.map(a => (
+              <div key={a.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-white text-sm">{a.reason}</div>
+                  <div className="text-white/35 text-xs">{a.date}</div>
+                </div>
+                <span className={`text-sm font-semibold ${a.minutes >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {a.minutes >= 0 ? '+' : ''}{a.minutes}min
+                </span>
+                <button onClick={() => handleDelete(a.id)} className="btn-danger text-xs px-2">✕</button>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+    </div>
+  )
+}
+
+// ─── Feriados / Folgas tab ────────────────────────────────────────────────────
+function FeriadosTab() {
+  const [exceptions, setExceptions] = useState<DayException[]>([])
+  const [loading, setLoading] = useState(true)
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [type, setType] = useState<'holiday' | 'day_off'>('holiday')
+  const [description, setDescription] = useState('')
+  const [err, setErr] = useState('')
+  const [ok, setOk] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/day-exceptions')
+      if (res.ok) setExceptions(await res.json())
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setErr(''); setOk(''); setSaving(true)
+    const res = await fetch('/api/day-exceptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, type, description: description.trim() }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setErr(data.error ?? 'Erro ao salvar.'); setSaving(false); return }
+    setOk('Registado!')
+    setDescription('')
+    setSaving(false)
+    await load()
+    setTimeout(() => setOk(''), 3000)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Remover este feriado/folga?')) return
+    const res = await fetch(`/api/day-exceptions/${id}`, { method: 'DELETE' })
+    if (!res.ok) { const d = await res.json(); setErr(d.error ?? 'Erro ao remover.'); return }
+    await load()
+  }
+
+  const TYPE_LABEL: Record<string, string> = { holiday: 'Feriado', day_off: 'Folga' }
+
+  return (
+    <div className="tab-content space-y-4">
+      <div className="glass p-5">
+        <span className="section-label">Adicionar feriado / folga</span>
+        <form onSubmit={handleAdd} className="space-y-3 mt-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="input-label">Data</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="glass-input" required />
+            </div>
+            <div>
+              <label className="input-label">Tipo</label>
+              <select value={type} onChange={e => setType(e.target.value as 'holiday' | 'day_off')} className="glass-select">
+                <option value="holiday">Feriado</option>
+                <option value="day_off">Folga</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="input-label">Descrição</label>
+            <input value={description} onChange={e => setDescription(e.target.value)} placeholder="ex: Natal" className="glass-input" required />
+          </div>
+          {err && <div className="alert-error">{err}</div>}
+          {ok  && <div className="alert-success">{ok}</div>}
+          <button type="submit" disabled={saving} className="btn-glass w-full">
+            {saving ? 'Salvando...' : '+ Adicionar'}
+          </button>
+        </form>
+      </div>
+
+      <div className="glass p-5">
+        {loading
+          ? <div className="alert-info">Carregando...</div>
+          : exceptions.length === 0
+          ? <div className="alert-info">Nenhum feriado ou folga registada.</div>
+          : (
+            <>
+              <span className="section-label">{exceptions.length} registo(s)</span>
+              {exceptions.map(exc => (
+                <div key={exc.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white text-sm font-medium">{exc.description}</div>
+                    <div className="text-white/35 text-xs">{new Date(exc.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${exc.type === 'holiday' ? 'bg-indigo-400/20 text-indigo-300' : 'bg-emerald-400/20 text-emerald-300'}`}>
+                    {TYPE_LABEL[exc.type]}
+                  </span>
+                  <button onClick={() => handleDelete(exc.id)} className="btn-danger text-xs px-2">✕</button>
+                </div>
+              ))}
+            </>
+          )
+        }
+      </div>
+    </div>
+  )
+}
+
 // ─── Auditoria tab ────────────────────────────────────────────────────────────
 const AUDIT_LABELS: Record<string, string> = {
-  employee_create:      '👤 Funcionário criado',
-  employee_update:      '✏ Funcionário atualizado',
-  employee_delete:      '🗑 Funcionário desativado',
-  record_create:        '➕ Registo criado',
-  record_update:        '✏ Registo editado',
-  record_delete:        '🗑 Registo apagado',
-  punch_on_behalf:      '▶ Ponto registado por admin',
-  hour_bank_adjustment: '⚖ Ajuste banco de horas',
+  employee_create:           '👤 Funcionário criado',
+  employee_update:           '✏ Funcionário atualizado',
+  employee_delete:           '🗑 Funcionário desativado',
+  record_create:             '➕ Registo criado',
+  record_update:             '✏ Registo editado',
+  record_delete:             '🗑 Registo apagado',
+  punch_on_behalf:           '▶ Ponto registado por admin',
+  hour_bank_adjustment:      '⚖ Ajuste banco de horas',
+  hour_bank_adjustment_delete: '🗑 Ajuste banco removido',
+  day_exception_create:      '📅 Feriado/folga criado',
+  day_exception_delete:      '🗑 Feriado/folga removido',
 }
 
 function AuditoriaTab() {
@@ -1522,6 +1808,8 @@ export default function AdminPage() {
           {tab === 'status'       && <StatusTab employees={employees} currentUserId={user.id} />}
           {tab === 'registros'    && <RegistrosTab employees={employees} />}
           {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
+          {tab === 'banco'        && <BancoHorasTab employees={employees} />}
+          {tab === 'feriados'     && <FeriadosTab />}
           {tab === 'relatorios'   && <RelatoriosTab employees={employees} />}
           {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
         </div>

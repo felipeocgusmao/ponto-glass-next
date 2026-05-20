@@ -55,11 +55,15 @@ export async function GET(request: NextRequest) {
 
   const { data: adjustments } = await supabase
     .from('hour_bank_adjustments')
-    .select('minutes')
+    .select('*')
     .eq('employee_id', empId)
+    .order('date', { ascending: false })
 
-  const adjustmentsTotal = (adjustments ?? []).reduce((s, a) => s + a.minutes, 0)
-  return NextResponse.json({ balanceMin: Math.round(rawBalanceMin + adjustmentsTotal) })
+  const adjustmentsTotal = (adjustments ?? []).reduce((s: number, a: { minutes: number }) => s + a.minutes, 0)
+  return NextResponse.json({
+    balanceMin: Math.round(rawBalanceMin + adjustmentsTotal),
+    adjustments: isPrivileged ? (adjustments ?? []) : [],
+  })
 }
 
 export async function POST(request: NextRequest) {
