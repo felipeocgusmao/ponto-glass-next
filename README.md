@@ -111,19 +111,22 @@ Cada peça foi escolhida com intenção:
 ## ◈ funcionalidades
 
 ```
-  FUNCIONÁRIO                          ADMINISTRADOR
-  ───────────                          ─────────────
-  ● Relógio ao vivo                    ● Painel de status em tempo real
-  ● Status: dentro / fora              ● Ver quem está em serviço agora
-  ● Registrar entrada / saída          ● Registrar ponto por qualquer funcionário
-  ● Horas trabalhadas ao vivo (30s)    ● Cadastrar e remover funcionários
-  ● Ganhos do dia em tempo real        ● Configurar jornada por funcionário (4–10h)
-  ● Desconto de almoço automático      ● Configurar desconto de almoço (0–60min)
-  ● Horas extras acumuladas            ● Definir valor/hora por funcionário
-  ● Notificações de fim de jornada     ● Redefinir senha de qualquer funcionário
-  ● Troca de senha                     ● Relatórios por período com exportação CSV
-  ● Histórico do dia                   ● Layout responsivo (mobile + desktop)
+  FUNCIONÁRIO                          GERENTE                              ADMINISTRADOR
+  ───────────                          ───────                              ─────────────
+  ● Relógio ao vivo                    ● Painel de status ao vivo           ● Tudo do Gerente
+  ● Status: dentro / pausa / fora      ● Ver quem está em serviço agora     ● Cadastrar e remover funcionários
+  ● Registrar entrada / saída          ● Ver ganhos de cada funcionário      ● Configurar jornada (4–10h)
+  ● Pausas: Almoço / Café / Retorno    ● Registrar ponto por funcionário    ● Configurar desconto de almoço
+  ● Horas trabalhadas ao vivo (30s)    ● Histórico de registros             ● Definir valor/hora em €
+  ● Ganhos do dia em tempo real        ● Relatórios por período             ● Redefinir senha de qualquer usuário
+  ● Desconto de almoço automático*     ● Exportar CSV profissional          ● Alterar nome de usuário
+  ● Horas extras acumuladas                                                 ● Criar usuários (funcionário/gerente/admin)
+  ● Notificações de fim de jornada
+  ● Troca de senha
+  ● Histórico do dia
 ```
+
+*\*desconto automático só se aplica quando pausas explícitas não foram registradas (fallback legado)*
 
 **Auto-seed:** no primeiro login, o sistema cria o usuário `admin` automaticamente.  
 Nenhuma configuração manual de banco necessária.
@@ -162,10 +165,10 @@ A interface existe sem gritar. Está lá — elegante, funcional, presente.
 ponto_glass_next/
 │
 ├── app/
-│   ├── page.tsx              ← redirect inteligente (admin | ponto)
+│   ├── page.tsx              ← redirect inteligente (admin/manager → /admin | employee → /ponto)
 │   ├── login/page.tsx        ← autenticação
 │   ├── ponto/page.tsx        ← painel do funcionário
-│   ├── admin/page.tsx        ← painel admin (Status / Registros / Equipe / Relatório)
+│   ├── admin/page.tsx        ← painel admin/gerente (tabs filtradas por role)
 │   │
 │   └── api/
 │       ├── auth/
@@ -173,7 +176,7 @@ ponto_glass_next/
 │       │   ├── logout/       ← limpa cookie
 │       │   └── recover/      ← reset de emergência via RECOVERY_SECRET
 │       ├── me/               ← perfil completo do usuário logado
-│       ├── punch/            ← registra entrada/saída (admin pode registrar por outros)
+│       ├── punch/            ← registra entrada/saída (admin/gerente podem registrar por outros)
 │       ├── records/          ← lista registros (filtros por data / funcionário)
 │       ├── employees/        ← CRUD funcionários + configurações individuais
 │       │   └── [id]/         ← PATCH (jornada, almoço, valor/hora, senha) / DELETE
@@ -191,7 +194,7 @@ ponto_glass_next/
 │   ├── types.ts              ← Employee, EmployeeProfile, PunchRecord, JWTUser
 │   └── utils.ts              ← calcHours, calcNetMinutes, calcEarnings, fmtMinutes…
 │
-├── middleware.ts              ← RBAC: protege rotas por role
+├── middleware.ts              ← RBAC: protege rotas por role (admin/manager/employee)
 └── supabase/schema.sql        ← schema do banco com RLS habilitado
 ```
 
@@ -228,6 +231,8 @@ RECOVERY_SECRET=chave-de-recuperacao-de-emergencia
 **4. Crie o banco**
 
 Execute `supabase/schema.sql` no SQL Editor do seu projeto Supabase.
+
+> **Banco já existente?** O arquivo inclui blocos de migração comentados (v1→v2, v2→v3, v3→v4) — execute apenas os blocos correspondentes à versão que você já tem.
 
 **5. Rode**
 ```bash
@@ -269,7 +274,7 @@ employees (
   name                TEXT,
   username            TEXT  UNIQUE,
   password_hash       TEXT,           ← bcrypt, nunca texto puro
-  role                TEXT,           ← 'admin' | 'employee'
+  role                TEXT,           ← 'admin' | 'manager' | 'employee'
   active              BOOLEAN,        ← soft delete
   workday_hours       DECIMAL(4,2),   ← jornada configurável (padrão 8h)
   lunch_break_minutes INT,            ← desconto de almoço (padrão 60min)
@@ -281,12 +286,16 @@ employees (
 records (
   id            UUID  PRIMARY KEY,
   employee_id   UUID  → employees.id,
-  employee_name TEXT,           ← desnormalizado para relatórios
-  type          TEXT,           ← 'entrada' | 'saída'
+  employee_name TEXT,              ← desnormalizado para relatórios
+  type          TEXT,              ← 'entrada' | 'saída'
+                                      'inicio_almoco' | 'fim_almoco'
+                                      'pausa_cafe'    | 'retorno_cafe'
   timestamp     TIMESTAMPTZ,
-  date          DATE            ← índice de busca por dia
+  date          DATE               ← índice de busca por dia
 )
 ```
+
+> O arquivo `supabase/schema.sql` inclui os scripts de migração para bancos existentes.
 
 RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servidor.
 
@@ -299,7 +308,7 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
 ```
   ✓  Senhas com bcrypt (salt automático)
   ✓  JWT assinado com HS256 em httpOnly cookie (inatingível por JS)
-  ✓  Middleware de RBAC em todas as rotas sensíveis
+  ✓  Middleware de RBAC em todas as rotas sensíveis (admin / manager / employee)
   ✓  Service role key nunca exposta ao cliente
   ✓  Rate limiting: 5 tentativas/15min no login e na recuperação
   ✓  Row Level Security habilitado no Supabase
@@ -320,14 +329,21 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
   ✓  Horas extras calculadas automaticamente
   ✓  Notificações de fim de jornada e hora extra
   ✓  Histórico e relatórios por período
-  ✓  Ganhos do dia em tempo real
+  ✓  Ganhos do dia em tempo real (EUR)
   ✓  PWA — ícone na tela inicial do celular
   ✓  Layout responsivo mobile + desktop
   ✓  Admin registra ponto por funcionário
-  ☐  Papel "gerente" (acesso intermediário)
-  ☐  Inbox de alertas (funcionário sem saída registrada)
-  ☐  Domínio personalizado
-  ☐  Multi-empresa (tenancy)
+  ✓  Papel "gerente" (acesso intermediário)
+  ✓  Pausas explícitas: Almoço / Pausa Café / Retorno
+  ✓  Ganhos por funcionário no painel de status
+  ✓  CSV profissional (resumo diário com pausas e ganhos)
+  ✓  Admin altera nome de usuário dos funcionários
+  ☐  Inbox de alertas (funcionário sem saída registrada)   → issue #4
+  ☐  Domínio personalizado                                 → issue #5
+  ☐  Multi-empresa (tenancy)                               → issue #6
+  ☐  Dashboard com gráficos mensais de horas/ganhos        → issue #8
+  ☐  Relatório mensal automático por e-mail                → issue #9
+  ☐  Audit log de alterações administrativas               → issue #10
 ```
 
 <br/>

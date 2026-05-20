@@ -46,6 +46,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/ponto', request.url))
   }
 
+  if (pathname.startsWith('/ponto') && ['admin', 'manager'].includes(user.role)) {
+    return NextResponse.redirect(new URL('/admin', request.url))
+  }
+
   return NextResponse.next()
 }
 
