@@ -81,10 +81,10 @@ export function calcHours(records: PunchRecord[], lunchBreakMinutes = 0): string
 }
 
 export function fmtMinutes(min: number): string {
-  const abs = Math.abs(min)
+  const abs = Math.round(Math.abs(min))
   const h = Math.floor(abs / 60)
   const m = abs % 60
-  return h > 0 ? `${h}h ${m.toString().padStart(2, '0')}m` : `${m}m`
+  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`
 }
 
 export function calcOvertimeToday(
