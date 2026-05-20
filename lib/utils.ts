@@ -168,7 +168,7 @@ export function exportCSV(
   let grandTotalMin = 0
   let grandTotalEarnings = 0
 
-  Array.from(byEmp.keys()).sort((a, b) => {
+  Array.from(byEmp.keys()).filter(id => empMap.has(id)).sort((a, b) => {
     const nameA = Array.from(byEmp.get(a)!.values())[0]?.[0]?.employee_name ?? ''
     const nameB = Array.from(byEmp.get(b)!.values())[0]?.[0]?.employee_name ?? ''
     return nameA.localeCompare(nameB, 'pt')
