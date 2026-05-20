@@ -17,9 +17,24 @@ export async function PATCH(
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { username: new_username, workday_hours, lunch_break_minutes, hourly_rate, new_password } = await request.json()
+  const { username: new_username, role, workday_hours, lunch_break_minutes, hourly_rate, new_password } = await request.json()
 
   const updates: Record<string, unknown> = {}
+
+  if (role !== undefined) {
+    if (!['admin', 'manager', 'employee'].includes(role))
+      return NextResponse.json({ error: 'Perfil inválido' }, { status: 400 })
+    if (role !== 'admin') {
+      const { data: target } = await supabase.from('employees').select('role').eq('id', params.id).single()
+      if (target?.role === 'admin') {
+        const { count } = await supabase
+          .from('employees').select('*', { count: 'exact', head: true }).eq('role', 'admin').eq('active', true)
+        if ((count ?? 0) <= 1)
+          return NextResponse.json({ error: 'Não é possível rebaixar o último administrador' }, { status: 400 })
+      }
+    }
+    updates.role = role
+  }
 
   if (new_username !== undefined) {
     const trimmed = String(new_username).trim().toLowerCase()
