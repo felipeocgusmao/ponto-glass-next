@@ -113,15 +113,17 @@ Cada peça foi escolhida com intenção:
 ```
   FUNCIONÁRIO                          GERENTE                              ADMINISTRADOR
   ───────────                          ───────                              ─────────────
-  ● Relógio ao vivo                    ● Painel de status ao vivo           ● Tudo do Gerente
-  ● Status: dentro / pausa / fora      ● Ver quem está em serviço agora     ● Cadastrar e remover funcionários
-  ● Registrar entrada / saída          ● Ver ganhos de cada funcionário      ● Configurar jornada (4–10h)
-  ● Pausas: Almoço / Café / Retorno    ● Registrar ponto por funcionário    ● Configurar desconto de almoço
-  ● Horas trabalhadas ao vivo (30s)    ● Histórico de registros             ● Definir valor/hora em €
-  ● Ganhos do dia em tempo real        ● Relatórios por período             ● Redefinir senha de qualquer usuário
-  ● Desconto de almoço automático*     ● Exportar CSV profissional          ● Alterar nome de usuário
-  ● Horas extras acumuladas                                                 ● Criar usuários (funcionário/gerente/admin)
-  ● Notificações de fim de jornada
+  ● Relógio ao vivo                    ● Dashboard mensal (gráfico + metas) ● Tudo do Gerente
+  ● Status: dentro / pausa / fora      ● Painel de status ao vivo           ● Cadastrar e remover funcionários
+  ● Registrar entrada / saída          ● Ver quem está em serviço agora     ● Configurar jornada (4–10h)
+  ● Pausas: Almoço / Café / Retorno    ● Ver ganhos de cada funcionário     ● Configurar desconto de almoço
+  ● Horas trabalhadas ao vivo (30s)    ● Registrar ponto por funcionário    ● Definir valor/hora em €
+  ● Ganhos do dia em tempo real        ● Histórico de registros             ● Redefinir senha de qualquer usuário
+  ● Desconto de almoço automático*     ● Banco de horas — saldos e ajustes  ● Alterar nome de usuário e email
+  ● Banco de horas acumulado           ● Feriados e folgas justificadas     ● Criar usuários (funcionário/gerente/admin)
+  ● Horas extras acumuladas            ● Relatórios por período             ● Geolocalização por funcionário
+  ● Notificações de fim de jornada     ● Exportar CSV profissional          ● Audit log de todas as ações
+  ● Geolocalização no registo          ● Exportar recibo PDF por pessoa     ● Dashboard com gráfico mensal
   ● Troca de senha
   ● Histórico do dia
 ```
@@ -176,26 +178,37 @@ ponto_glass_next/
 │       │   ├── logout/       ← limpa cookie
 │       │   └── recover/      ← reset de emergência via RECOVERY_SECRET
 │       ├── me/               ← perfil completo do usuário logado
-│       ├── punch/            ← registra entrada/saída (admin/gerente podem registrar por outros)
-│       ├── records/          ← lista registros (filtros por data / funcionário)
-│       ├── employees/        ← CRUD funcionários + configurações individuais
-│       │   └── [id]/         ← PATCH (jornada, almoço, valor/hora, senha) / DELETE
-│       └── reports/          ← relatório por período (máx 366 dias / 2000 registros)
+│       ├── punch/            ← registra ponto com geolocalização opcional
+│       ├── records/          ← lista e edita registros (filtros por data / funcionário)
+│       │   └── [id]/         ← PATCH (editar) / DELETE (remover)
+│       ├── employees/        ← CRUD funcionários (email, jornada, geo, valor/hora)
+│       │   └── [id]/         ← PATCH / DELETE (soft delete)
+│       ├── reports/          ← relatório por período (máx 366 dias / 2000 registros)
+│       ├── hour-bank/        ← saldo e ajustes manuais do banco de horas
+│       │   └── [id]/         ← DELETE ajuste
+│       ├── day-exceptions/   ← feriados e folgas justificadas
+│       │   └── [id]/         ← DELETE exceção
+│       └── audit/            ← audit log de ações administrativas (admin only)
 │
 ├── components/
-│   ├── PunchCard.tsx         ← card de ponto com métricas ao vivo (30s)
+│   ├── PunchCard.tsx         ← card de ponto com métricas ao vivo, geo e banco de horas
 │   ├── LiveClock.tsx         ← relógio em tempo real
 │   └── ChangePasswordModal.tsx
 │
 ├── lib/
 │   ├── auth.ts               ← createJWT / verifyJWT
 │   ├── supabase.ts           ← cliente Supabase (service_role)
+│   ├── audit.ts              ← logAudit() fire-and-forget
 │   ├── rateLimit.ts          ← rate limiter em memória (login / recover)
-│   ├── types.ts              ← Employee, EmployeeProfile, PunchRecord, JWTUser
-│   └── utils.ts              ← calcHours, calcNetMinutes, calcEarnings, fmtMinutes…
+│   ├── types.ts              ← Employee, EmployeeProfile, PunchRecord, AuditLog, DayException…
+│   └── utils.ts              ← calcHours, calcNetMinutes, calcTimeBreakdown, fmtMinutes…
+│
+├── public/
+│   ├── manifest.json         ← PWA manifest
+│   └── sw.js                 ← Service Worker (cache offline)
 │
 ├── middleware.ts              ← RBAC: protege rotas por role (admin/manager/employee)
-└── supabase/schema.sql        ← schema do banco com RLS habilitado
+└── supabase/schema.sql        ← schema completo + migrações v1→v6
 ```
 
 <br/>
@@ -232,7 +245,7 @@ RECOVERY_SECRET=chave-de-recuperacao-de-emergencia
 
 Execute `supabase/schema.sql` no SQL Editor do seu projeto Supabase.
 
-> **Banco já existente?** O arquivo inclui blocos de migração comentados (v1→v2, v2→v3, v3→v4) — execute apenas os blocos correspondentes à versão que você já tem.
+> **Banco já existente?** O arquivo inclui blocos de migração incremental v1→v6 — execute apenas os blocos correspondentes à versão que você já tem.
 
 **5. Rode**
 ```bash
@@ -273,12 +286,14 @@ employees (
   id                  UUID  PRIMARY KEY,
   name                TEXT,
   username            TEXT  UNIQUE,
+  email               TEXT,           ← opcional
   password_hash       TEXT,           ← bcrypt, nunca texto puro
   role                TEXT,           ← 'admin' | 'manager' | 'employee'
   active              BOOLEAN,        ← soft delete
   workday_hours       DECIMAL(4,2),   ← jornada configurável (padrão 8h)
   lunch_break_minutes INT,            ← desconto de almoço (padrão 60min)
   hourly_rate         DECIMAL(10,2),  ← valor/hora em € (opcional)
+  geo_mode            TEXT,           ← 'required' | 'optional' | 'disabled'
   created_at          TIMESTAMPTZ
 )
 
@@ -291,13 +306,49 @@ records (
                                       'inicio_almoco' | 'fim_almoco'
                                       'pausa_cafe'    | 'retorno_cafe'
   timestamp     TIMESTAMPTZ,
-  date          DATE               ← índice de busca por dia
+  date          DATE,              ← índice de busca por dia
+  latitude      DECIMAL(9,6),     ← geolocalização opcional
+  longitude     DECIMAL(9,6)
+)
+
+-- ajustes manuais do banco de horas
+hour_bank_adjustments (
+  id          UUID  PRIMARY KEY,
+  employee_id UUID  → employees.id,
+  minutes     INT,                 ← positivo = crédito, negativo = débito
+  reason      TEXT,
+  date        DATE,
+  created_by  UUID  → employees.id,
+  created_at  TIMESTAMPTZ
+)
+
+-- feriados e folgas justificadas
+day_exceptions (
+  id          UUID  PRIMARY KEY,
+  date        DATE,
+  type        TEXT,                ← 'holiday' | 'day_off'
+  description TEXT,
+  employee_id UUID  → employees.id ← null = aplica a todos
+  created_by  UUID  → employees.id,
+  created_at  TIMESTAMPTZ
+)
+
+-- audit log
+audit_logs (
+  id          UUID  PRIMARY KEY,
+  actor_id    UUID  → employees.id,
+  actor_name  TEXT,
+  action      TEXT,                ← 'employee_create' | 'punch_on_behalf' | …
+  target_id   UUID,
+  target_name TEXT,
+  details     JSONB,
+  created_at  TIMESTAMPTZ
 )
 ```
 
-> O arquivo `supabase/schema.sql` inclui os scripts de migração para bancos existentes.
+> O arquivo `supabase/schema.sql` inclui os scripts de migração incremental **v1 → v6**.
 
-RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servidor.
+RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servidor.
 
 <br/>
 
@@ -311,11 +362,12 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
   ✓  Middleware de RBAC em todas as rotas sensíveis (admin / manager / employee)
   ✓  Service role key nunca exposta ao cliente
   ✓  Rate limiting: 5 tentativas/15min no login e na recuperação
-  ✓  Row Level Security habilitado no Supabase
+  ✓  Row Level Security habilitado no Supabase (todas as tabelas)
   ✓  Funcionários só enxergam os próprios registros
   ✓  Soft delete — nenhum dado é apagado permanentemente
   ✓  Proteção ao último administrador (não pode ser removido)
   ✓  Recuperação de emergência via RECOVERY_SECRET
+  ✓  Audit log completo de todas as ações administrativas
 ```
 
 <br/>
@@ -330,7 +382,7 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
   ✓  Notificações de fim de jornada e hora extra
   ✓  Histórico e relatórios por período
   ✓  Ganhos do dia em tempo real (EUR)
-  ✓  PWA — ícone na tela inicial do celular
+  ✓  PWA — ícone na tela inicial do celular (manifest + service worker)
   ✓  Layout responsivo mobile + desktop
   ✓  Admin registra ponto por funcionário
   ✓  Papel "gerente" (acesso intermediário)
@@ -338,12 +390,17 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
   ✓  Ganhos por funcionário no painel de status
   ✓  CSV profissional (resumo diário com pausas e ganhos)
   ✓  Admin altera nome de usuário dos funcionários
-  ☐  Inbox de alertas (funcionário sem saída registrada)   → issue #4
+  ✓  Dashboard com gráfico mensal de horas e metas por funcionário
+  ✓  Audit log completo de todas as ações administrativas
+  ✓  Banco de horas — saldo acumulado + ajustes manuais
+  ✓  Geolocalização no registo de ponto (opcional / obrigatória / desativada)
+  ✓  Campo email por funcionário
+  ✓  Feriados e folgas justificadas
+  ✓  Recibo PDF por funcionário
+  ✓  Alertas de dias sem saída registrada
+  ☐  Relatório mensal automático por e-mail                → issue #9
   ☐  Domínio personalizado                                 → issue #5
   ☐  Multi-empresa (tenancy)                               → issue #6
-  ☐  Dashboard com gráficos mensais de horas/ganhos        → issue #8
-  ☐  Relatório mensal automático por e-mail                → issue #9
-  ☐  Audit log de alterações administrativas               → issue #10
 ```
 
 <br/>
