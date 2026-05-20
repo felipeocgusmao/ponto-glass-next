@@ -15,12 +15,12 @@ export async function GET(request: NextRequest) {
   const today = searchParams.get('today') === 'true'
   const date = searchParams.get('date')
   const employeeId = searchParams.get('employeeId')
-  const isAdmin = user.role === 'admin'
+  const isPrivileged = user.role === 'admin' || user.role === 'manager'
 
   let query = supabase.from('records').select('*').order('timestamp', { ascending: true })
 
-  // Non-admins see only their own records
-  if (!isAdmin) {
+  // Employees see only their own records; admins/managers see all
+  if (!isPrivileged) {
     query = query.eq('employee_id', user.id)
   } else if (employeeId && employeeId !== 'all') {
     query = query.eq('employee_id', employeeId)
