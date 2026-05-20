@@ -2,6 +2,7 @@ export interface Employee {
   id: string
   name: string
   username: string
+  email: string | null
   role: 'admin' | 'manager' | 'employee'
   active: boolean
   created_at: string
@@ -53,6 +54,16 @@ export interface HourBankAdjustment {
   minutes: number
   reason: string
   date: string
+  created_by: string | null
+  created_at: string
+}
+
+export interface DayException {
+  id: string
+  date: string
+  type: 'holiday' | 'day_off'
+  description: string
+  employee_id: string | null
   created_by: string | null
   created_at: string
 }

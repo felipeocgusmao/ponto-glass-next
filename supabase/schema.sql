@@ -103,3 +103,20 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_audit_created    ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_action     ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_bank_employee    ON hour_bank_adjustments(employee_id);
+
+-- v5 → v6: campo email + feriados/folgas
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS email TEXT;
+
+CREATE TABLE IF NOT EXISTS day_exceptions (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  date        DATE        NOT NULL,
+  type        TEXT        NOT NULL CHECK (type IN ('holiday', 'day_off')),
+  description TEXT        NOT NULL,
+  employee_id UUID        REFERENCES employees(id),
+  created_by  UUID        REFERENCES employees(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_day_exceptions_date     ON day_exceptions(date);
+CREATE INDEX IF NOT EXISTS idx_day_exceptions_employee ON day_exceptions(employee_id);

@@ -1,0 +1,18 @@
+{
+  "name": "PontoGlass",
+  "short_name": "PontoGlass",
+  "description": "Controle de ponto digital",
+  "start_url": "/ponto",
+  "display": "standalone",
+  "background_color": "#070714",
+  "theme_color": "#070714",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
