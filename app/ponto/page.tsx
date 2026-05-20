@@ -71,6 +71,7 @@ export default function PontoPage() {
           workdayMinutes={Math.round(user.workday_hours * 60)}
           lunchBreakMinutes={user.lunch_break_minutes}
           hourlyRate={user.hourly_rate}
+          userId={user.id}
         />
       </div>
     </main>

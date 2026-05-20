@@ -31,6 +31,7 @@ interface Props {
   workdayMinutes?: number
   lunchBreakMinutes?: number
   hourlyRate?: number | null
+  userId?: string
 }
 
 function sendNotification(title: string, body: string) {
@@ -42,6 +43,7 @@ export default function PunchCard({
   workdayMinutes = 480,
   lunchBreakMinutes = 60,
   hourlyRate = null,
+  userId,
 }: Props) {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -53,10 +55,13 @@ export default function PunchCard({
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/records?today=true')
+      const url = userId
+        ? `/api/records?today=true&employeeId=${userId}`
+        : '/api/records?today=true'
+      const res = await fetch(url)
       if (res.ok) setRecords(await res.json())
     } catch { /* mantém registros atuais */ }
-  }, [])
+  }, [userId])
 
   useEffect(() => { load() }, [load])
 

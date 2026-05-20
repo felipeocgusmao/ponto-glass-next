@@ -90,6 +90,7 @@ function StatusTab({ employees, currentUserId }: { employees: Employee[]; curren
   const [liveMs, setLiveMs] = useState(() => Date.now())
   const [punching, setPunching] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ id: string; kind: 'success' | 'error'; text: string } | null>(null)
+  const [weekRecords, setWeekRecords] = useState<PunchRecord[]>([])
 
   const load = useCallback(async () => {
     try {
@@ -98,7 +99,22 @@ function StatusTab({ employees, currentUserId }: { employees: Employee[]; curren
     } catch { /* keep current */ }
   }, [])
 
+  const loadWeek = useCallback(async () => {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const day = now.getDay()
+    const monday = new Date(now); monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1))
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1)
+    if (fmt(yesterday) < fmt(monday)) return
+    try {
+      const res = await fetch(`/api/reports?from=${fmt(monday)}&to=${fmt(yesterday)}`)
+      if (res.ok) setWeekRecords(await res.json())
+    } catch { /* keep current */ }
+  }, [])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadWeek() }, [loadWeek])
 
   useEffect(() => {
     const iv = setInterval(() => setLiveMs(Date.now()), 30_000)
@@ -140,6 +156,12 @@ function StatusTab({ employees, currentUserId }: { employees: Employee[]; curren
     recordsByEmp.get(r.employee_id)!.push(r)
   })
 
+  const weekByEmp = new Map<string, PunchRecord[]>()
+  weekRecords.forEach(r => {
+    if (!weekByEmp.has(r.employee_id)) weekByEmp.set(r.employee_id, [])
+    weekByEmp.get(r.employee_id)!.push(r)
+  })
+
   const workers = employees.filter(e => e.id !== currentUserId)
 
   const statuses = workers.map(emp => {
@@ -174,7 +196,11 @@ function StatusTab({ employees, currentUserId }: { employees: Employee[]; curren
       ? ((liveNetMin / 60) * emp.hourly_rate).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
       : null
 
-    return { emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings }
+    const pastWeekRecs = weekByEmp.get(emp.id) ?? []
+    const pastWeekMin = pastWeekRecs.length > 0 ? (calcOvertimePeriod(pastWeekRecs, 0, emp.lunch_break_minutes) ?? 0) : 0
+    const weekTotal = Math.round(pastWeekMin + liveNetMin)
+
+    return { emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal }
   })
 
   const onlineCount   = statuses.filter(s => s.isIn).length
@@ -200,7 +226,7 @@ function StatusTab({ employees, currentUserId }: { employees: Employee[]; curren
         {workers.length === 0 && (
           <div className="alert-info mt-2">Nenhum funcionário cadastrado.</div>
         )}
-        {statuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings }) => (
+        {statuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal }) => (
           <div key={emp.id} className="worker-status-item">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="relative flex-shrink-0">
@@ -221,6 +247,9 @@ function StatusTab({ employees, currentUserId }: { employees: Employee[]; curren
                 </div>
                 {liveEarnings && (
                   <div className="text-xs text-green-300/70 mt-0.5">{liveEarnings} hoje</div>
+                )}
+                {weekTotal > 0 && (
+                  <div className="text-xs text-white/30 mt-0.5">{fmtMinutes(weekTotal)} esta semana</div>
                 )}
                 {msg?.id === emp.id && (
                   <div className={`text-xs mt-1 ${msg.kind === 'success' ? 'text-green-400' : 'text-red-400'}`}>
@@ -253,6 +282,14 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editTs, setEditTs] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+
+  const toLocalInput = (ts: string) => {
+    const d = new Date(ts)
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  }
 
   const handleFromChange = (val: string) => { setFrom(val); if (val > to) setTo(val) }
   const handleToChange   = (val: string) => { setTo(val);   if (val < from) setFrom(val) }
@@ -285,6 +322,28 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
       setError('Erro de conexão.')
     } finally {
       setDeleting(null)
+    }
+  }
+
+  const handleEdit = async (id: string) => {
+    setEditSaving(true)
+    try {
+      const res = await fetch(`/api/records/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timestamp: new Date(editTs).toISOString() }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setRecords(prev => prev.map(r => r.id === id ? { ...r, timestamp: updated.timestamp, date: updated.date } : r))
+        setEditingId(null)
+      } else {
+        const d = await res.json(); setError(d.error ?? 'Erro ao salvar.')
+      }
+    } catch {
+      setError('Erro de conexão.')
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -329,27 +388,55 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
                 <span className="section-label">{records.length} registro(s)</span>
                 {records.map((r) => {
                   const tagClass = r.type === 'entrada' ? 'rec-tag-in' : r.type === 'saída' ? 'rec-tag-out' : 'rec-tag-break'
+                  const isEditing = editingId === r.id
                   return (
-                    <div key={r.id} className="record-item">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-white text-sm">{r.employee_name}</div>
-                        <div className="text-white/35 text-xs mt-1">
-                          {new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
-                          {' · '}
-                          {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+                    <div key={r.id}>
+                      <div className="record-item">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-white text-sm">{r.employee_name}</div>
+                          <div className="text-white/35 text-xs mt-1">
+                            {new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+                            {' · '}
+                            {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={tagClass}>{tagLabel[r.type] ?? r.type}</span>
+                          <button
+                            onClick={() => { setEditingId(r.id); setEditTs(toLocalInput(r.timestamp)) }}
+                            disabled={editSaving}
+                            className="text-white/30 hover:text-blue-400 transition-colors text-xs px-1"
+                            title="Editar horário"
+                          >✏</button>
+                          <button
+                            onClick={() => handleDelete(r.id)}
+                            disabled={deleting === r.id}
+                            className="text-white/30 hover:text-red-400 transition-colors text-xs px-1"
+                            title="Apagar registro"
+                          >
+                            {deleting === r.id ? '…' : '✕'}
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={tagClass}>{tagLabel[r.type] ?? r.type}</span>
-                        <button
-                          onClick={() => handleDelete(r.id)}
-                          disabled={deleting === r.id}
-                          className="text-white/30 hover:text-red-400 transition-colors text-xs px-1"
-                          title="Apagar registro"
-                        >
-                          {deleting === r.id ? '…' : '✕'}
-                        </button>
-                      </div>
+                      {isEditing && (
+                        <div className="flex items-center gap-2 py-2 px-1">
+                          <input
+                            type="datetime-local"
+                            value={editTs}
+                            onChange={e => setEditTs(e.target.value)}
+                            className="glass-input flex-1 text-xs"
+                          />
+                          <button
+                            onClick={() => handleEdit(r.id)}
+                            disabled={editSaving}
+                            className="btn-glass text-xs px-2 py-1"
+                          >{editSaving ? '…' : 'OK'}</button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="text-white/30 hover:text-white/60 text-xs px-1"
+                          >✕</button>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -760,6 +847,70 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
   )
 }
 
+// ─── Missing-exit alert banner ────────────────────────────────────────────────
+function MissingExitBanner() {
+  const [alerts, setAlerts] = useState<{ name: string; date: string }[]>([])
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    const check = async () => {
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1)
+      const weekAgo   = new Date(now); weekAgo.setDate(now.getDate() - 7)
+      try {
+        const res = await fetch(`/api/reports?from=${fmt(weekAgo)}&to=${fmt(yesterday)}`)
+        if (!res.ok) return
+        const records: PunchRecord[] = await res.json()
+        const byEmpDate = new Map<string, Map<string, PunchRecord[]>>()
+        records.forEach(r => {
+          if (!byEmpDate.has(r.employee_id)) byEmpDate.set(r.employee_id, new Map())
+          const dm = byEmpDate.get(r.employee_id)!
+          if (!dm.has(r.date)) dm.set(r.date, [])
+          dm.get(r.date)!.push(r)
+        })
+        const missing: { name: string; date: string }[] = []
+        byEmpDate.forEach((dm, empId) => {
+          const empName = records.find(r => r.employee_id === empId)?.employee_name ?? empId
+          dm.forEach((dayRecs, date) => {
+            const last = [...dayRecs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).at(-1)
+            if (last && WORKING_TYPES.includes(last.type)) missing.push({ name: empName, date })
+          })
+        })
+        setAlerts(missing)
+      } catch { /* silent */ }
+    }
+    check()
+  }, [])
+
+  if (dismissed || alerts.length === 0) return null
+
+  return (
+    <div className="glass p-4 mb-4 border border-amber-400/30 bg-amber-400/5 rounded-xl">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <div className="text-amber-300 font-semibold text-sm mb-2">
+            ⚠ {alerts.length} dia(s) sem saída registrada
+          </div>
+          <div className="space-y-0.5">
+            {alerts.map((a, i) => (
+              <div key={i} className="text-white/55 text-xs">
+                {a.name} — {new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+              </div>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-white/30 hover:text-white/60 transition-colors text-sm leading-none"
+          title="Fechar"
+        >✕</button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Admin page ───────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
@@ -855,6 +1006,9 @@ export default function AdminPage() {
           ))}
         </div>
 
+        {/* Missing-exit alerts */}
+        <MissingExitBanner />
+
         {/* Tab content */}
         <div key={tab}>
           {tab === 'meu_ponto'    && (
@@ -863,6 +1017,7 @@ export default function AdminPage() {
                 workdayMinutes={Math.round(user.workday_hours * 60)}
                 lunchBreakMinutes={user.lunch_break_minutes}
                 hourlyRate={user.hourly_rate}
+                userId={user.id}
               />
             </div>
           )}
