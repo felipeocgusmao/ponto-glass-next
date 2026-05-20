@@ -239,7 +239,12 @@ export function exportCSV(
   row('TOTAL GERAL', '', '', '', '', fmtMinutes(grandTotalMin), '', grandEarningsStr)
 
   const csv = `sep=${SEP}\n` + lines.join('\n')
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  // UTF-16 LE with BOM — Excel always recognises this encoding correctly
+  const buf = new ArrayBuffer((csv.length + 1) * 2)
+  const view = new Uint16Array(buf)
+  view[0] = 0xFEFF
+  for (let i = 0; i < csv.length; i++) view[i + 1] = csv.charCodeAt(i)
+  const blob = new Blob([buf], { type: 'text/csv;charset=utf-16le' })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href = url
