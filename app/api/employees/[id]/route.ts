@@ -17,9 +17,16 @@ export async function PATCH(
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { username: new_username, role, workday_hours, lunch_break_minutes, hourly_rate, new_password } = await request.json()
+  const { name: new_name, username: new_username, role, workday_hours, lunch_break_minutes, hourly_rate, new_password } = await request.json()
 
   const updates: Record<string, unknown> = {}
+
+  if (new_name !== undefined) {
+    const trimmed = String(new_name).trim()
+    if (trimmed.length < 2 || trimmed.length > 100)
+      return NextResponse.json({ error: 'Nome deve ter entre 2 e 100 caracteres' }, { status: 400 })
+    updates.name = trimmed
+  }
 
   if (role !== undefined) {
     if (!['admin', 'manager', 'employee'].includes(role))

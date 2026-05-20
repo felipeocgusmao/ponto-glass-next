@@ -252,6 +252,7 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const handleFromChange = (val: string) => { setFrom(val); if (val > to) setTo(val) }
   const handleToChange   = (val: string) => { setTo(val);   if (val < from) setFrom(val) }
@@ -273,12 +274,30 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
 
   useEffect(() => { load() }, [load])
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Apagar este registro?')) return
+    setDeleting(id)
+    try {
+      const res = await fetch(`/api/records/${id}`, { method: 'DELETE' })
+      if (res.ok) setRecords(prev => prev.filter(r => r.id !== id))
+      else { const d = await res.json(); setError(d.error ?? 'Erro ao apagar.') }
+    } catch {
+      setError('Erro de conexão.')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const tagLabel: Record<string, string> = {
+    entrada: 'Entrada', 'saída': 'Saída',
+    inicio_almoco: 'Almoço', fim_almoco: 'Ret. Almoço',
+    pausa_cafe: 'Café', retorno_cafe: 'Ret. Café',
+  }
+
   return (
     <div className="tab-content space-y-4">
-      {/* Filters */}
       <div className="glass p-5 space-y-3">
         <span className="section-label">Filtros</span>
-
         <div className="date-range">
           <div className="date-range-col">
             <label className="input-label">De</label>
@@ -290,7 +309,6 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
             <input type="date" value={to} onChange={(e) => handleToChange(e.target.value)} />
           </div>
         </div>
-
         <div>
           <label className="input-label">Funcionário</label>
           <select value={empId} onChange={(e) => setEmpId(e.target.value)} className="glass-select">
@@ -300,7 +318,6 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
         </div>
       </div>
 
-      {/* Results */}
       <div className="glass p-5">
         {error && <div className="alert-error mb-3">{error}</div>}
         {loading
@@ -312,14 +329,9 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
                 <span className="section-label">{records.length} registro(s)</span>
                 {records.map((r) => {
                   const tagClass = r.type === 'entrada' ? 'rec-tag-in' : r.type === 'saída' ? 'rec-tag-out' : 'rec-tag-break'
-                  const tagLabel: Record<string, string> = {
-                    entrada: 'Entrada', saída: 'Saída',
-                    inicio_almoco: 'Almoço', fim_almoco: 'Ret. Almoço',
-                    pausa_cafe: 'Café', retorno_cafe: 'Ret. Café',
-                  }
                   return (
                     <div key={r.id} className="record-item">
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <div className="font-semibold text-white text-sm">{r.employee_name}</div>
                         <div className="text-white/35 text-xs mt-1">
                           {new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
@@ -327,7 +339,17 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
                           {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
                         </div>
                       </div>
-                      <span className={tagClass}>{tagLabel[r.type] ?? r.type}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={tagClass}>{tagLabel[r.type] ?? r.type}</span>
+                        <button
+                          onClick={() => handleDelete(r.id)}
+                          disabled={deleting === r.id}
+                          className="text-white/30 hover:text-red-400 transition-colors text-xs px-1"
+                          title="Apagar registro"
+                        >
+                          {deleting === r.id ? '…' : '✕'}
+                        </button>
+                      </div>
                     </div>
                   )
                 })}
@@ -341,6 +363,7 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
 
 // ─── Funcionários tab ─────────────────────────────────────────────────────────
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
+  const [name, setName] = useState(emp.name)
   const [username, setUsername] = useState(emp.username)
   const [role, setRole] = useState<'employee' | 'manager' | 'admin'>(emp.role as 'employee' | 'manager' | 'admin')
   const [workdayHours, setWorkdayHours] = useState(String(emp.workday_hours))
@@ -358,6 +381,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
       lunch_break_minutes: lunchMin,
       hourly_rate: rate,
     }
+    if (name !== emp.name) body.name = name
     if (username !== emp.username) body.username = username
     if (role !== emp.role) body.role = role
     if (newPassword) body.new_password = newPassword
@@ -377,6 +401,13 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
 
   return (
     <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+      <div>
+        <label className="input-label">Nome completo</label>
+        <input
+          value={name} onChange={(e) => setName(e.target.value)}
+          placeholder="ex: Maria Silva" className="glass-input"
+        />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="input-label">Nome de usuário</label>
@@ -610,6 +641,7 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
 
   const [from, setFrom] = useState(firstOfMonth)
   const [to, setTo] = useState(todayStr)
+  const [filterEmpId, setFilterEmpId] = useState('all')
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -622,7 +654,9 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
   const load = async () => {
     setError(''); setTruncated(false); setLoading(true)
     try {
-      const res = await fetch(`/api/reports?from=${from}&to=${to}`)
+      const params = new URLSearchParams({ from, to })
+      if (filterEmpId !== 'all') params.set('employeeId', filterEmpId)
+      const res = await fetch(`/api/reports?${params}`)
       if (res.ok) {
         setRecords(await res.json())
         setLoaded(true)
@@ -659,6 +693,14 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
             <label className="input-label">Até</label>
             <input type="date" value={to} onChange={(e) => handleToChange(e.target.value)} />
           </div>
+        </div>
+
+        <div>
+          <label className="input-label">Funcionário</label>
+          <select value={filterEmpId} onChange={(e) => setFilterEmpId(e.target.value)} className="glass-select">
+            <option value="all">Todos</option>
+            {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
         </div>
 
         {error && <div className="alert-error">{error}</div>}
