@@ -32,6 +32,7 @@ interface Props {
   lunchBreakMinutes?: number
   hourlyRate?: number | null
   userId?: string
+  geoMode?: 'required' | 'optional' | 'disabled'
 }
 
 function sendNotification(title: string, body: string) {
@@ -44,11 +45,13 @@ export default function PunchCard({
   lunchBreakMinutes = 60,
   hourlyRate = null,
   userId,
+  geoMode = 'optional',
 }: Props) {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const [liveMs, setLiveMs] = useState(() => Date.now())
+  const [bankMin, setBankMin] = useState<number | null>(null)
   const punching = useRef(false)
   const notified = useRef(new Set<string>())
   const notifiedDate = useRef('')
@@ -63,7 +66,16 @@ export default function PunchCard({
     } catch { /* mantém registros atuais */ }
   }, [userId])
 
+  const loadBank = useCallback(async () => {
+    if (!userId) return
+    try {
+      const res = await fetch(`/api/hour-bank?employeeId=${userId}`)
+      if (res.ok) { const d = await res.json(); setBankMin(d.balanceMin) }
+    } catch { /* silent */ }
+  }, [userId])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadBank() }, [loadBank])
 
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -129,11 +141,32 @@ export default function PunchCard({
     return () => clearInterval(interval)
   }, [records, workdayMinutes, lunchBreakMinutes])
 
+  const captureGeo = (): Promise<{ latitude: number; longitude: number } | null> =>
+    new Promise(resolve => {
+      if (geoMode === 'disabled' || typeof navigator === 'undefined' || !navigator.geolocation) {
+        resolve(null); return
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => resolve(null),
+        { timeout: 5000, maximumAge: 30000 },
+      )
+    })
+
   const handlePunch = async (type: PunchType) => {
     if (punching.current) return
     punching.current = true
     setLoading(true)
     setMsg(null)
+
+    const geo = await captureGeo()
+    if (geoMode === 'required' && !geo) {
+      setMsg({ kind: 'error', text: 'Localização necessária. Autorize o acesso e tente novamente.' })
+      setLoading(false)
+      punching.current = false
+      setTimeout(() => setMsg(null), 4_000)
+      return
+    }
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8_000)
@@ -142,7 +175,7 @@ export default function PunchCard({
       const res = await fetch('/api/punch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type }),
+        body: JSON.stringify({ type, ...(geo ?? {}) }),
         signal: controller.signal,
       })
       clearTimeout(timeout)
@@ -150,7 +183,7 @@ export default function PunchCard({
         ? { kind: 'success', text: TYPE_SUCCESS[type] }
         : { kind: 'error', text: 'Erro ao registrar ponto.' }
       )
-      if (res.ok) await load()
+      if (res.ok) { await load(); await loadBank() }
     } catch (err) {
       clearTimeout(timeout)
       const isAbort = err instanceof Error && err.name === 'AbortError'
@@ -198,7 +231,7 @@ export default function PunchCard({
     ? ((liveNetMin / 60) * hourlyRate).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
     : null
 
-  const metricsCount  = 2 + (liveOvertime !== null ? 1 : 0) + (liveEarnings ? 1 : 0)
+  const metricsCount  = 2 + (liveOvertime !== null ? 1 : 0) + (liveEarnings ? 1 : 0) + (bankMin !== null ? 1 : 0)
   const gridCols      = metricsCount <= 2 ? 'grid-cols-2' : metricsCount === 3 ? 'grid-cols-3' : 'grid-cols-2'
 
   function statusBadge() {
@@ -285,6 +318,14 @@ export default function PunchCard({
               <div className="metric-box">
                 <div className="metric-val text-green-300 text-lg">{liveEarnings}</div>
                 <div className="metric-lbl">Ganhos hoje</div>
+              </div>
+            )}
+            {bankMin !== null && (
+              <div className="metric-box">
+                <div className={`metric-val text-xl ${bankMin >= 0 ? 'text-green-300' : 'text-red-400'}`}>
+                  {bankMin >= 0 ? '+' : '-'}{fmtMinutes(Math.abs(bankMin))}
+                </div>
+                <div className="metric-lbl">Banco horas</div>
               </div>
             )}
           </div>

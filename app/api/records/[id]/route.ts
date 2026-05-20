@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { logAudit } from '@/lib/audit'
 
 export async function PATCH(
   request: NextRequest,
@@ -32,6 +33,11 @@ export async function PATCH(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await logAudit(user, 'record_update', { id: data.employee_id, name: data.employee_name }, {
+    recordId: params.id, newTimestamp: parsed.toISOString(),
+  })
+
   return NextResponse.json(data)
 }
 
@@ -49,7 +55,17 @@ export async function DELETE(
   if (!['admin', 'manager'].includes(user.role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const { data: rec } = await supabase
+    .from('records').select('employee_id, employee_name, type, date').eq('id', params.id).single()
+
   const { error } = await supabase.from('records').delete().eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (rec) {
+    await logAudit(user, 'record_delete', { id: rec.employee_id, name: rec.employee_name }, {
+      recordId: params.id, type: rec.type, date: rec.date,
+    })
+  }
+
   return NextResponse.json({ success: true })
 }

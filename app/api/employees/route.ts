@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { logAudit } from '@/lib/audit'
 import bcrypt from 'bcryptjs'
 
 async function requireAdmin() {
@@ -27,7 +28,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('employees')
-    .select('id, name, username, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate')
+    .select('id, name, username, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode')
     .eq('active', true)
     .order('created_at', { ascending: true })
 
@@ -36,7 +37,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const actor = await requireAdmin()
+  if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { name, username, password, role, workday_hours, lunch_break_minutes, hourly_rate } = await request.json()
 
@@ -89,5 +91,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await logAudit(actor, 'employee_create', { id: data.id, name: data.name }, { role })
   return NextResponse.json(data, { status: 201 })
 }

@@ -5,19 +5,22 @@ import { useRouter } from 'next/navigation'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
 import PunchCard from '@/components/PunchCard'
 import { avatarInitials, exportCSV, calcOvertimePeriod, calcHours, fmtMinutes, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES } from '@/lib/utils'
-import type { Employee, EmployeeProfile, PunchRecord } from '@/lib/types'
+import type { Employee, EmployeeProfile, PunchRecord, AuditLog } from '@/lib/types'
 
-type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios'
+type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria'
 
 const ALL_TABS: { id: Tab; label: string }[] = [
-  { id: 'status',        label: 'Status'    },
-  { id: 'registros',    label: 'Registros' },
+  { id: 'dashboard',    label: 'Dashboard' },
+  { id: 'status',       label: 'Status'    },
+  { id: 'registros',   label: 'Registros' },
   { id: 'funcionarios', label: 'Equipe'    },
-  { id: 'relatorios',   label: 'Relatório' },
+  { id: 'relatorios',  label: 'Relatório' },
+  { id: 'auditoria',   label: 'Auditoria' },
 ]
 
 const MANAGER_TABS: { id: Tab; label: string }[] = [
   { id: 'meu_ponto',  label: 'Meu Ponto' },
+  { id: 'dashboard',  label: 'Dashboard' },
   { id: 'status',     label: 'Status'    },
   { id: 'registros',  label: 'Registros' },
   { id: 'relatorios', label: 'Relatório' },
@@ -73,13 +76,32 @@ function IconClock({ size = 22 }: { size?: number }) {
     </svg>
   )
 }
+function IconDashboard({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3h7v9H3z"/><path d="M14 3h7v5h-7z"/><path d="M14 12h7v9h-7z"/><path d="M3 16h7v5H3z"/>
+    </svg>
+  )
+}
+function IconAudit({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      <polyline points="10 9 9 9 8 9"/>
+    </svg>
+  )
+}
 
 const TAB_ICONS: Record<Tab, React.ReactNode> = {
   meu_ponto:    <IconClock />,
+  dashboard:    <IconDashboard />,
   status:       <IconStatus />,
   registros:    <IconList />,
   funcionarios: <IconUsers />,
   relatorios:   <IconBar />,
+  auditoria:    <IconAudit />,
 }
 
 const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
@@ -429,6 +451,15 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className={tagClass}>{tagLabel[r.type] ?? r.type}</span>
+                          {r.latitude && r.longitude && (
+                            <a
+                              href={`https://maps.google.com/?q=${r.latitude},${r.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-white/30 hover:text-blue-400 transition-colors text-xs px-1"
+                              title="Ver localização"
+                            >📍</a>
+                          )}
                           <button
                             onClick={() => { setEditingId(r.id); setEditTs(toLocalInput(r.timestamp)) }}
                             disabled={editSaving}
@@ -516,6 +547,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
   const [workdayHours, setWorkdayHours] = useState(String(emp.workday_hours))
   const [lunchMin, setLunchMin] = useState(String(emp.lunch_break_minutes))
   const [rate, setRate] = useState(emp.hourly_rate != null ? String(emp.hourly_rate) : '')
+  const [geoMode, setGeoMode] = useState<'required' | 'optional' | 'disabled'>(emp.geo_mode ?? 'optional')
   const [newPassword, setNewPassword] = useState('')
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
@@ -531,6 +563,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
     if (name !== emp.name) body.name = name
     if (username !== emp.username) body.username = username
     if (role !== emp.role) body.role = role
+    if (geoMode !== (emp.geo_mode ?? 'optional')) body.geo_mode = geoMode
     if (newPassword) body.new_password = newPassword
 
     const res = await fetch(`/api/employees/${emp.id}`, {
@@ -599,6 +632,14 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
             placeholder="0,00" className="glass-input"
           />
         </div>
+      </div>
+      <div>
+        <label className="input-label">Geolocalização</label>
+        <select value={geoMode} onChange={e => setGeoMode(e.target.value as 'required' | 'optional' | 'disabled')} className="glass-select">
+          <option value="optional">Opcional (recomendado)</option>
+          <option value="required">Obrigatória</option>
+          <option value="disabled">Desativada</option>
+        </select>
       </div>
       <div>
         <label className="input-label">Nova senha (deixe em branco para não alterar)</label>
@@ -1066,6 +1107,242 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
   )
 }
 
+// ─── Dashboard tab ────────────────────────────────────────────────────────────
+function DashboardTab({ employees }: { employees: Employee[] }) {
+  const now = new Date()
+  const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const todayStr = now.toISOString().split('T')[0]
+
+  const [monthRecs, setMonthRecs] = useState<PunchRecord[]>([])
+  const [todayRecs, setTodayRecs] = useState<PunchRecord[]>([])
+  const [bankBalances, setBankBalances] = useState<Map<string, number>>(new Map())
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [mRes, tRes] = await Promise.all([
+        fetch(`/api/reports?from=${firstOfMonth}&to=${todayStr}`),
+        fetch('/api/records?today=true'),
+      ])
+      if (mRes.ok) setMonthRecs(await mRes.json())
+      if (tRes.ok) setTodayRecs(await tRes.json())
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }, [firstOfMonth, todayStr])
+
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (employees.length === 0) return
+    const fetchAll = async () => {
+      const map = new Map<string, number>()
+      await Promise.all(employees.map(async emp => {
+        try {
+          const res = await fetch(`/api/hour-bank?employeeId=${emp.id}`)
+          if (res.ok) { const d = await res.json(); map.set(emp.id, d.balanceMin) }
+        } catch { /* silent */ }
+      }))
+      setBankBalances(new Map(map))
+    }
+    fetchAll()
+  }, [employees])
+
+  const todayByEmp = new Map<string, PunchRecord[]>()
+  todayRecs.forEach(r => {
+    if (!todayByEmp.has(r.employee_id)) todayByEmp.set(r.employee_id, [])
+    todayByEmp.get(r.employee_id)!.push(r)
+  })
+
+  const onlineNow = employees.filter(emp => {
+    const recs = [...(todayByEmp.get(emp.id) ?? [])].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    const last = recs.at(-1)
+    return last && WORKING_TYPES.includes(last.type)
+  }).length
+
+  const workingDays = getWorkingDays(firstOfMonth, todayStr)
+  const byDateEmp = new Map<string, Map<string, PunchRecord[]>>()
+  monthRecs.forEach(r => {
+    if (!byDateEmp.has(r.date)) byDateEmp.set(r.date, new Map())
+    const em = byDateEmp.get(r.date)!
+    if (!em.has(r.employee_id)) em.set(r.employee_id, [])
+    em.get(r.employee_id)!.push(r)
+  })
+
+  const chartData = workingDays.map(date => {
+    const empMap = byDateEmp.get(date)
+    if (!empMap) return { date, min: 0 }
+    let totalMin = 0
+    empMap.forEach((dayRecs, eId) => {
+      const e = employees.find(emp => emp.id === eId)
+      const lMin = e?.lunch_break_minutes ?? 60
+      const hasBreaks = dayRecs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
+      totalMin += hasBreaks ? calcTimeBreakdown(dayRecs).workedMin : Math.max(0, calcNetMinutes(dayRecs, lMin))
+    })
+    return { date, min: totalMin }
+  })
+  const maxChartMin = Math.max(...chartData.map(d => d.min), 1)
+
+  const byEmpMonth: Record<string, PunchRecord[]> = {}
+  monthRecs.forEach(r => {
+    if (!byEmpMonth[r.employee_id]) byEmpMonth[r.employee_id] = []
+    byEmpMonth[r.employee_id].push(r)
+  })
+  const totalMonthMin = Object.values(byEmpMonth).reduce((sum, recs) => {
+    return sum + Math.max(0, calcOvertimePeriod(recs, 0, 60) ?? 0)
+  }, 0)
+
+  if (loading) return (
+    <div className="tab-content">
+      <div className="glass p-5"><div className="alert-info">Carregando dashboard...</div></div>
+    </div>
+  )
+
+  return (
+    <div className="tab-content space-y-4">
+      <div className="glass p-5">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="metric-box">
+            <div className="metric-val text-green-300">{onlineNow}</div>
+            <div className="metric-lbl">Online agora</div>
+          </div>
+          <div className="metric-box">
+            <div className="metric-val">{totalMonthMin > 0 ? fmtMinutes(Math.round(totalMonthMin)) : '—'}</div>
+            <div className="metric-lbl">Horas este mês</div>
+          </div>
+        </div>
+      </div>
+
+      {workingDays.length >= 2 && (
+        <div className="glass p-5">
+          <span className="section-label">
+            Horas por dia — {now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
+          </span>
+          <div className="flex items-end gap-px mt-4" style={{ height: '80px' }}>
+            {chartData.map(({ date, min }) => {
+              const pct = Math.min(100, (min / maxChartMin) * 100)
+              const d = new Date(date + 'T12:00:00')
+              const label = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`
+              const isToday = date === todayStr
+              return (
+                <div key={date} className="flex-1 h-full flex flex-col justify-end" title={label}>
+                  <div
+                    className={`w-full rounded-t transition-colors ${min === 0 ? 'bg-white/10' : isToday ? 'bg-green-400/50 hover:bg-green-400/70' : 'bg-indigo-400/50 hover:bg-indigo-400/70'}`}
+                    style={{ height: pct > 0 ? `${pct}%` : '3px' }}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="glass p-5">
+        <span className="section-label">Funcionários — este mês</span>
+        {employees.map(emp => {
+          const empRecs = byEmpMonth[emp.id] ?? []
+          const monthMin = empRecs.length > 0 ? Math.max(0, calcOvertimePeriod(empRecs, 0, emp.lunch_break_minutes) ?? 0) : 0
+          const targetMin = emp.workday_hours * 60 * workingDays.length
+          const pct = targetMin > 0 ? Math.min(100, (monthMin / targetMin) * 100) : 0
+          const bank = bankBalances.get(emp.id)
+          return (
+            <div key={emp.id} className="py-3 border-b border-white/5 last:border-0">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-white text-sm font-medium">{emp.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-white/60 text-xs">{monthMin > 0 ? fmtMinutes(Math.round(monthMin)) : '—'}</span>
+                  {bank !== undefined && (
+                    <span className={`text-xs font-medium ${bank >= 0 ? 'text-green-400/80' : 'text-red-400/80'}`}>
+                      banco: {bank >= 0 ? '+' : '-'}{fmtMinutes(Math.abs(bank))}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="w-full bg-white/10 rounded-full h-1.5">
+                <div
+                  className={`h-1.5 rounded-full transition-all ${pct >= 100 ? 'bg-green-400' : pct >= 75 ? 'bg-indigo-400' : 'bg-white/40'}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Auditoria tab ────────────────────────────────────────────────────────────
+const AUDIT_LABELS: Record<string, string> = {
+  employee_create:      '👤 Funcionário criado',
+  employee_update:      '✏ Funcionário atualizado',
+  employee_delete:      '🗑 Funcionário desativado',
+  record_create:        '➕ Registo criado',
+  record_update:        '✏ Registo editado',
+  record_delete:        '🗑 Registo apagado',
+  punch_on_behalf:      '▶ Ponto registado por admin',
+  hour_bank_adjustment: '⚖ Ajuste banco de horas',
+}
+
+function AuditoriaTab() {
+  const [logs, setLogs] = useState<AuditLog[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionFilter, setActionFilter] = useState('all')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ limit: '200' })
+      if (actionFilter !== 'all') params.set('action', actionFilter)
+      const res = await fetch(`/api/audit?${params}`)
+      if (res.ok) setLogs(await res.json())
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }, [actionFilter])
+
+  useEffect(() => { load() }, [load])
+
+  return (
+    <div className="tab-content space-y-4">
+      <div className="glass p-5">
+        <span className="section-label">Filtro</span>
+        <select value={actionFilter} onChange={e => setActionFilter(e.target.value)} className="glass-select mt-3">
+          <option value="all">Todas as ações</option>
+          {Object.entries(AUDIT_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="glass p-5">
+        {loading
+          ? <div className="alert-info">Carregando...</div>
+          : logs.length === 0
+          ? <div className="alert-info">Nenhum registo de auditoria.</div>
+          : (
+            <>
+              <span className="section-label">{logs.length} evento(s)</span>
+              {logs.map(log => (
+                <div key={log.id} className="record-item">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white text-sm font-medium">
+                      {AUDIT_LABELS[log.action] ?? log.action}
+                      {log.target_name && <span className="text-white/50 font-normal"> — {log.target_name}</span>}
+                    </div>
+                    <div className="text-white/35 text-xs mt-0.5">
+                      por {log.actor_name} · {new Date(log.created_at).toLocaleString('pt-BR')}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )
+        }
+      </div>
+    </div>
+  )
+}
+
 // ─── Missing-exit alert banner ────────────────────────────────────────────────
 function MissingExitBanner() {
   const [alerts, setAlerts] = useState<{ name: string; date: string }[]>([])
@@ -1134,7 +1411,7 @@ function MissingExitBanner() {
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [tab, setTab] = useState<Tab>('status')
+  const [tab, setTab] = useState<Tab>('dashboard')
   const isManager = user?.role === 'manager'
   const visibleTabs = isManager ? MANAGER_TABS : ALL_TABS
   const [showPwd, setShowPwd] = useState(false)
@@ -1237,13 +1514,16 @@ export default function AdminPage() {
                 lunchBreakMinutes={user.lunch_break_minutes}
                 hourlyRate={user.hourly_rate}
                 userId={user.id}
+                geoMode={user.geo_mode}
               />
             </div>
           )}
+          {tab === 'dashboard'    && <DashboardTab employees={employees} />}
           {tab === 'status'       && <StatusTab employees={employees} currentUserId={user.id} />}
           {tab === 'registros'    && <RegistrosTab employees={employees} />}
           {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
           {tab === 'relatorios'   && <RelatoriosTab employees={employees} />}
+          {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
         </div>
       </div>
 

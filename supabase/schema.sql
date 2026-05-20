@@ -69,3 +69,37 @@ ALTER TABLE records
 ALTER TABLE records
   ADD CONSTRAINT records_type_check
   CHECK (type IN ('entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe'));
+
+-- v4 → v5: geolocalização, banco de horas e audit log
+ALTER TABLE records
+  ADD COLUMN IF NOT EXISTS latitude  DECIMAL(9,6),
+  ADD COLUMN IF NOT EXISTS longitude DECIMAL(9,6);
+
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS geo_mode TEXT NOT NULL DEFAULT 'optional'
+    CHECK (geo_mode IN ('required', 'optional', 'disabled'));
+
+CREATE TABLE IF NOT EXISTS hour_bank_adjustments (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID        NOT NULL REFERENCES employees(id),
+  minutes     INTEGER     NOT NULL,
+  reason      TEXT        NOT NULL,
+  date        DATE        NOT NULL DEFAULT CURRENT_DATE,
+  created_by  UUID        REFERENCES employees(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_id    UUID        REFERENCES employees(id),
+  actor_name  TEXT        NOT NULL,
+  action      TEXT        NOT NULL,
+  target_id   UUID,
+  target_name TEXT,
+  details     JSONB,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_created    ON audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_action     ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_bank_employee    ON hour_bank_adjustments(employee_id);

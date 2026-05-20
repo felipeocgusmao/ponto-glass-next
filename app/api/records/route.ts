@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { logAudit } from '@/lib/audit'
 
 const VALID_TYPES = ['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 
@@ -21,7 +22,6 @@ export async function GET(request: NextRequest) {
 
   let query = supabase.from('records').select('*').order('timestamp', { ascending: true })
 
-  // Employees see only their own records; admins/managers see all
   if (!isPrivileged) {
     query = query.eq('employee_id', user.id)
   } else if (employeeId && employeeId !== 'all') {
@@ -74,5 +74,7 @@ export async function POST(request: NextRequest) {
     .select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await logAudit(user, 'record_create', { id: employeeId, name: emp.name }, { type, date })
   return NextResponse.json(data, { status: 201 })
 }
