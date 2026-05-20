@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
+import PunchCard from '@/components/PunchCard'
 import { avatarInitials, exportCSV, calcOvertimePeriod, calcHours, fmtMinutes, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES } from '@/lib/utils'
 import type { Employee, EmployeeProfile, PunchRecord } from '@/lib/types'
 
-type Tab = 'status' | 'registros' | 'funcionarios' | 'relatorios'
+type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios'
 
 const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'status',        label: 'Status'    },
@@ -15,7 +16,12 @@ const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'relatorios',   label: 'Relatório' },
 ]
 
-const MANAGER_TAB_IDS: Tab[] = ['status', 'registros', 'relatorios']
+const MANAGER_TABS: { id: Tab; label: string }[] = [
+  { id: 'meu_ponto',  label: 'Meu Ponto' },
+  { id: 'status',     label: 'Status'    },
+  { id: 'registros',  label: 'Registros' },
+  { id: 'relatorios', label: 'Relatório' },
+]
 
 function IconList({ size = 22 }: { size?: number }) {
   return (
@@ -59,7 +65,17 @@ function IconStatus({ size = 22 }: { size?: number }) {
   )
 }
 
+function IconClock({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <polyline points="12 7 12 12 15 15"/>
+    </svg>
+  )
+}
+
 const TAB_ICONS: Record<Tab, React.ReactNode> = {
+  meu_ponto:    <IconClock />,
   status:       <IconStatus />,
   registros:    <IconList />,
   funcionarios: <IconUsers />,
@@ -700,13 +716,15 @@ export default function AdminPage() {
   const router = useRouter()
 
   const isManager = user?.role === 'manager'
-  const visibleTabs = isManager ? ALL_TABS.filter(t => MANAGER_TAB_IDS.includes(t.id)) : ALL_TABS
+  const visibleTabs = isManager ? MANAGER_TABS : ALL_TABS
 
   const loadUser = useCallback(async () => {
     try {
       const res = await fetch('/api/me')
       if (!res.ok) { router.push('/login'); return }
-      setUser(await res.json())
+      const data = await res.json()
+      setUser(data)
+      if (data.role === 'manager') setTab('meu_ponto')
     } catch {
       setFetchError(true)
     }
@@ -786,6 +804,15 @@ export default function AdminPage() {
 
         {/* Tab content */}
         <div key={tab}>
+          {tab === 'meu_ponto'    && (
+            <div className="tab-content max-w-md mx-auto">
+              <PunchCard
+                workdayMinutes={Math.round(user.workday_hours * 60)}
+                lunchBreakMinutes={user.lunch_break_minutes}
+                hourlyRate={user.hourly_rate}
+              />
+            </div>
+          )}
           {tab === 'status'       && <StatusTab employees={employees} currentUserId={user.id} />}
           {tab === 'registros'    && <RegistrosTab employees={employees} />}
           {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
