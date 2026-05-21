@@ -182,7 +182,7 @@ ul, ol { list-style: none; }
   letter-spacing: 0.06em; color: var(--fg-subtle);
   padding: 10px 8px 6px; white-space: nowrap; overflow: hidden;
 }
-.sb-nav { display: flex; flex-direction: column; gap: 1px; }
+.sb-nav { display: flex; flex-direction: column; gap: 1px; flex: 1; overflow-y: auto; }
 .sb-item {
   display: flex; align-items: center; gap: 9px;
   padding: 6px 8px; border-radius: var(--r-sm);
