@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { type ReactNode, createContext, useContext, useEffect, useState } from 'react'
 import { type Lang, type TranslationKey, translate, detectLang, LANG_LABELS } from './i18n'
 export type { Lang }
 export { LANG_LABELS }
@@ -13,7 +13,7 @@ interface LangCtx {
 
 const Ctx = createContext<LangCtx>({ lang: 'pt-PT', setLang: () => {}, t: k => k })
 
-export function LangProvider({ children }: { children: React.ReactNode }) {
+export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>('pt-PT')
 
   useEffect(() => { setLangState(detectLang()) }, [])
