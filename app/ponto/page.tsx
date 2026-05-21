@@ -70,7 +70,7 @@ function getGeo(): Promise<{ lat: number; lng: number } | null> {
   })
 }
 
-function ProgressRing({ pct, overtime }: { pct: number; overtime: boolean }) {
+function ProgressRing({ pct, overtime, label }: { pct: number; overtime: boolean; label: string }) {
   const r = 56, c = 2 * Math.PI * r
   const off = c - (pct / 100) * c
   return (
@@ -88,7 +88,7 @@ function ProgressRing({ pct, overtime }: { pct: number; overtime: boolean }) {
       </text>
       <text x="0" y="20" textAnchor="middle" fontSize="9"
         fill="var(--fg-subtle)" fontWeight="600" letterSpacing="0.06em">
-        {t('ponto.journey')}
+        {label}
       </text>
     </svg>
   )
@@ -397,7 +397,7 @@ export default function PontoPage() {
             </div>
 
             <div className="emp-progress">
-              <ProgressRing pct={pct} overtime={overtime > 0}/>
+              <ProgressRing pct={pct} overtime={overtime > 0} label={t('ponto.journey')}/>
               <div className="emp-stats">
                 <div className="emp-stat primary">
                   <span className="emp-stat-label">{t('ponto.worked')}</span>
