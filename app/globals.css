@@ -274,6 +274,7 @@ ul, ol { list-style: none; }
   flex: 1; overflow: auto; padding: var(--section-pad);
   display: flex; flex-direction: column; gap: var(--section-pad); min-width: 0;
 }
+.page > * { flex-shrink: 0; }
 .page-head {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 16px; flex-wrap: wrap;
