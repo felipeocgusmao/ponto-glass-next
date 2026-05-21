@@ -17,6 +17,7 @@ import { BancoHorasTab } from './_components/tabs/BancoHorasTab'
 import { FeriadosTab } from './_components/tabs/FeriadosTab'
 import { RelatoriosTab } from './_components/tabs/RelatoriosTab'
 import { AuditoriaTab } from './_components/tabs/AuditoriaTab'
+import { CorrecoesTab } from './_components/tabs/CorrecoesTab'
 
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
@@ -114,6 +115,7 @@ export default function AdminPage() {
           {tab === 'banco'        && <BancoHorasTab employees={employees} />}
           {tab === 'feriados'     && <FeriadosTab />}
           {tab === 'relatorios'   && <RelatoriosTab employees={employees} />}
+          {tab === 'correcoes'    && <CorrecoesTab />}
           {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
         </div>
       </div>

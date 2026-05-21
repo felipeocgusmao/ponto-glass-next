@@ -1,0 +1,173 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import type { CorrectionRequest } from '@/lib/types'
+import { SL } from '../../_lib/helpers'
+
+const PUNCH_LABEL: Record<string, string> = {
+  entrada: 'Entrada', 'saída': 'Saída',
+  inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço',
+  pausa_cafe: 'Pausa café', retorno_cafe: 'Retorno café',
+}
+
+function fmtTs(ts: string) {
+  const d = new Date(ts)
+  return d.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function fmtDate(d: string) {
+  const [y, m, day] = d.split('-')
+  return `${day}/${m}/${y}`
+}
+
+export function CorrecoesTab() {
+  const [items, setItems] = useState<CorrectionRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionId, setActionId] = useState<string | null>(null)
+  const [rejectNote, setRejectNote] = useState('')
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/correction-requests')
+      if (res.ok) setItems(await res.json())
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const act = async (id: string, action: 'approve' | 'reject', note?: string) => {
+    setActionId(id)
+    try {
+      const res = await fetch(`/api/correction-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, note }),
+      })
+      if (res.ok) {
+        setRejectTarget(null)
+        setRejectNote('')
+        await load()
+      }
+    } catch { /* silent */ }
+    finally { setActionId(null) }
+  }
+
+  const pending = items.filter(i => i.status === 'pending')
+  const resolved = items.filter(i => i.status !== 'pending')
+
+  if (loading) return (
+    <div className="card">
+      <div style={{ padding: 20 }}><div className="alert-inline info">Carregando...</div></div>
+    </div>
+  )
+
+  return (
+    <>
+      {/* ── PENDING ─────────────────────────────────────────────────────── */}
+      <div className="card">
+        <div style={{ padding: '16px 20px' }}>
+          <SL>Pedidos pendentes {pending.length > 0 && `· ${pending.length}`}</SL>
+
+          {pending.length === 0 && (
+            <div className="alert-inline ok" style={{ marginTop: 8 }}>Nenhum pedido pendente.</div>
+          )}
+
+          {pending.map(cr => (
+            <div key={cr.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{cr.employee_name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 2 }}>
+                    <span className="chip outline" style={{ fontSize: 10, marginRight: 6 }}>{PUNCH_LABEL[cr.req_type] ?? cr.req_type}</span>
+                    {fmtTs(cr.req_timestamp)}
+                  </div>
+                  {cr.reason && (
+                    <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                      "{cr.reason}"
+                    </div>
+                  )}
+                  <div style={{ fontSize: 10, color: 'var(--fg-subtle)', marginTop: 4 }}>
+                    Pedido em {fmtTs(cr.created_at)}
+                  </div>
+                </div>
+                <span className="chip warn" style={{ fontSize: 10, flexShrink: 0 }}>pendente</span>
+              </div>
+
+              {rejectTarget === cr.id ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input
+                    className="input"
+                    placeholder="Motivo da rejeição (opcional)"
+                    value={rejectNote}
+                    onChange={e => setRejectNote(e.target.value)}
+                    style={{ fontSize: 12 }}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn danger sm"
+                      disabled={!!actionId}
+                      onClick={() => act(cr.id, 'reject', rejectNote)}
+                      style={{ flex: 1, justifyContent: 'center' }}
+                    >
+                      {actionId === cr.id ? 'Rejeitando…' : 'Confirmar rejeição'}
+                    </button>
+                    <button className="btn ghost sm" onClick={() => setRejectTarget(null)}>Cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn primary sm"
+                    disabled={!!actionId}
+                    onClick={() => act(cr.id, 'approve')}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                  >
+                    {actionId === cr.id ? 'Aprovando…' : '✓ Aprovar'}
+                  </button>
+                  <button
+                    className="btn ghost sm"
+                    disabled={!!actionId}
+                    onClick={() => { setRejectTarget(cr.id); setRejectNote('') }}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                  >
+                    ✕ Rejeitar
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── RESOLVED ────────────────────────────────────────────────────── */}
+      {resolved.length > 0 && (
+        <div className="card">
+          <div style={{ padding: '16px 20px' }}>
+            <SL>Histórico de pedidos</SL>
+            {resolved.map(cr => (
+              <div key={cr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{cr.employee_name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
+                    {PUNCH_LABEL[cr.req_type] ?? cr.req_type} · {fmtDate(cr.req_date)} · {new Date(cr.req_timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  {cr.reviewer_note && (
+                    <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 2, fontStyle: 'italic' }}>
+                      Nota: "{cr.reviewer_note}"
+                    </div>
+                  )}
+                </div>
+                <span className={`chip ${cr.status === 'approved' ? 'success' : 'danger'}`} style={{ fontSize: 10, flexShrink: 0 }}>
+                  {cr.status === 'approved' ? 'aprovado' : 'rejeitado'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

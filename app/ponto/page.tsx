@@ -7,7 +7,10 @@ import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes } from '@/
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
-type Tab = 'ponto' | 'historico' | 'banco'
+type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes'
+
+type CorrectionStatus = 'pending' | 'approved' | 'rejected'
+interface CorrReq { id: string; req_type: string; req_timestamp: string; req_date: string; reason: string | null; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
 
 const PUNCH_LABEL: Record<string, string> = {
   entrada: 'Entrada', 'saída': 'Saída',
@@ -101,6 +104,7 @@ function RefreshIcon({ size = 14 }: { size?: number }) { return <svg width={size
 function ClockIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg> }
 function HistoryIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> }
 function BankIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg> }
+function EditIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> }
 
 export default function PontoPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
@@ -121,6 +125,17 @@ export default function PontoPage() {
   const [bankBalance, setBankBalance] = useState<number | null>(null)
   const [bankLoading, setBankLoading] = useState(false)
   const [bankLoaded, setBankLoaded] = useState(false)
+
+  // corrections tab state
+  const [corrList, setCorrList] = useState<CorrReq[]>([])
+  const [corrLoaded, setCorrLoaded] = useState(false)
+  const [corrLoading, setCorrLoading] = useState(false)
+  const [corrDate, setCorrDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [corrTime, setCorrTime] = useState(() => { const n = new Date(); return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}` })
+  const [corrType, setCorrType] = useState('entrada')
+  const [corrReason, setCorrReason] = useState('')
+  const [corrSubmitting, setCorrSubmitting] = useState(false)
+  const [corrMsg, setCorrMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const router = useRouter()
 
@@ -163,6 +178,39 @@ export default function PontoPage() {
     finally { setBankLoading(false) }
   }, [bankLoaded])
 
+  const loadCorrections = useCallback(async () => {
+    if (corrLoaded) return
+    setCorrLoading(true)
+    try {
+      const res = await fetch('/api/correction-requests')
+      if (res.ok) { setCorrList(await res.json()); setCorrLoaded(true) }
+    } catch { /* keep */ }
+    finally { setCorrLoading(false) }
+  }, [corrLoaded])
+
+  const submitCorrection = async () => {
+    if (!corrDate || !corrTime || !corrType) return
+    setCorrSubmitting(true); setCorrMsg(null)
+    try {
+      const timestamp = `${corrDate}T${corrTime}:00`
+      const res = await fetch('/api/correction-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: corrType, timestamp, reason: corrReason || undefined }),
+      })
+      if (res.ok) {
+        setCorrMsg({ ok: true, text: 'Pedido enviado. Aguarde aprovação do administrador.' })
+        setCorrReason('')
+        setCorrLoaded(false) // force reload
+        await loadCorrections()
+      } else {
+        const d = await res.json()
+        setCorrMsg({ ok: false, text: d.error ?? 'Erro ao enviar pedido.' })
+      }
+    } catch { setCorrMsg({ ok: false, text: 'Erro de conexão.' }) }
+    finally { setCorrSubmitting(false) }
+  }
+
   useEffect(() => { loadUser(); loadRecords() }, [loadUser, loadRecords])
   useEffect(() => {
     const i = setInterval(() => setNow(new Date()), 1000)
@@ -176,7 +224,8 @@ export default function PontoPage() {
   useEffect(() => {
     if (tab === 'historico') loadHistory()
     if (tab === 'banco') loadBank()
-  }, [tab, loadHistory, loadBank])
+    if (tab === 'correcoes') loadCorrections()
+  }, [tab, loadHistory, loadBank, loadCorrections])
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
@@ -496,6 +545,78 @@ export default function PontoPage() {
             )}
           </div>
         )}
+        {/* ── CORREÇÕES TAB ─────────────────────────────────────────────── */}
+        {tab === 'correcoes' && (
+          <div className="emp-card">
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 16 }}>
+              Pedir correção de batida
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+              <div className="field">
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Data</label>
+                <input type="date" className="input" value={corrDate} onChange={e => setCorrDate(e.target.value)} max={new Date().toISOString().split('T')[0]} />
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div className="field" style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tipo</label>
+                  <select className="input" value={corrType} onChange={e => setCorrType(e.target.value)}>
+                    <option value="entrada">Entrada</option>
+                    <option value="saída">Saída</option>
+                    <option value="inicio_almoco">Início almoço</option>
+                    <option value="fim_almoco">Fim almoço</option>
+                    <option value="pausa_cafe">Pausa café</option>
+                    <option value="retorno_cafe">Retorno café</option>
+                  </select>
+                </div>
+                <div className="field" style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Hora</label>
+                  <input type="time" className="input" value={corrTime} onChange={e => setCorrTime(e.target.value)} />
+                </div>
+              </div>
+              <div className="field">
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Motivo (opcional)</label>
+                <input type="text" className="input" value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder="Ex: Esqueci de bater saída" />
+              </div>
+
+              {corrMsg && (
+                <div className={`alert-inline ${corrMsg.ok ? 'ok' : 'err'}`}>{corrMsg.text}</div>
+              )}
+
+              <button className="btn-emp primary-big" onClick={submitCorrection} disabled={corrSubmitting}>
+                {corrSubmitting ? 'Enviando…' : 'Enviar pedido'}
+              </button>
+            </div>
+
+            {corrLoading && <div className="alert-inline info">Carregando...</div>}
+
+            {corrLoaded && corrList.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 12 }}>
+                  Meus pedidos
+                </div>
+                {corrList.map(cr => {
+                  const PUNCH_LABEL: Record<string, string> = { entrada: 'Entrada', 'saída': 'Saída', inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço', pausa_cafe: 'Pausa café', retorno_cafe: 'Retorno café' }
+                  const d = new Date(cr.req_timestamp)
+                  const dateStr = cr.req_date.split('-').reverse().join('/')
+                  const timeStr = d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+                  return (
+                    <div key={cr.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500 }}>{PUNCH_LABEL[cr.req_type] ?? cr.req_type} · {dateStr} {timeStr}</span>
+                        <span className={`chip ${cr.status === 'approved' ? 'success' : cr.status === 'rejected' ? 'danger' : 'warn'}`} style={{ fontSize: 10 }}>
+                          {cr.status === 'approved' ? 'aprovado' : cr.status === 'rejected' ? 'rejeitado' : 'pendente'}
+                        </span>
+                      </div>
+                      {cr.reason && <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontStyle: 'italic' }}>"{cr.reason}"</div>}
+                      {cr.reviewer_note && <div style={{ fontSize: 11, color: 'var(--danger-fg)', marginTop: 2 }}>Nota: "{cr.reviewer_note}"</div>}
+                    </div>
+                  )
+                })}
+              </>
+            )}
+          </div>
+        )}
       </main>
 
       {/* ── BOTTOM TAB BAR ──────────────────────────────────────────────────── */}
@@ -506,9 +627,10 @@ export default function PontoPage() {
         backdropFilter: 'blur(12px)', zIndex: 50,
       }}>
         {([
-          { id: 'ponto',    label: 'Ponto',     Icon: ClockIcon },
-          { id: 'historico',label: 'Histórico', Icon: HistoryIcon },
-          { id: 'banco',    label: 'Banco',     Icon: BankIcon },
+          { id: 'ponto',     label: 'Ponto',     Icon: ClockIcon },
+          { id: 'historico', label: 'Histórico', Icon: HistoryIcon },
+          { id: 'banco',     label: 'Banco',     Icon: BankIcon },
+          { id: 'correcoes', label: 'Correção',  Icon: EditIcon },
         ] as const).map(({ id, label, Icon }) => (
           <button
             key={id}

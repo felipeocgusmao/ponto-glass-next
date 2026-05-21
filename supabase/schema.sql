@@ -120,3 +120,23 @@ CREATE TABLE IF NOT EXISTS day_exceptions (
 
 CREATE INDEX IF NOT EXISTS idx_day_exceptions_date     ON day_exceptions(date);
 CREATE INDEX IF NOT EXISTS idx_day_exceptions_employee ON day_exceptions(employee_id);
+
+-- v6 → v7: fluxo de correção de batidas
+CREATE TABLE IF NOT EXISTS correction_requests (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id     UUID        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  employee_name   TEXT        NOT NULL,
+  req_type        TEXT        NOT NULL CHECK (req_type IN ('entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe')),
+  req_timestamp   TIMESTAMPTZ NOT NULL,
+  req_date        DATE        NOT NULL,
+  reason          TEXT,
+  status          TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  reviewer_id     UUID        REFERENCES employees(id),
+  reviewer_name   TEXT,
+  reviewer_note   TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  resolved_at     TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_corrections_employee ON correction_requests(employee_id);
+CREATE INDEX IF NOT EXISTS idx_corrections_status   ON correction_requests(status);

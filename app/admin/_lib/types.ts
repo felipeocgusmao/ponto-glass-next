@@ -1,11 +1,12 @@
 'use client'
 
-export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados'
+export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes'
 
 export const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard',    label: 'Dashboard'  },
   { id: 'status',       label: 'Status'     },
   { id: 'registros',    label: 'Registros'  },
+  { id: 'correcoes',    label: 'Correções'  },
   { id: 'funcionarios', label: 'Equipe'     },
   { id: 'banco',        label: 'Banco'      },
   { id: 'feriados',     label: 'Feriados'   },
@@ -18,6 +19,7 @@ export const MANAGER_TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard',    label: 'Dashboard'  },
   { id: 'status',       label: 'Status'     },
   { id: 'registros',    label: 'Registros'  },
+  { id: 'correcoes',    label: 'Correções'  },
   { id: 'banco',        label: 'Banco'      },
   { id: 'feriados',     label: 'Feriados'   },
   { id: 'relatorios',   label: 'Relatório'  },
@@ -39,4 +41,6 @@ export const AUDIT_LABELS: Record<string, string> = {
   hour_bank_adjustment_delete:  '🗑 Ajuste banco removido',
   day_exception_create:         '📅 Feriado/folga criado',
   day_exception_delete:         '🗑 Feriado/folga removido',
+  correction_approved:          '✅ Correção aprovada',
+  correction_rejected:          '✕ Correção rejeitada',
 }

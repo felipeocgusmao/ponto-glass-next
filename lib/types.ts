@@ -58,6 +58,22 @@ export interface HourBankAdjustment {
   created_at: string
 }
 
+export interface CorrectionRequest {
+  id: string
+  employee_id: string
+  employee_name: string
+  req_type: string
+  req_timestamp: string
+  req_date: string
+  reason: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  reviewer_id: string | null
+  reviewer_name: string | null
+  reviewer_note: string | null
+  created_at: string
+  resolved_at: string | null
+}
+
 export interface DayException {
   id: string
   date: string
