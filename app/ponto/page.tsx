@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeProfile, PunchRecord } from '@/lib/types'
-import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes } from '@/lib/utils'
+import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, openPayslip } from '@/lib/utils'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
@@ -474,6 +474,19 @@ export default function PontoPage() {
 
             {!historyLoading && sortedDays.length === 0 && (
               <div className="alert-inline info">Nenhum registo este mês.</div>
+            )}
+
+            {!historyLoading && historyRecs.length > 0 && (
+              <button
+                className="btn-emp"
+                style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
+                onClick={() => {
+                  const period = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+                  openPayslip(user.name, period, historyRecs, user.workday_hours, user.lunch_break_minutes, user.hourly_rate)
+                }}
+              >
+                📄 Exportar holerite do mês
+              </button>
             )}
 
             {sortedDays.map(date => {
