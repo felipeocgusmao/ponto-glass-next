@@ -4,8 +4,10 @@ import { useState } from 'react'
 import type { Employee } from '@/lib/types'
 import { avatarInitials } from '@/lib/utils'
 import { empColor, SL } from '../../_lib/helpers'
+import { useLang } from '@/lib/LangContext'
 
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
+  const { t } = useLang()
   const [name, setName] = useState(emp.name)
   const [username, setUsername] = useState(emp.username)
   const [email, setEmail] = useState(emp.email ?? '')
@@ -35,7 +37,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
     })
     const data = await res.json()
     if (!res.ok) { setErr(data.error ?? 'Erro ao salvar.'); setSaving(false); return }
-    setOk(newPassword ? 'Configurações e senha atualizadas!' : 'Configurações salvas!')
+    setOk(newPassword ? t('emp.saved_pwd') : t('emp.saved'))
     setNewPassword('')
     setSaving(false)
     setTimeout(() => onDone(), 1200)
@@ -44,74 +46,75 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
   return (
     <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="field">
-        <label>Nome completo</label>
+        <label>{t('emp.full_name')}</label>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="ex: Maria Silva" className="input" />
       </div>
       <div className="form-grid-2">
         <div className="field">
-          <label>Nome de usuário</label>
+          <label>{t('emp.username_label')}</label>
           <input value={username} onChange={e => setUsername(e.target.value)} placeholder="ex: maria.silva" className="input" />
         </div>
         <div className="field">
-          <label>Perfil</label>
+          <label>{t('emp.profile')}</label>
           <select value={role} onChange={e => setRole(e.target.value as 'employee' | 'manager' | 'admin')} className="input">
-            <option value="employee">Funcionário</option>
-            <option value="manager">Gerente</option>
-            <option value="admin">Admin</option>
+            <option value="employee">{t('auth.role.employee')}</option>
+            <option value="manager">{t('auth.role.manager')}</option>
+            <option value="admin">{t('auth.role.admin')}</option>
           </select>
         </div>
       </div>
       <div className="field">
-        <label>Email (opcional)</label>
+        <label>{t('emp.email_optional')}</label>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="maria@empresa.com" className="input" />
       </div>
       <div className="form-grid-3">
         <div className="field">
-          <label>Jornada</label>
+          <label>{t('emp.workday')}</label>
           <select value={workdayHours} onChange={e => setWorkdayHours(e.target.value)} className="input">
             {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => <option key={h} value={h}>{h}h</option>)}
           </select>
         </div>
         <div className="field">
-          <label>Almoço</label>
+          <label>{t('emp.lunch_label')}</label>
           <select value={lunchMin} onChange={e => setLunchMin(e.target.value)} className="input">
-            <option value="0">Sem desconto</option>
-            <option value="15">15 min</option>
-            <option value="30">30 min</option>
-            <option value="45">45 min</option>
-            <option value="60">1 hora</option>
+            <option value="0">{t('emp.lunch.none')}</option>
+            <option value="15">{t('emp.lunch.15')}</option>
+            <option value="30">{t('emp.lunch.30')}</option>
+            <option value="45">{t('emp.lunch.45')}</option>
+            <option value="60">{t('emp.lunch.60')}</option>
           </select>
         </div>
         <div className="field">
-          <label>€/hora</label>
+          <label>{t('emp.hourly_rate')}</label>
           <input type="number" min="0" step="0.01" value={rate} onChange={e => setRate(e.target.value)} placeholder="0,00" className="input" />
         </div>
       </div>
       <div className="field">
-        <label>Geolocalização</label>
+        <label>{t('emp.geo_label')}</label>
         <select value={geoMode} onChange={e => setGeoMode(e.target.value as 'required' | 'optional' | 'disabled')} className="input">
-          <option value="optional">Opcional (recomendado)</option>
-          <option value="required">Obrigatória</option>
-          <option value="disabled">Desativada</option>
+          <option value="optional">{t('emp.geo.optional')}</option>
+          <option value="required">{t('emp.geo.required')}</option>
+          <option value="disabled">{t('emp.geo.disabled')}</option>
         </select>
       </div>
       <div className="field">
-        <label>Nova senha (deixe em branco para não alterar)</label>
+        <label>{t('emp.new_pwd')}</label>
         <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mín. 6 caracteres" className="input" />
       </div>
       {err && <div className="alert-inline err">{err}</div>}
       {ok  && <div className="alert-inline ok">{ok}</div>}
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={handleSave} disabled={saving} className="btn primary" style={{ flex: 1, justifyContent: 'center' }}>
-          {saving ? 'Salvando...' : 'Salvar'}
+          {saving ? t('emp.saving') : t('common.save')}
         </button>
-        <button onClick={onDone} className="btn ghost">Cancelar</button>
+        <button onClick={onDone} className="btn ghost">{t('common.cancel')}</button>
       </div>
     </div>
   )
 }
 
 export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRefresh: () => void }) {
+  const { t } = useLang()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -151,7 +154,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
     <>
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
-          <SL>{employees.length} ativo(s)</SL>
+          <SL>{employees.length} {t('emp.active')}</SL>
           {err && <div className="alert-inline err" style={{ marginBottom: 12 }}>{err}</div>}
           {employees.map(emp => (
             <div key={emp.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 12, marginBottom: 12 }}>
@@ -162,7 +165,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', display: 'flex', alignItems: 'center', gap: 6 }}>
                       {emp.name}
                       {emp.role === 'admin' && <span className="chip accent" style={{ fontSize: 10 }}>Admin</span>}
-                      {emp.role === 'manager' && <span className="chip accent" style={{ fontSize: 10 }}>Gerente</span>}
+                      {emp.role === 'manager' && <span className="chip accent" style={{ fontSize: 10 }}>{t('auth.role.manager')}</span>}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
                       @{emp.username} · {emp.workday_hours}h ·{' '}
@@ -175,7 +178,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => setEditingId(editingId === emp.id ? null : emp.id)} className="btn ghost sm icon" title="Configurações">⚙</button>
                   {emp.username !== 'admin' && (
-                    <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">Remover</button>
+                    <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">{t('emp.remove')}</button>
                   )}
                 </div>
               </div>
@@ -189,53 +192,53 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
 
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
-          <SL>Novo funcionário</SL>
+          <SL>{t('emp.add_new')}</SL>
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
             <div className="form-grid-2">
-              <div className="field"><label>Nome</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Maria Silva" className="input" required /></div>
-              <div className="field"><label>Usuário</label><input value={username} onChange={e => setUsername(e.target.value)} placeholder="maria.silva" className="input" required /></div>
+              <div className="field"><label>{t('emp.name')}</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Maria Silva" className="input" required /></div>
+              <div className="field"><label>{t('emp.username_label')}</label><input value={username} onChange={e => setUsername(e.target.value)} placeholder="maria.silva" className="input" required /></div>
             </div>
             <div className="field">
-              <label>Email (opcional)</label>
+              <label>{t('emp.email_optional')}</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="maria@empresa.com" className="input" />
             </div>
             <div className="form-grid-2">
-              <div className="field"><label>Senha</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mín. 6 chars" className="input" required /></div>
+              <div className="field"><label>{t('auth.password')}</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mín. 6 chars" className="input" required /></div>
               <div className="field">
-                <label>Perfil</label>
+                <label>{t('emp.profile')}</label>
                 <select value={role} onChange={e => setRole(e.target.value as 'employee' | 'manager' | 'admin')} className="input">
-                  <option value="employee">Funcionário</option>
-                  <option value="manager">Gerente</option>
-                  <option value="admin">Admin</option>
+                  <option value="employee">{t('auth.role.employee')}</option>
+                  <option value="manager">{t('auth.role.manager')}</option>
+                  <option value="admin">{t('auth.role.admin')}</option>
                 </select>
               </div>
             </div>
             <div className="form-grid-3">
               <div className="field">
-                <label>Jornada</label>
+                <label>{t('emp.workday')}</label>
                 <select value={workdayHours} onChange={e => setWorkdayHours(e.target.value)} className="input">
                   {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => <option key={h} value={h}>{h}h</option>)}
                 </select>
               </div>
               <div className="field">
-                <label>Almoço</label>
+                <label>{t('emp.lunch_label')}</label>
                 <select value={lunchMin} onChange={e => setLunchMin(e.target.value)} className="input">
-                  <option value="0">Sem desconto</option>
-                  <option value="15">15 min</option>
-                  <option value="30">30 min</option>
-                  <option value="45">45 min</option>
-                  <option value="60">1 hora</option>
+                  <option value="0">{t('emp.lunch.none')}</option>
+                  <option value="15">{t('emp.lunch.15')}</option>
+                  <option value="30">{t('emp.lunch.30')}</option>
+                  <option value="45">{t('emp.lunch.45')}</option>
+                  <option value="60">{t('emp.lunch.60')}</option>
                 </select>
               </div>
               <div className="field">
-                <label>€/hora</label>
+                <label>{t('emp.hourly_rate')}</label>
                 <input type="number" min="0" step="0.01" value={rate} onChange={e => setRate(e.target.value)} placeholder="Opcional" className="input" />
               </div>
             </div>
             {err && <div className="alert-inline err">{err}</div>}
             {ok  && <div className="alert-inline ok">{ok}</div>}
             <button type="submit" disabled={loading} className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>
-              {loading ? 'Adicionando...' : '+ Adicionar'}
+              {loading ? t('emp.adding') : t('emp.add_btn')}
             </button>
           </form>
         </div>
