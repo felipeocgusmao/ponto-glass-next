@@ -336,17 +336,19 @@ export default function PontoPage() {
           <img src="/icon-192.svg" width="26" height="26" alt="" style={{ borderRadius: 6, flexShrink: 0 }} />
           <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: '-0.01em' }}>PontoGlass</div>
         </div>
-        <div className="emp-user-menu">
-          <div style={{ display: 'flex', gap: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 6, padding: '2px 3px', gap: 1 }}>
             {LANGS.map(l => (
               <button
                 key={l}
                 onClick={() => setLang(l)}
                 style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: '3px 5px',
-                  fontSize: 10, fontWeight: lang === l ? 700 : 400,
-                  color: lang === l ? 'var(--accent)' : 'var(--fg-muted)',
-                  borderBottom: lang === l ? '2px solid var(--accent)' : '2px solid transparent',
+                  background: lang === l ? 'var(--accent)' : 'none',
+                  border: 'none', cursor: 'pointer', padding: '3px 6px',
+                  borderRadius: 4,
+                  fontSize: 10, fontWeight: 600,
+                  color: lang === l ? '#fff' : 'var(--fg-muted)',
+                  transition: 'all 0.15s',
                 }}
               >
                 {LANG_LABELS[l]}
@@ -356,13 +358,9 @@ export default function PontoPage() {
           <button className="theme-toggle" onClick={toggleTheme}>
             {theme === 'dark' ? <SunIcon size={14}/> : <MoonIcon size={14}/>}
           </button>
-          <div className="emp-user-info">
-            <div className="emp-user-name">{user.name}</div>
-            <div className="emp-user-role">@{user.username} · {t('auth.role.employee')}</div>
-          </div>
-          <div className={`avatar size-36 av-c${empColor(user.id)}`}>{initials(user.name)}</div>
+          <div className={`avatar size-30 av-c${empColor(user.id)}`} title={user.name}>{initials(user.name)}</div>
           <button className="btn ghost sm icon" onClick={handleLogout} title={t('common.logout')}>
-            <LogoutIcon size={14}/>
+            <LogoutIcon size={15}/>
           </button>
         </div>
       </header>
