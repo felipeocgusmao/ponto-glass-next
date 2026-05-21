@@ -57,6 +57,9 @@ function IconBank({ size = 16 }: { size?: number }) {
 function IconCalendar({ size = 16 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
 }
+function IconHamburger() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+}
 function SunIcon() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
 }
@@ -219,22 +222,24 @@ td{border:1px solid #ddd;padding:7px 10px;font-size:12px}.total-row{font-weight:
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd, theme, toggleTheme }: {
+function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd, theme, toggleTheme, mobileOpen, onMobileClose }: {
   tab: Tab; setTab: (t: Tab) => void
   tabs: { id: Tab; label: string }[]
   user: EmployeeProfile; onLogout: () => void; onChangePwd: () => void
   theme: string; toggleTheme: () => void
+  mobileOpen: boolean; onMobileClose: () => void
 }) {
   const ci = empColor(user.id)
+  const handleTabClick = (t: Tab) => { setTab(t); onMobileClose() }
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
       <div className="sb-head">
         <div className="sb-logo">P</div>
         <span className="sb-brand">PontoGlass</span>
       </div>
       <nav className="sb-nav" style={{ padding: '8px' }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`sb-item${tab === t.id ? ' active' : ''}`}>
+          <button key={t.id} onClick={() => handleTabClick(t.id)} className={`sb-item${tab === t.id ? ' active' : ''}`}>
             <span className="sb-item-icon">{TAB_ICONS[t.id]}</span>
             <span className="sb-item-label">{t.label}</span>
           </button>
@@ -671,7 +676,7 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SL>Filtros</SL>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-grid-2">
             <div className="field">
               <label>De</label>
               <input type="date" value={from} onChange={e => handleFromChange(e.target.value)} className="input" />
@@ -756,7 +761,7 @@ function RegistrosTab({ employees }: { employees: Employee[] }) {
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-grid-2">
             <div className="field">
               <label>Tipo</label>
               <select value={newType} onChange={e => setNewType(e.target.value)} className="input">
@@ -827,7 +832,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
         <label>Nome completo</label>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="ex: Maria Silva" className="input" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div className="form-grid-2">
         <div className="field">
           <label>Nome de usuário</label>
           <input value={username} onChange={e => setUsername(e.target.value)} placeholder="ex: maria.silva" className="input" />
@@ -845,7 +850,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
         <label>Email (opcional)</label>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="maria@empresa.com" className="input" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+      <div className="form-grid-3">
         <div className="field">
           <label>Jornada</label>
           <select value={workdayHours} onChange={e => setWorkdayHours(e.target.value)} className="input">
@@ -971,7 +976,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
         <div style={{ padding: '16px 20px' }}>
           <SL>Novo funcionário</SL>
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-grid-2">
               <div className="field"><label>Nome</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Maria Silva" className="input" required /></div>
               <div className="field"><label>Usuário</label><input value={username} onChange={e => setUsername(e.target.value)} placeholder="maria.silva" className="input" required /></div>
             </div>
@@ -979,7 +984,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
               <label>Email (opcional)</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="maria@empresa.com" className="input" />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-grid-2">
               <div className="field"><label>Senha</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mín. 6 chars" className="input" required /></div>
               <div className="field">
                 <label>Perfil</label>
@@ -990,7 +995,7 @@ function FuncionariosTab({ employees, onRefresh }: { employees: Employee[]; onRe
                 </select>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            <div className="form-grid-3">
               <div className="field">
                 <label>Jornada</label>
                 <select value={workdayHours} onChange={e => setWorkdayHours(e.target.value)} className="input">
@@ -1066,7 +1071,7 @@ function RelatoriosTab({ employees }: { employees: Employee[] }) {
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SL>Período</SL>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-grid-2">
             <div className="field"><label>De</label><input type="date" value={from} onChange={e => handleFromChange(e.target.value)} className="input" /></div>
             <div className="field"><label>Até</label><input type="date" value={to} onChange={e => handleToChange(e.target.value)} className="input" /></div>
           </div>
@@ -1460,7 +1465,7 @@ function BancoHorasTab({ employees }: { employees: Employee[] }) {
                 {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-grid-2">
               <div className="field">
                 <label>Minutos (positivo = crédito)</label>
                 <input type="number" value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="ex: 60 ou -30" className="input" />
@@ -1760,6 +1765,7 @@ export default function AdminPage() {
   const [showPwd, setShowPwd] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const [theme, setTheme] = useState('dark')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
 
   const isManager = user?.role === 'manager'
@@ -1822,13 +1828,18 @@ export default function AdminPage() {
   return (
     <div className="app">
       {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         tab={tab} setTab={setTab} tabs={visibleTabs}
         user={user} onLogout={handleLogout} onChangePwd={() => setShowPwd(true)}
         theme={theme} toggleTheme={toggleTheme}
+        mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)}
       />
       <div className="main">
         <header className="topbar">
+          <button onClick={() => setSidebarOpen(true)} className="topbar-hamburger" aria-label="Abrir menu">
+            <IconHamburger />
+          </button>
           <div className="breadcrumbs">
             <span className="crumb current">{visibleTabs.find(t => t.id === tab)?.label ?? ''}</span>
           </div>
