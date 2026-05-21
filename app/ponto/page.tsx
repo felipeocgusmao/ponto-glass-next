@@ -267,7 +267,7 @@ export default function PontoPage() {
     if (!byDay.has(r.date)) byDay.set(r.date, [])
     byDay.get(r.date)!.push(r)
   })
-  const sortedDays = [...byDay.keys()].sort((a, b) => b.localeCompare(a))
+  const sortedDays = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a))
   const totalMonthMin = sortedDays.reduce((sum, date) => {
     const recs = byDay.get(date)!
     const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
