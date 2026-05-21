@@ -3,12 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { CorrectionRequest } from '@/lib/types'
 import { SL } from '../../_lib/helpers'
-
-const PUNCH_LABEL: Record<string, string> = {
-  entrada: 'Entrada', 'saída': 'Saída',
-  inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço',
-  pausa_cafe: 'Pausa café', retorno_cafe: 'Retorno café',
-}
+import { useLang } from '@/lib/LangContext'
+import type { TranslationKey } from '@/lib/i18n'
 
 function fmtTs(ts: string) {
   const d = new Date(ts)
@@ -21,6 +17,7 @@ function fmtDate(d: string) {
 }
 
 export function CorrecoesTab() {
+  const { t } = useLang()
   const [items, setItems] = useState<CorrectionRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
@@ -60,7 +57,7 @@ export function CorrecoesTab() {
 
   if (loading) return (
     <div className="card">
-      <div style={{ padding: 20 }}><div className="alert-inline info">Carregando...</div></div>
+      <div style={{ padding: 20 }}><div className="alert-inline info">{t('common.loading')}</div></div>
     </div>
   )
 
@@ -69,10 +66,10 @@ export function CorrecoesTab() {
       {/* ── PENDING ─────────────────────────────────────────────────────── */}
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
-          <SL>Pedidos pendentes {pending.length > 0 && `· ${pending.length}`}</SL>
+          <SL>{t('admin.corr.pending')} {pending.length > 0 && `· ${pending.length}`}</SL>
 
           {pending.length === 0 && (
-            <div className="alert-inline ok" style={{ marginTop: 8 }}>Nenhum pedido pendente.</div>
+            <div className="alert-inline ok" style={{ marginTop: 8 }}>{t('admin.corr.none_pending')}</div>
           )}
 
           {pending.map(cr => (
@@ -81,7 +78,7 @@ export function CorrecoesTab() {
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{cr.employee_name}</div>
                   <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 2 }}>
-                    <span className="chip outline" style={{ fontSize: 10, marginRight: 6 }}>{PUNCH_LABEL[cr.req_type] ?? cr.req_type}</span>
+                    <span className="chip outline" style={{ fontSize: 10, marginRight: 6 }}>{t(('punch.' + cr.req_type) as TranslationKey) ?? cr.req_type}</span>
                     {fmtTs(cr.req_timestamp)}
                   </div>
                   {cr.reason && (
@@ -90,17 +87,17 @@ export function CorrecoesTab() {
                     </div>
                   )}
                   <div style={{ fontSize: 10, color: 'var(--fg-subtle)', marginTop: 4 }}>
-                    Pedido em {fmtTs(cr.created_at)}
+                    {t('admin.corr.requested_at')} {fmtTs(cr.created_at)}
                   </div>
                 </div>
-                <span className="chip warn" style={{ fontSize: 10, flexShrink: 0 }}>pendente</span>
+                <span className="chip warn" style={{ fontSize: 10, flexShrink: 0 }}>{t('corr.status.pending')}</span>
               </div>
 
               {rejectTarget === cr.id ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <input
                     className="input"
-                    placeholder="Motivo da rejeição (opcional)"
+                    placeholder={t('admin.corr.reject_note')}
                     value={rejectNote}
                     onChange={e => setRejectNote(e.target.value)}
                     style={{ fontSize: 12 }}
@@ -112,9 +109,9 @@ export function CorrecoesTab() {
                       onClick={() => act(cr.id, 'reject', rejectNote)}
                       style={{ flex: 1, justifyContent: 'center' }}
                     >
-                      {actionId === cr.id ? 'Rejeitando…' : 'Confirmar rejeição'}
+                      {actionId === cr.id ? t('admin.corr.rejecting') : t('admin.corr.confirm_reject')}
                     </button>
-                    <button className="btn ghost sm" onClick={() => setRejectTarget(null)}>Cancelar</button>
+                    <button className="btn ghost sm" onClick={() => setRejectTarget(null)}>{t('common.cancel')}</button>
                   </div>
                 </div>
               ) : (
@@ -125,7 +122,7 @@ export function CorrecoesTab() {
                     onClick={() => act(cr.id, 'approve')}
                     style={{ flex: 1, justifyContent: 'center' }}
                   >
-                    {actionId === cr.id ? 'Aprovando…' : '✓ Aprovar'}
+                    {actionId === cr.id ? t('admin.corr.approving') : '✓ ' + t('common.approve')}
                   </button>
                   <button
                     className="btn ghost sm"
@@ -133,7 +130,7 @@ export function CorrecoesTab() {
                     onClick={() => { setRejectTarget(cr.id); setRejectNote('') }}
                     style={{ flex: 1, justifyContent: 'center' }}
                   >
-                    ✕ Rejeitar
+                    {'✕ ' + t('common.reject')}
                   </button>
                 </div>
               )}
@@ -146,22 +143,22 @@ export function CorrecoesTab() {
       {resolved.length > 0 && (
         <div className="card">
           <div style={{ padding: '16px 20px' }}>
-            <SL>Histórico de pedidos</SL>
+            <SL>{t('admin.corr.history')}</SL>
             {resolved.map(cr => (
               <div key={cr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{cr.employee_name}</div>
                   <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
-                    {PUNCH_LABEL[cr.req_type] ?? cr.req_type} · {fmtDate(cr.req_date)} · {new Date(cr.req_timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                    {t(('punch.' + cr.req_type) as TranslationKey) ?? cr.req_type} · {fmtDate(cr.req_date)} · {new Date(cr.req_timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                   {cr.reviewer_note && (
                     <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 2, fontStyle: 'italic' }}>
-                      Nota: "{cr.reviewer_note}"
+                      {t('corr.reviewer_note')}: "{cr.reviewer_note}"
                     </div>
                   )}
                 </div>
                 <span className={`chip ${cr.status === 'approved' ? 'success' : 'danger'}`} style={{ fontSize: 10, flexShrink: 0 }}>
-                  {cr.status === 'approved' ? 'aprovado' : 'rejeitado'}
+                  {cr.status === 'approved' ? t('corr.status.approved') : t('corr.status.rejected')}
                 </span>
               </div>
             ))}

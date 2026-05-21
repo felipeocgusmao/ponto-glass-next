@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { EmployeeProfile, PunchRecord } from '@/lib/types'
 import { getWorkState, calcLiveMin, fmtMin, ProgressRing, getGeo } from '../../_lib/helpers'
+import { useLang } from '@/lib/LangContext'
 
 export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
+  const { t } = useLang()
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [now, setNow] = useState(new Date())
   const [punching, setPunching] = useState(false)
@@ -41,7 +43,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
       const geo = await getGeo()
       if (geo) { lat = geo.lat; lng = geo.lng }
       else if (user.geo_mode === 'required') {
-        setToast({ kind: 'err', text: 'Localização obrigatória. Ative o GPS.' })
+        setToast({ kind: 'err', text: t('meu.geo_error') })
         setPunching(false); return
       }
     }
@@ -55,16 +57,19 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
       setToast({ kind: 'err', text: data.error ?? 'Erro ao registrar.' })
       setPunching(false); return
     }
-    setToast({ kind: 'ok', text: 'Registrado!' })
+    setToast({ kind: 'ok', text: t('meu.registered') })
     setPunching(false)
     loadRecords()
     setTimeout(() => setToast(null), 2500)
   }
 
-  const tagLabel: Record<string, string> = {
-    entrada: 'Entrada', 'saída': 'Saída',
-    inicio_almoco: 'Almoço', fim_almoco: 'Ret. Almoço',
-    pausa_cafe: 'Café', retorno_cafe: 'Ret. Café',
+  const tagLabel = (type: string): string => {
+    const map: Record<string, string> = {
+      entrada: t('punch.entrada'), 'saída': t('punch.saída'),
+      inicio_almoco: t('punch.inicio_almoco'), fim_almoco: t('punch.fim_almoco'),
+      pausa_cafe: t('punch.pausa_cafe'), retorno_cafe: t('punch.retorno_cafe'),
+    }
+    return map[type] ?? type
   }
 
   const sorted = [...records].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -80,7 +85,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
           </div>
           <div style={{ marginTop: 8 }}>
             <span className={`chip ${state === 'working' ? 'success' : state === 'lunch' || state === 'coffee' ? 'warn' : 'outline'}`}>
-              {state === 'working' ? '● Em serviço' : state === 'lunch' ? '🍽 No almoço' : state === 'coffee' ? '☕ Pausa café' : '○ Fora do expediente'}
+              {state === 'working' ? t('meu.on_duty') : state === 'lunch' ? t('meu.at_lunch') : state === 'coffee' ? t('meu.coffee') : t('meu.off')}
             </span>
           </div>
         </div>
@@ -89,11 +94,11 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
           <ProgressRing pct={pct} overtime={isOvertime} />
           <div className="emp-stats">
             <div>
-              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Trabalhado</div>
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('meu.worked')}</div>
               <div className="tnum" style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em', marginTop: 2 }}>{liveMin > 0 ? fmtMin(Math.round(liveMin)) : '0m'}</div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Meta</div>
+              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('meu.goal')}</div>
               <div className="tnum" style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-muted)', marginTop: 2 }}>{fmtMin(workdayMin)}</div>
             </div>
           </div>
@@ -102,34 +107,34 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
         <div className="emp-actions">
           {state === 'off' && (
             <button onClick={() => punch('entrada')} disabled={punching} className="btn-emp primary-big">
-              {punching ? '…' : '▶ Registrar Entrada'}
+              {punching ? '…' : t('meu.register_in')}
             </button>
           )}
           {state === 'working' && (
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => punch('inicio_almoco')} disabled={punching} className="btn-emp warn">🍽 Almoço</button>
-              <button onClick={() => punch('pausa_cafe')} disabled={punching} className="btn-emp warn">☕ Café</button>
-              <button onClick={() => punch('saída')} disabled={punching} className="btn-emp danger-big" style={{ flex: 2 }}>⏹ Saída</button>
+              <button onClick={() => punch('inicio_almoco')} disabled={punching} className="btn-emp warn">{t('meu.at_lunch')}</button>
+              <button onClick={() => punch('pausa_cafe')} disabled={punching} className="btn-emp warn">{t('meu.coffee')}</button>
+              <button onClick={() => punch('saída')} disabled={punching} className="btn-emp danger-big" style={{ flex: 2 }}>{t('status.clock_out')}</button>
             </div>
           )}
           {state === 'lunch' && (
-            <button onClick={() => punch('fim_almoco')} disabled={punching} className="btn-emp warn">🍽 Retornar do Almoço</button>
+            <button onClick={() => punch('fim_almoco')} disabled={punching} className="btn-emp warn">{t('meu.return_lunch')}</button>
           )}
           {state === 'coffee' && (
-            <button onClick={() => punch('retorno_cafe')} disabled={punching} className="btn-emp warn">☕ Retornar do Café</button>
+            <button onClick={() => punch('retorno_cafe')} disabled={punching} className="btn-emp warn">{t('meu.return_coffee')}</button>
           )}
         </div>
 
         <div className="emp-history">
-          <div className="emp-history-head"><span>Hoje</span></div>
+          <div className="emp-history-head"><span>{t('meu.today')}</span></div>
           {sorted.length === 0
-            ? <div className="emp-history-empty">Nenhum registro hoje</div>
+            ? <div className="emp-history-empty">{t('meu.no_records')}</div>
             : (
               <div className="emp-history-list">
                 {sorted.map(r => (
                   <div key={r.id} className="emp-history-item">
                     <span className={`chip ${r.type === 'entrada' ? 'success' : r.type === 'saída' ? 'danger' : 'warn'}`} style={{ fontSize: 11 }}>
-                      {tagLabel[r.type] ?? r.type}
+                      {tagLabel(r.type)}
                     </span>
                     <span className="tnum" style={{ fontSize: 13, color: 'var(--fg-muted)', marginLeft: 'auto' }}>
                       {new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}

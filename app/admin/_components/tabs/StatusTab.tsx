@@ -5,8 +5,10 @@ import type { Employee, PunchRecord } from '@/lib/types'
 import { avatarInitials, fmtMinutes, calcNetMinutes, calcTimeBreakdown, calcOvertimePeriod, WORKING_TYPES } from '@/lib/utils'
 import { empColor, SL } from '../../_lib/helpers'
 import { EXPLICIT_BREAK_TYPES } from '../../_lib/types'
+import { useLang } from '@/lib/LangContext'
 
 export function StatusTab({ employees, currentUserId }: { employees: Employee[]; currentUserId: string }) {
+  const { t } = useLang()
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [liveMs, setLiveMs] = useState(() => Date.now())
   const [punching, setPunching] = useState<string | null>(null)
@@ -49,7 +51,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
       })
       const data = await res.json()
       if (res.ok) {
-        setMsg({ id: emp.id, kind: 'success', text: type === 'entrada' ? 'Entrada registrada!' : 'Saída registrada!' })
+        setMsg({ id: emp.id, kind: 'success', text: type === 'entrada' ? t('status.registered_in') : t('status.registered_out') })
         await load()
       } else {
         setMsg({ id: emp.id, kind: 'error', text: data.error ?? 'Erro ao registrar.' })
@@ -111,11 +113,11 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div className="kpi">
-            <div className="kpi-label">Em serviço agora</div>
+            <div className="kpi-label">{t('status.on_duty_now')}</div>
             <div className="kpi-value" style={{ color: 'var(--success-fg)' }}>{onlineCount}</div>
           </div>
           <div className="kpi">
-            <div className="kpi-label">Horas hoje (total)</div>
+            <div className="kpi-label">{t('status.hours_today')}</div>
             <div className="kpi-value">{totalMinToday > 0 ? fmtMinutes(Math.round(totalMinToday)) : '—'}</div>
           </div>
         </div>
@@ -123,10 +125,10 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
 
       <div className="card">
         <div style={{ padding: '16px 20px 8px' }}>
-          <SL>{workers.length} funcionário(s)</SL>
+          <SL>{workers.length} {t('status.employees')}</SL>
         </div>
         {workers.length === 0 && (
-          <div style={{ padding: '0 20px 16px' }}><div className="alert-inline info">Nenhum funcionário cadastrado.</div></div>
+          <div style={{ padding: '0 20px 16px' }}><div className="alert-inline info">{t('status.none_emp')}</div></div>
         )}
         {statuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal }) => (
           <div key={emp.id} className="status-row">
@@ -143,16 +145,16 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
               <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{emp.name}</div>
               <div style={{ fontSize: 12, marginTop: 2, color: 'var(--fg-muted)' }}>
                 {isWorking
-                  ? <span style={{ color: 'var(--success-fg)' }}>● Em serviço · {liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}</span>
+                  ? <span style={{ color: 'var(--success-fg)' }}>{t('status.on_duty')} · {liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}</span>
                   : isOnLunch
-                  ? <span style={{ color: 'var(--warning-fg)' }}>🍽 No almoço</span>
+                  ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.at_lunch')}</span>
                   : isOnCafe
-                  ? <span style={{ color: 'var(--warning-fg)' }}>☕ Pausa café</span>
-                  : <span>{liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) + ' hoje' : 'Sem registro hoje'}</span>
+                  ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.coffee_break')}</span>
+                  : <span>{liveNetMin > 0 ? `${fmtMinutes(Math.round(liveNetMin))} ${t('common.today')}` : t('status.no_records')}</span>
                 }
               </div>
-              {liveEarnings && <div style={{ fontSize: 11, color: 'var(--success-fg)', marginTop: 2, opacity: 0.75 }}>{liveEarnings} hoje</div>}
-              {weekTotal > 0 && <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 1 }}>{fmtMinutes(weekTotal)} esta semana</div>}
+              {liveEarnings && <div style={{ fontSize: 11, color: 'var(--success-fg)', marginTop: 2, opacity: 0.75 }}>{liveEarnings} {t('common.today')}</div>}
+              {weekTotal > 0 && <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 1 }}>{fmtMinutes(weekTotal)} {t('status.this_week')}</div>}
               {msg?.id === emp.id && (
                 <div style={{ fontSize: 12, marginTop: 4, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
               )}
@@ -162,7 +164,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
               disabled={punching === emp.id}
               className={isIn ? 'btn danger sm' : 'btn primary sm'}
             >
-              {punching === emp.id ? '…' : isIn ? '⏹ Saída' : '▶ Entrada'}
+              {punching === emp.id ? '…' : isIn ? t('status.clock_out') : t('status.clock_in')}
             </button>
           </div>
         ))}

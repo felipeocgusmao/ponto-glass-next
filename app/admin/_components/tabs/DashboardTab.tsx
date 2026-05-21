@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { fmtMinutes, calcOvertimePeriod, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES } from '@/lib/utils'
 import { SL, getWorkingDays } from '../../_lib/helpers'
+import { useLang } from '@/lib/LangContext'
+import type { TranslationKey } from '@/lib/i18n'
 
 type EmpStatus = 'working' | 'pause' | 'out' | 'absent'
 
@@ -15,13 +17,6 @@ function getEmpStatus(recs: PunchRecord[]): EmpStatus {
   if (last.type === 'inicio_almoco' || last.type === 'pausa_cafe') return 'pause'
   if (last.type === 'saída') return 'out'
   return 'absent'
-}
-
-const STATUS_LABEL: Record<EmpStatus, string> = {
-  working: 'Trabalhando',
-  pause: 'Em pausa',
-  out: 'Saiu',
-  absent: 'Ausente',
 }
 
 const STATUS_COLOR: Record<EmpStatus, string> = {
@@ -49,6 +44,7 @@ function empColor(id: string): number {
 }
 
 export function DashboardTab({ employees }: { employees: Employee[] }) {
+  const { t } = useLang()
   const now = new Date()
   const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const todayStr = now.toISOString().split('T')[0]
@@ -142,7 +138,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
   if (loading) return (
     <div className="card">
       <div style={{ padding: 20 }}>
-        <div className="alert-inline info">Carregando dashboard...</div>
+        <div className="alert-inline info">{t('dash.loading')}</div>
       </div>
     </div>
   )
@@ -152,7 +148,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
       {/* ── STATUS TODAY ─────────────────────────────────────────────────── */}
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
-          <SL>Presença hoje · {now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' })}</SL>
+          <SL>{t('dash.presence_today')} · {now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' })}</SL>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 10 }}>
             {((['working', 'pause', 'out', 'absent'] as EmpStatus[])).map(s => (
               <div key={s} style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 12px', textAlign: 'center' }}>
@@ -160,7 +156,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                   {statusCounts[s]}
                 </div>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', marginTop: 2, letterSpacing: '0.04em' }}>
-                  {STATUS_LABEL[s].toUpperCase()}
+                  {t(('dash.status.' + s) as TranslationKey).toUpperCase()}
                 </div>
               </div>
             ))}
@@ -171,7 +167,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
       {/* ── EMPLOYEE STATUS LIST ─────────────────────────────────────────── */}
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
-          <SL>Equipa agora</SL>
+          <SL>{t('dash.team_now')}</SL>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {empStatuses
               .sort((a, b) => {
@@ -190,12 +186,12 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp.name}</div>
                       {since && (
                         <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
-                          {status === 'working' ? 'desde' : status === 'pause' ? 'pausa desde' : 'saiu às'} {since}
+                          {status === 'working' ? t('dash.since') : status === 'pause' ? t('dash.pause_since') : t('dash.left_at')} {since}
                         </div>
                       )}
                     </div>
                     <span className={`chip ${STATUS_CHIP[status]}`} style={{ fontSize: 10, flexShrink: 0 }}>
-                      {STATUS_LABEL[status]}
+                      {t(('dash.status.' + status) as TranslationKey)}
                     </span>
                   </div>
                 )
@@ -208,14 +204,14 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
       {chartDays.length >= 2 && (
         <div className="card">
           <div style={{ padding: '16px 20px' }}>
-            <SL>Horas por dia — {now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</SL>
+            <SL>{t('dash.hours_per_day')} — {now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</SL>
             <div style={{ marginTop: 12 }}>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 80 }}>
                 {chartData.map(({ date, min }) => {
                   const pct = Math.min(100, (min / maxChartMin) * 100)
                   const d = new Date(date + 'T12:00:00')
                   const isToday = date === todayStr
-                  const label = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`
+                  const label = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}: ${min > 0 ? fmtMinutes(min) : t('dash.no_records_bar')}`
                   return (
                     <div key={date} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} title={label}>
                       <div style={{
@@ -249,7 +245,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
       {/* ── MONTHLY PROGRESS PER EMPLOYEE ───────────────────────────────── */}
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
-          <SL>Este mês — progresso da equipa</SL>
+          <SL>{t('dash.month_progress')}</SL>
           {employees.map(emp => {
             const empRecs = byEmpMonth[emp.id] ?? []
             const monthMin = empRecs.length > 0 ? Math.max(0, calcOvertimePeriod(empRecs, 0, emp.lunch_break_minutes) ?? 0) : 0
