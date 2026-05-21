@@ -34,7 +34,7 @@ export default function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd
   return (
     <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
       <div className="sb-head">
-        <div className="sb-logo">P</div>
+        <img src="/icon-192.svg" width="28" height="28" alt="" style={{ borderRadius: 8, flexShrink: 0 }} />
         <span className="sb-brand">PontoGlass</span>
       </div>
       <nav className="sb-nav" style={{ padding: '8px' }}>

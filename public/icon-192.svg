@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e1b4b"></stop>
+      <stop offset="0.45" stop-color="#312e81"></stop>
+      <stop offset="1" stop-color="#0f172a"></stop>
+    </linearGradient>
+
+    
+    <radialGradient id="glow1" cx="0.2" cy="0.18" r="0.55">
+      <stop offset="0" stop-color="#818cf8" stop-opacity="0.75"></stop>
+      <stop offset="0.6" stop-color="#6366f1" stop-opacity="0.18"></stop>
+      <stop offset="1" stop-color="#312e81" stop-opacity="0"></stop>
+    </radialGradient>
+
+    
+    <radialGradient id="glow2" cx="0.85" cy="0.95" r="0.55">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.32"></stop>
+      <stop offset="0.7" stop-color="#0891b2" stop-opacity="0.08"></stop>
+      <stop offset="1" stop-color="#0a0c14" stop-opacity="0"></stop>
+    </radialGradient>
+
+    
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"></stop>
+      <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.06"></stop>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"></stop>
+    </linearGradient>
+
+    
+    <linearGradient id="ring" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"></stop>
+      <stop offset="1" stop-color="#a5b4fc" stop-opacity="0.45"></stop>
+    </linearGradient>
+
+    
+    <linearGradient id="arc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a5b4fc"></stop>
+      <stop offset="1" stop-color="#67e8f9"></stop>
+    </linearGradient>
+
+    
+    <radialGradient id="dotGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"></stop>
+      <stop offset="0.6" stop-color="#c7d2fe" stop-opacity="0.55"></stop>
+      <stop offset="1" stop-color="#818cf8" stop-opacity="0"></stop>
+    </radialGradient>
+
+    
+    <filter id="innerShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.4"></feGaussianBlur>
+    </filter>
+
+    
+    <clipPath id="iconClip">
+      <rect width="192" height="192" rx="42" ry="42"></rect>
+    </clipPath>
+  </defs>
+
+  
+  <g clip-path="url(#iconClip)">
+    <rect width="192" height="192" fill="url(#bg)"></rect>
+    <rect width="192" height="192" fill="url(#glow1)"></rect>
+    <rect width="192" height="192" fill="url(#glow2)"></rect>
+
+    
+    <g opacity="0.045" stroke="#ffffff" stroke-width="0.6">
+      <path d="M0 48 H192 M0 96 H192 M0 144 H192 M48 0 V192 M96 0 V192 M144 0 V192"></path>
+    </g>
+
+    
+    <g transform="translate(96 96)">
+      
+      <circle r="68" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"></circle>
+
+      
+      <g stroke="#ffffff" stroke-linecap="round">
+        
+        <line x1="0" y1="-58" x2="0" y2="-50" stroke-width="2.2" stroke-opacity="0.85"></line>
+        
+        <line x1="58" y1="0" x2="50" y2="0" stroke-width="2.2" stroke-opacity="0.85"></line>
+        
+        <line x1="0" y1="58" x2="0" y2="50" stroke-width="2.2" stroke-opacity="0.85"></line>
+        
+        <line x1="-58" y1="0" x2="-50" y2="0" stroke-width="2.2" stroke-opacity="0.85"></line>
+        
+        <g stroke-width="1" stroke-opacity="0.32">
+          <line x1="29" y1="-50.23" x2="25.5" y2="-44.16"></line>
+          <line x1="50.23" y1="-29" x2="44.16" y2="-25.5"></line>
+          <line x1="50.23" y1="29" x2="44.16" y2="25.5"></line>
+          <line x1="29" y1="50.23" x2="25.5" y2="44.16"></line>
+          <line x1="-29" y1="50.23" x2="-25.5" y2="44.16"></line>
+          <line x1="-50.23" y1="29" x2="-44.16" y2="25.5"></line>
+          <line x1="-50.23" y1="-29" x2="-44.16" y2="-25.5"></line>
+          <line x1="-29" y1="-50.23" x2="-25.5" y2="-44.16"></line>
+        </g>
+      </g>
+
+      
+      
+      <circle r="64" fill="none" stroke="url(#arc)" stroke-width="5.5" stroke-linecap="round" stroke-dasharray="282 402" transform="rotate(-90)" opacity="0.95" filter="drop-shadow(0 0 6px #6366f180)"></circle>
+
+      
+      <line x1="0" y1="0" x2="-22" y2="-22" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-opacity="0.92"></line>
+
+      
+      <line x1="0" y1="0" x2="28" y2="-30" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-opacity="0.95"></line>
+
+      
+      <circle r="14" fill="url(#dotGlow)" opacity="0.5"></circle>
+      <circle r="5" fill="#ffffff"></circle>
+      <circle r="2.4" fill="#312e81"></circle>
+    </g>
+
+    
+    <rect width="192" height="192" fill="url(#shine)"></rect>
+
+    
+    <path d="M 14 22 Q 96 -4 178 22 L 178 38 Q 96 14 14 38 Z" fill="#ffffff" fill-opacity="0.12"></path>
+
+    
+    <rect x="0.5" y="0.5" width="191" height="191" rx="41.5" ry="41.5" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="1"></rect>
+  </g>
+</svg>
