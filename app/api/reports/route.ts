@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   try { user = await verifyJWT(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
-  if (!['admin', 'manager'].includes(user.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const isPrivileged = ['admin', 'manager'].includes(user.role)
 
   const { searchParams } = new URL(request.url)
   const from = searchParams.get('from')
@@ -31,7 +31,12 @@ export async function GET(request: NextRequest) {
   if (diffDays > 366)
     return NextResponse.json({ error: 'Período máximo permitido é de 366 dias' }, { status: 400 })
 
-  const employeeId = searchParams.get('employeeId')
+  const requestedId = searchParams.get('employeeId')
+  // Employees can only query their own records
+  if (!isPrivileged && requestedId && requestedId !== user.id)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const employeeId = isPrivileged ? requestedId : user.id
+
   const MAX_ROWS = 2000
 
   let query = supabase
