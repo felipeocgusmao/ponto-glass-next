@@ -4,90 +4,55 @@ export const size = { width: 180, height: 180 }
 export const contentType = 'image/png'
 
 export default function AppleIcon() {
+  // Clock ring: 110x110, centered in 180x180 → offset 35px each side
+  // Ring center: 55, 55 within ring coords
   return new ImageResponse(
     (
       <div
         style={{
-          width: 180,
-          height: 180,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          width: 180, height: 180,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #0f172a 100%)',
           borderRadius: 40,
-          position: 'relative',
-          overflow: 'hidden',
         }}
       >
-        {/* glow top-left */}
-        <div style={{
-          position: 'absolute', top: -20, left: -20,
-          width: 120, height: 120, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(129,140,248,0.5) 0%, transparent 70%)',
-          display: 'flex',
-        }} />
-
         {/* clock ring */}
         <div style={{
           width: 110, height: 110, borderRadius: '50%',
-          border: '2px solid rgba(255,255,255,0.1)',
+          border: '6px solid #818cf8',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           position: 'relative',
         }}>
-          {/* arc overlay — top 3/4 in indigo */}
-          <div style={{
-            position: 'absolute', inset: -6,
-            borderRadius: '50%',
-            border: '7px solid transparent',
-            borderTopColor: '#a5b4fc',
-            borderRightColor: '#818cf8',
-            borderBottomColor: 'transparent',
-            transform: 'rotate(-45deg)',
-            display: 'flex',
-          }} />
-
-          {/* tick marks */}
-          {[0, 90, 180, 270].map(deg => (
-            <div key={deg} style={{
-              position: 'absolute',
-              width: 3, height: 9,
-              background: 'rgba(255,255,255,0.7)',
-              borderRadius: 2,
-              transform: `rotate(${deg}deg) translateY(-46px)`,
-              display: 'flex',
-            }} />
-          ))}
-
-          {/* hour hand ~8 o'clock */}
+          {/* hour hand — points ~8 o'clock (rotate -135°) */}
           <div style={{
             position: 'absolute',
-            width: 4, height: 28,
-            background: 'white',
+            width: 4, height: 26,
+            background: 'rgba(255,255,255,0.9)',
             borderRadius: 4,
-            bottom: '50%',
-            left: 'calc(50% - 2px)',
+            bottom: 55,
+            left: 53,
             transformOrigin: 'bottom center',
             transform: 'rotate(-135deg)',
             display: 'flex',
           }} />
-
-          {/* minute hand ~12 o'clock */}
+          {/* minute hand — points ~12 o'clock (rotate 20°) */}
           <div style={{
             position: 'absolute',
-            width: 3, height: 38,
+            width: 3, height: 36,
             background: 'white',
             borderRadius: 3,
-            bottom: '50%',
-            left: 'calc(50% - 1.5px)',
+            bottom: 55,
+            left: 54,
             transformOrigin: 'bottom center',
-            transform: 'rotate(30deg)',
+            transform: 'rotate(20deg)',
             display: 'flex',
           }} />
-
           {/* center dot */}
           <div style={{
+            position: 'absolute',
             width: 10, height: 10, borderRadius: '50%',
             background: 'white',
+            top: 50, left: 50,
             display: 'flex',
           }} />
         </div>
