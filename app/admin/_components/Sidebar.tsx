@@ -4,6 +4,7 @@ import { avatarInitials } from '@/lib/utils'
 import type { EmployeeProfile } from '@/lib/types'
 import type { Tab } from '../_lib/types'
 import { empColor } from '../_lib/helpers'
+import { useLang, LANG_LABELS, type Lang } from '@/lib/LangContext'
 import {
   IconClock, IconDashboard, IconStatus, IconList, IconUsers,
   IconBank, IconCalendar, IconBar, IconAudit, IconEdit,
@@ -23,6 +24,8 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   auditoria:    <IconAudit />,
 }
 
+const LANGS: Lang[] = ['pt-PT', 'pt-BR', 'en', 'es']
+
 export default function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd, theme, toggleTheme, mobileOpen, onMobileClose, badges = {} }: {
   tab: Tab; setTab: (t: Tab) => void
   tabs: { id: Tab; label: string }[]
@@ -31,8 +34,10 @@ export default function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd
   mobileOpen: boolean; onMobileClose: () => void
   badges?: Partial<Record<Tab, number>>
 }) {
+  const { lang, setLang, t } = useLang()
   const ci = empColor(user.id)
-  const handleTabClick = (t: Tab) => { setTab(t); onMobileClose() }
+  const handleTabClick = (tabId: Tab) => { setTab(tabId); onMobileClose() }
+
   return (
     <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
       <div className="sb-head">
@@ -40,12 +45,12 @@ export default function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd
         <span className="sb-brand">PontoGlass</span>
       </div>
       <nav className="sb-nav" style={{ padding: '8px' }}>
-        {tabs.map(t => {
-          const count = badges[t.id] ?? 0
+        {tabs.map(tabItem => {
+          const count = badges[tabItem.id] ?? 0
           return (
-            <button key={t.id} onClick={() => handleTabClick(t.id)} className={`sb-item${tab === t.id ? ' active' : ''}`}>
-              <span className="sb-item-icon">{TAB_ICONS[t.id]}</span>
-              <span className="sb-item-label">{t.label}</span>
+            <button key={tabItem.id} onClick={() => handleTabClick(tabItem.id)} className={`sb-item${tab === tabItem.id ? ' active' : ''}`}>
+              <span className="sb-item-icon">{TAB_ICONS[tabItem.id]}</span>
+              <span className="sb-item-label">{t(`tab.${tabItem.id}` as Parameters<typeof t>[0])}</span>
               {count > 0 && (
                 <span style={{
                   marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999,
@@ -65,19 +70,37 @@ export default function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd
           <div className={`avatar size-28 av-c${ci}`}>{avatarInitials(user.name)}</div>
           <div className="sb-user-meta">
             <div className="sb-user-name">{user.name}</div>
-            <div className="sb-user-role">{user.role === 'manager' ? 'Gerente' : 'Admin'}</div>
+            <div className="sb-user-role">{user.role === 'manager' ? t('auth.role.manager') : 'Admin'}</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 8, padding: '0 2px' }}>
+        <div style={{ display: 'flex', gap: 4, marginTop: 8, padding: '0 2px', flexWrap: 'wrap' }}>
           <button onClick={toggleTheme} className="btn ghost sm icon" title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}>
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>
-          <button onClick={onChangePwd} className="btn ghost sm icon" title="Trocar senha">
+          <button onClick={onChangePwd} className="btn ghost sm icon" title={t('auth.change_password')}>
             <LockSmIcon />
           </button>
           <button onClick={onLogout} className="btn ghost sm" style={{ flex: 1, justifyContent: 'center' }}>
-            Sair
+            {t('common.logout')}
           </button>
+        </div>
+        <div style={{ display: 'flex', gap: 4, marginTop: 6, padding: '0 2px' }}>
+          {LANGS.map(l => (
+            <button
+              key={l}
+              onClick={() => setLang(l)}
+              className="btn ghost sm"
+              style={{
+                flex: 1, justifyContent: 'center', padding: '3px 0',
+                fontSize: 10, fontWeight: lang === l ? 700 : 400,
+                color: lang === l ? 'var(--accent)' : 'var(--fg-muted)',
+                borderBottom: lang === l ? '2px solid var(--accent)' : '2px solid transparent',
+                borderRadius: 0,
+              }}
+            >
+              {LANG_LABELS[l]}
+            </button>
+          ))}
         </div>
       </div>
     </aside>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeProfile, PunchRecord } from '@/lib/types'
 import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, openPayslip } from '@/lib/utils'
+import { useLang, LANG_LABELS, type Lang } from '@/lib/LangContext'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
@@ -12,7 +13,7 @@ type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes'
 type CorrectionStatus = 'pending' | 'approved' | 'rejected'
 interface CorrReq { id: string; req_type: string; req_timestamp: string; req_date: string; reason: string | null; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
 
-const PUNCH_LABEL: Record<string, string> = {
+const PUNCH_LABEL_PT: Record<string, string> = {
   entrada: 'Entrada', 'saída': 'Saída',
   inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço',
   pausa_cafe: 'Pausa café', retorno_cafe: 'Retorno café',
@@ -87,7 +88,7 @@ function ProgressRing({ pct, overtime }: { pct: number; overtime: boolean }) {
       </text>
       <text x="0" y="20" textAnchor="middle" fontSize="9"
         fill="var(--fg-subtle)" fontWeight="600" letterSpacing="0.06em">
-        JORNADA
+        {t('ponto.journey')}
       </text>
     </svg>
   )
@@ -106,7 +107,10 @@ function HistoryIcon({ size = 18 }: { size?: number }) { return <svg width={size
 function BankIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg> }
 function EditIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> }
 
+const LANGS: Lang[] = ['pt-PT', 'pt-BR', 'en', 'es']
+
 export default function PontoPage() {
+  const { lang, setLang, t } = useLang()
   const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [now, setNow] = useState(new Date())
@@ -199,7 +203,7 @@ export default function PontoPage() {
         body: JSON.stringify({ type: corrType, timestamp, reason: corrReason || undefined }),
       })
       if (res.ok) {
-        setCorrMsg({ ok: true, text: 'Pedido enviado. Aguarde aprovação do administrador.' })
+        setCorrMsg({ ok: true, text: t('corr.success') })
         setCorrReason('')
         setCorrLoaded(false) // force reload
         await loadCorrections()
@@ -247,7 +251,7 @@ export default function PontoPage() {
     if (geoMode !== 'disabled') {
       geo = await getGeo()
       if (geoMode === 'required' && !geo) {
-        showToast('Localização obrigatória. Permita o acesso.')
+        showToast(t('ponto.geo_required'))
         setPunching(false)
         return
       }
@@ -261,12 +265,12 @@ export default function PontoPage() {
       if (res.ok) {
         await loadRecords()
         setHistoryLoaded(false) // invalidate history cache
-        showToast(type === 'entrada' ? 'Entrada registrada' : type === 'saída' ? 'Saída registrada' : PUNCH_LABEL[type])
+        showToast(type === 'entrada' ? t('ponto.registered_in') : type === 'saída' ? t('ponto.registered_out') : PUNCH_LABEL_PT[type])
       } else {
         const d = await res.json()
         showToast(d.error ?? 'Erro ao registrar')
       }
-    } catch { showToast('Erro de conexão') }
+    } catch { showToast(t('ponto.connect_error')) }
     finally { setPunching(false) }
   }
 
@@ -279,9 +283,9 @@ export default function PontoPage() {
     <div className="emp-shell">
       <main className="emp-main">
         <div className="emp-card" style={{ textAlign: 'center', gap: 16 }}>
-          <div className="muted">Erro ao conectar. Verifique sua conexão.</div>
+          <div className="muted">{t('error.connect')}</div>
           <button onClick={() => { setFetchError(false); loadUser(); loadRecords() }} className="btn primary">
-            Tentar novamente
+            {t('common.retry')}
           </button>
         </div>
       </main>
@@ -308,7 +312,7 @@ export default function PontoPage() {
   const hh = String(now.getHours()).padStart(2, '0')
   const mm = String(now.getMinutes()).padStart(2, '0')
   const ss = String(now.getSeconds()).padStart(2, '0')
-  const greeting = now.getHours() < 12 ? 'Bom dia' : now.getHours() < 19 ? 'Boa tarde' : 'Boa noite'
+  const greeting = now.getHours() < 12 ? t('ponto.greeting.morning') : now.getHours() < 19 ? t('ponto.greeting.afternoon') : t('ponto.greeting.evening')
 
   // ── History tab helpers ──────────────────────────────────────────────────────
   const byDay = new Map<string, PunchRecord[]>()
@@ -333,15 +337,31 @@ export default function PontoPage() {
           <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: '-0.01em' }}>PontoGlass</div>
         </div>
         <div className="emp-user-menu">
-          <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}>
+          <div style={{ display: 'flex', gap: 2 }}>
+            {LANGS.map(l => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '3px 5px',
+                  fontSize: 10, fontWeight: lang === l ? 700 : 400,
+                  color: lang === l ? 'var(--accent)' : 'var(--fg-muted)',
+                  borderBottom: lang === l ? '2px solid var(--accent)' : '2px solid transparent',
+                }}
+              >
+                {LANG_LABELS[l]}
+              </button>
+            ))}
+          </div>
+          <button className="theme-toggle" onClick={toggleTheme}>
             {theme === 'dark' ? <SunIcon size={14}/> : <MoonIcon size={14}/>}
           </button>
           <div className="emp-user-info">
             <div className="emp-user-name">{user.name}</div>
-            <div className="emp-user-role">@{user.username} · Funcionário</div>
+            <div className="emp-user-role">@{user.username} · {t('auth.role.employee')}</div>
           </div>
           <div className={`avatar size-36 av-c${empColor(user.id)}`}>{initials(user.name)}</div>
-          <button className="btn ghost sm icon" onClick={handleLogout} title="Sair">
+          <button className="btn ghost sm icon" onClick={handleLogout} title={t('common.logout')}>
             <LogoutIcon size={14}/>
           </button>
         </div>
@@ -368,11 +388,11 @@ export default function PontoPage() {
                 <span className="emp-clock-sec">:{ss}</span>
               </div>
               <div className="emp-status">
-                {state === 'working' && since && <span className="chip success"><span className="dot"/>Trabalhando · desde {fmtTime(since)}</span>}
-                {state === 'lunch' && since && <span className="chip warn"><span className="dot"/>Em almoço · desde {fmtTime(since)}</span>}
-                {state === 'coffee' && since && <span className="chip warn"><span className="dot"/>Em pausa · desde {fmtTime(since)}</span>}
-                {state === 'out' && since && <span className="chip">Encerrou às {fmtTime(since)}</span>}
-                {state === 'absent' && <span className="chip">Não iniciou o expediente</span>}
+                {state === 'working' && since && <span className="chip success"><span className="dot"/>{t('ponto.status.working')} {fmtTime(since)}</span>}
+                {state === 'lunch' && since && <span className="chip warn"><span className="dot"/>{t('ponto.status.lunch')} {fmtTime(since)}</span>}
+                {state === 'coffee' && since && <span className="chip warn"><span className="dot"/>{t('ponto.status.coffee')} {fmtTime(since)}</span>}
+                {state === 'out' && since && <span className="chip">{t('ponto.status.out')} {fmtTime(since)}</span>}
+                {state === 'absent' && <span className="chip">{t('ponto.status.absent')}</span>}
               </div>
             </div>
 
@@ -380,16 +400,16 @@ export default function PontoPage() {
               <ProgressRing pct={pct} overtime={overtime > 0}/>
               <div className="emp-stats">
                 <div className="emp-stat primary">
-                  <span className="emp-stat-label">Trabalhadas</span>
+                  <span className="emp-stat-label">{t('ponto.worked')}</span>
                   <span className="emp-stat-value">{fmtMinutes(liveMin)}</span>
                 </div>
                 <div className={`emp-stat ${overtime > 0 ? 'tone-warn' : ''}`}>
-                  <span className="emp-stat-label">{overtime > 0 ? 'Horas extras' : 'Restam'}</span>
+                  <span className="emp-stat-label">{overtime > 0 ? t('ponto.overtime') : t('ponto.remaining')}</span>
                   <span className="emp-stat-value">{overtime > 0 ? '+' + fmtMinutes(overtime) : fmtMinutes(remaining)}</span>
                 </div>
                 {earnings != null && (
                   <div className="emp-stat tone-success">
-                    <span className="emp-stat-label">Ganhos do dia</span>
+                    <span className="emp-stat-label">{t('ponto.daily_earnings')}</span>
                     <span className="emp-stat-value">{fmtEur(earnings)}</span>
                   </div>
                 )}
@@ -399,53 +419,53 @@ export default function PontoPage() {
             <div className="emp-actions">
               {state === 'absent' && (
                 <button className="btn-emp primary-big" onClick={() => punch('entrada')} disabled={punching}>
-                  <PlayIcon size={16}/> {punching ? 'Registrando…' : 'Bater entrada'}
+                  <PlayIcon size={16}/> {punching ? t('ponto.registering') : t('ponto.punch_in')}
                 </button>
               )}
               {state === 'working' && (
                 <>
                   <div className="emp-action-row">
-                    <button className="btn-emp warn" onClick={() => punch('inicio_almoco')} disabled={punching}><UtensilsIcon size={14}/> Almoço</button>
-                    <button className="btn-emp warn" onClick={() => punch('pausa_cafe')} disabled={punching}><CoffeeIcon size={14}/> Pausa</button>
+                    <button className="btn-emp warn" onClick={() => punch('inicio_almoco')} disabled={punching}><UtensilsIcon size={14}/> {t('ponto.lunch_start')}</button>
+                    <button className="btn-emp warn" onClick={() => punch('pausa_cafe')} disabled={punching}><CoffeeIcon size={14}/> {t('ponto.coffee_start')}</button>
                   </div>
                   <button className="btn-emp danger-big" onClick={() => punch('saída')} disabled={punching}>
-                    <StopIcon size={14}/> {punching ? 'Registrando…' : 'Bater saída'}
+                    <StopIcon size={14}/> {punching ? t('ponto.registering') : t('ponto.punch_out')}
                   </button>
                 </>
               )}
               {state === 'lunch' && (
                 <button className="btn-emp primary-big" onClick={() => punch('fim_almoco')} disabled={punching}>
-                  <PlayIcon size={16}/> {punching ? 'Registrando…' : 'Voltei do almoço'}
+                  <PlayIcon size={16}/> {punching ? t('ponto.registering') : t('ponto.lunch_end')}
                 </button>
               )}
               {state === 'coffee' && (
                 <button className="btn-emp primary-big" onClick={() => punch('retorno_cafe')} disabled={punching}>
-                  <PlayIcon size={16}/> {punching ? 'Registrando…' : 'Voltei da pausa'}
+                  <PlayIcon size={16}/> {punching ? t('ponto.registering') : t('ponto.coffee_end')}
                 </button>
               )}
               {state === 'out' && (
                 <button className="btn-emp" onClick={() => punch('entrada')} disabled={punching}>
-                  <RefreshIcon size={14}/> Bater entrada novamente
+                  <RefreshIcon size={14}/> {t('ponto.punch_again')}
                 </button>
               )}
             </div>
 
             <div className="emp-history">
               <div className="emp-history-head">
-                <span>Histórico de hoje</span>
+                <span>{t('ponto.today_history')}</span>
                 <span className="muted tnum" style={{ fontSize: 11 }}>
-                  {myRecs.length} {myRecs.length === 1 ? 'batida' : 'batidas'}
+                  {myRecs.length} {myRecs.length === 1 ? t('ponto.punch') : t('ponto.punches')}
                 </span>
               </div>
               {myRecs.length === 0 ? (
-                <div className="emp-history-empty">Nenhuma batida ainda — use o botão acima.</div>
+                <div className="emp-history-empty">{t('ponto.no_punches')}</div>
               ) : (
                 <div className="emp-history-list">
                   {[...myRecs]
                     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
                     .map(r => (
                       <div key={r.id} className="emp-history-item">
-                        <span className={`chip ${PUNCH_TONE[r.type] ?? ''} outline`}>{PUNCH_LABEL[r.type] ?? r.type}</span>
+                        <span className={`chip ${PUNCH_TONE[r.type] ?? ''} outline`}>{t(`punch.${r.type}` as Parameters<typeof t>[0]) || PUNCH_LABEL_PT[r.type] || r.type}</span>
                         <span className="muted tnum mono" style={{ marginLeft: 'auto', fontSize: 12 }}>{fmtTime(r.timestamp)}</span>
                       </div>
                     ))}
@@ -465,15 +485,15 @@ export default function PontoPage() {
               {totalMonthMin > 0 && (
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                   <span style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--fg)' }}>{fmtMinutes(totalMonthMin)}</span>
-                  <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>trabalhadas este mês</span>
+                  <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('history.worked_month')}</span>
                 </div>
               )}
             </div>
 
-            {historyLoading && <div className="alert-inline info">Carregando...</div>}
+            {historyLoading && <div className="alert-inline info">{t('common.loading')}</div>}
 
             {!historyLoading && sortedDays.length === 0 && (
-              <div className="alert-inline info">Nenhum registo este mês.</div>
+              <div className="alert-inline info">{t('history.no_records')}</div>
             )}
 
             {!historyLoading && historyRecs.length > 0 && (
@@ -485,7 +505,7 @@ export default function PontoPage() {
                   openPayslip(user.name, period, historyRecs, user.workday_hours, user.lunch_break_minutes, user.hourly_rate)
                 }}
               >
-                📄 Exportar holerite do mês
+                {t('history.export_payslip')}
               </button>
             )}
 
@@ -512,7 +532,7 @@ export default function PontoPage() {
                     {recs.map(r => (
                       <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span className={`chip ${PUNCH_TONE[r.type] ?? ''} outline`} style={{ fontSize: 10 }}>
-                          {PUNCH_LABEL[r.type] ?? r.type}
+                          {t(`punch.${r.type}` as Parameters<typeof t>[0]) || PUNCH_LABEL_PT[r.type] || r.type}
                         </span>
                         <span className="muted tnum" style={{ fontSize: 10 }}>{fmtTime(r.timestamp)}</span>
                       </div>
@@ -528,10 +548,10 @@ export default function PontoPage() {
         {tab === 'banco' && (
           <div className="emp-card">
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 16 }}>
-              Banco de horas
+              {t('bank.title')}
             </div>
 
-            {bankLoading && <div className="alert-inline info">Carregando...</div>}
+            {bankLoading && <div className="alert-inline info">{t('common.loading')}</div>}
 
             {!bankLoading && bankBalance !== null && (
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
@@ -543,18 +563,16 @@ export default function PontoPage() {
                   {bankBalance >= 0 ? '+' : '-'}{fmtMinutes(Math.abs(bankBalance))}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--fg-muted)', marginTop: 8 }}>
-                  {bankBalance >= 0
-                    ? 'Tem horas a favor acumuladas'
-                    : 'Tem horas em débito'}
+                  {bankBalance >= 0 ? t('bank.surplus') : t('bank.deficit')}
                 </div>
                 <div style={{ marginTop: 24, padding: '12px 16px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--fg-muted)', textAlign: 'left' }}>
-                  O banco de horas acumula as diferenças entre as horas trabalhadas e a jornada prevista, incluindo ajustes manuais feitos pelo administrador.
+                  {t('bank.explanation')}
                 </div>
               </div>
             )}
 
             {!bankLoading && bankBalance === null && (
-              <div className="alert-inline info">Não foi possível carregar o saldo.</div>
+              <div className="alert-inline info">{t('bank.load_error')}</div>
             )}
           </div>
         )}
@@ -562,34 +580,34 @@ export default function PontoPage() {
         {tab === 'correcoes' && (
           <div className="emp-card">
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 16 }}>
-              Pedir correção de batida
+              {t('corr.request_title')}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
               <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Data</label>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.date')}</label>
                 <input type="date" className="input" value={corrDate} onChange={e => setCorrDate(e.target.value)} max={new Date().toISOString().split('T')[0]} />
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <div className="field" style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tipo</label>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.type')}</label>
                   <select className="input" value={corrType} onChange={e => setCorrType(e.target.value)}>
-                    <option value="entrada">Entrada</option>
-                    <option value="saída">Saída</option>
-                    <option value="inicio_almoco">Início almoço</option>
-                    <option value="fim_almoco">Fim almoço</option>
-                    <option value="pausa_cafe">Pausa café</option>
-                    <option value="retorno_cafe">Retorno café</option>
+                    <option value="entrada">{t('punch.entrada')}</option>
+                    <option value="saída">{t('punch.saída')}</option>
+                    <option value="inicio_almoco">{t('punch.inicio_almoco')}</option>
+                    <option value="fim_almoco">{t('punch.fim_almoco')}</option>
+                    <option value="pausa_cafe">{t('punch.pausa_cafe')}</option>
+                    <option value="retorno_cafe">{t('punch.retorno_cafe')}</option>
                   </select>
                 </div>
                 <div className="field" style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Hora</label>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.time')}</label>
                   <input type="time" className="input" value={corrTime} onChange={e => setCorrTime(e.target.value)} />
                 </div>
               </div>
               <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Motivo (opcional)</label>
-                <input type="text" className="input" value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder="Ex: Esqueci de bater saída" />
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.reason')}</label>
+                <input type="text" className="input" value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder={t('corr.reason_placeholder')} />
               </div>
 
               {corrMsg && (
@@ -597,32 +615,31 @@ export default function PontoPage() {
               )}
 
               <button className="btn-emp primary-big" onClick={submitCorrection} disabled={corrSubmitting}>
-                {corrSubmitting ? 'Enviando…' : 'Enviar pedido'}
+                {corrSubmitting ? t('corr.submitting') : t('corr.submit')}
               </button>
             </div>
 
-            {corrLoading && <div className="alert-inline info">Carregando...</div>}
+            {corrLoading && <div className="alert-inline info">{t('common.loading')}</div>}
 
             {corrLoaded && corrList.length > 0 && (
               <>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 12 }}>
-                  Meus pedidos
+                  {t('corr.my_requests')}
                 </div>
                 {corrList.map(cr => {
-                  const PUNCH_LABEL: Record<string, string> = { entrada: 'Entrada', 'saída': 'Saída', inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço', pausa_cafe: 'Pausa café', retorno_cafe: 'Retorno café' }
                   const d = new Date(cr.req_timestamp)
                   const dateStr = cr.req_date.split('-').reverse().join('/')
                   const timeStr = d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
                   return (
                     <div key={cr.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>{PUNCH_LABEL[cr.req_type] ?? cr.req_type} · {dateStr} {timeStr}</span>
+                        <span style={{ fontSize: 13, fontWeight: 500 }}>{t(`punch.${cr.req_type}` as Parameters<typeof t>[0]) || cr.req_type} · {dateStr} {timeStr}</span>
                         <span className={`chip ${cr.status === 'approved' ? 'success' : cr.status === 'rejected' ? 'danger' : 'warn'}`} style={{ fontSize: 10 }}>
-                          {cr.status === 'approved' ? 'aprovado' : cr.status === 'rejected' ? 'rejeitado' : 'pendente'}
+                          {cr.status === 'approved' ? t('corr.status.approved') : cr.status === 'rejected' ? t('corr.status.rejected') : t('corr.status.pending')}
                         </span>
                       </div>
                       {cr.reason && <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontStyle: 'italic' }}>"{cr.reason}"</div>}
-                      {cr.reviewer_note && <div style={{ fontSize: 11, color: 'var(--danger-fg)', marginTop: 2 }}>Nota: "{cr.reviewer_note}"</div>}
+                      {cr.reviewer_note && <div style={{ fontSize: 11, color: 'var(--danger-fg)', marginTop: 2 }}>{t('corr.reviewer_note')}: "{cr.reviewer_note}"</div>}
                     </div>
                   )
                 })}
@@ -640,11 +657,11 @@ export default function PontoPage() {
         backdropFilter: 'blur(12px)', zIndex: 50,
       }}>
         {([
-          { id: 'ponto',     label: 'Ponto',     Icon: ClockIcon },
-          { id: 'historico', label: 'Histórico', Icon: HistoryIcon },
-          { id: 'banco',     label: 'Banco',     Icon: BankIcon },
-          { id: 'correcoes', label: 'Correção',  Icon: EditIcon },
-        ] as const).map(({ id, label, Icon }) => (
+          { id: 'ponto',     labelKey: 'tab.meu_ponto' as const,  Icon: ClockIcon },
+          { id: 'historico', labelKey: 'tab.registros' as const,  Icon: HistoryIcon },
+          { id: 'banco',     labelKey: 'tab.banco' as const,      Icon: BankIcon },
+          { id: 'correcoes', labelKey: 'tab.correcoes' as const,  Icon: EditIcon },
+        ] as const).map(({ id, labelKey, Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -656,7 +673,7 @@ export default function PontoPage() {
             }}
           >
             <Icon size={20} />
-            <span style={{ fontSize: 10, fontWeight: tab === id ? 600 : 400, letterSpacing: '0.02em' }}>{label}</span>
+            <span style={{ fontSize: 10, fontWeight: tab === id ? 600 : 400, letterSpacing: '0.02em' }}>{t(labelKey)}</span>
           </button>
         ))}
       </nav>
