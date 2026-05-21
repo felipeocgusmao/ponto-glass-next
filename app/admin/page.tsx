@@ -27,6 +27,7 @@ export default function AdminPage() {
   const [fetchError, setFetchError] = useState(false)
   const [theme, setTheme] = useState('dark')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pendingCorrections, setPendingCorrections] = useState(0)
   const router = useRouter()
 
   const isManager = user?.role === 'manager'
@@ -56,13 +57,23 @@ export default function AdminPage() {
     } catch { /* employees ficam como estão */ }
   }, [])
 
+  const refreshPendingCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/correction-requests?status=pending')
+      if (res.ok) { const d = await res.json(); setPendingCorrections(d.length) }
+    } catch { /* silent */ }
+  }, [])
+
   useEffect(() => {
     const saved = localStorage.getItem('pg.theme')
     if (saved) setTheme(saved)
     setFetchError(false)
     loadUser()
     loadEmployees()
-  }, [loadUser, loadEmployees])
+    refreshPendingCount()
+    const interval = setInterval(refreshPendingCount, 60_000)
+    return () => clearInterval(interval)
+  }, [loadUser, loadEmployees, refreshPendingCount])
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -91,10 +102,11 @@ export default function AdminPage() {
       {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
-        tab={tab} setTab={setTab} tabs={visibleTabs}
+        tab={tab} setTab={t => { setTab(t); if (t === 'correcoes') refreshPendingCount() }} tabs={visibleTabs}
         user={user} onLogout={handleLogout} onChangePwd={() => setShowPwd(true)}
         theme={theme} toggleTheme={toggleTheme}
         mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)}
+        badges={{ correcoes: tab === 'correcoes' ? 0 : pendingCorrections }}
       />
       <div className="main">
         <header className="topbar">

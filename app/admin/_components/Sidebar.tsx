@@ -6,7 +6,7 @@ import type { Tab } from '../_lib/types'
 import { empColor } from '../_lib/helpers'
 import {
   IconClock, IconDashboard, IconStatus, IconList, IconUsers,
-  IconBank, IconCalendar, IconBar, IconAudit,
+  IconBank, IconCalendar, IconBar, IconAudit, IconEdit,
   SunIcon, MoonIcon, LockSmIcon,
 } from './icons'
 
@@ -15,6 +15,7 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   dashboard:    <IconDashboard />,
   status:       <IconStatus />,
   registros:    <IconList />,
+  correcoes:    <IconEdit />,
   funcionarios: <IconUsers />,
   banco:        <IconBank />,
   feriados:     <IconCalendar />,
@@ -22,12 +23,13 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   auditoria:    <IconAudit />,
 }
 
-export default function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd, theme, toggleTheme, mobileOpen, onMobileClose }: {
+export default function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd, theme, toggleTheme, mobileOpen, onMobileClose, badges = {} }: {
   tab: Tab; setTab: (t: Tab) => void
   tabs: { id: Tab; label: string }[]
   user: EmployeeProfile; onLogout: () => void; onChangePwd: () => void
   theme: string; toggleTheme: () => void
   mobileOpen: boolean; onMobileClose: () => void
+  badges?: Partial<Record<Tab, number>>
 }) {
   const ci = empColor(user.id)
   const handleTabClick = (t: Tab) => { setTab(t); onMobileClose() }
@@ -38,12 +40,25 @@ export default function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd
         <span className="sb-brand">PontoGlass</span>
       </div>
       <nav className="sb-nav" style={{ padding: '8px' }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => handleTabClick(t.id)} className={`sb-item${tab === t.id ? ' active' : ''}`}>
-            <span className="sb-item-icon">{TAB_ICONS[t.id]}</span>
-            <span className="sb-item-label">{t.label}</span>
-          </button>
-        ))}
+        {tabs.map(t => {
+          const count = badges[t.id] ?? 0
+          return (
+            <button key={t.id} onClick={() => handleTabClick(t.id)} className={`sb-item${tab === t.id ? ' active' : ''}`}>
+              <span className="sb-item-icon">{TAB_ICONS[t.id]}</span>
+              <span className="sb-item-label">{t.label}</span>
+              {count > 0 && (
+                <span style={{
+                  marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999,
+                  background: 'var(--danger-fg)', color: '#fff',
+                  fontSize: 10, fontWeight: 700, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', padding: '0 5px',
+                }}>
+                  {count > 99 ? '99+' : count}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </nav>
       <div className="sb-footer">
         <div className="sb-user">
