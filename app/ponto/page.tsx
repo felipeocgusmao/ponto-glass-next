@@ -232,7 +232,7 @@ export default function PontoPage() {
 
       <header className="emp-topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="sb-logo" style={{ width: 26, height: 26, borderRadius: 6 }}>P</div>
+          <img src="/icon-192.svg" width="26" height="26" alt="" style={{ borderRadius: 6 }} />
           <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: '-0.01em' }}>PontoGlass</div>
         </div>
         <div className="emp-user-menu">
