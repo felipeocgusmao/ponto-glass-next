@@ -85,7 +85,7 @@ Existe **um URL** e **uma senha**.
 │                                                         │
 │   Frontend    →   Next.js 14  (App Router)              │
 │   Linguagem   →   TypeScript  (strict)                  │
-│   Estilo      →   Tailwind CSS + Liquid Glass custom    │
+│   Estilo      →   CSS Variables  (sem Tailwind)         │
 │   Auth        →   JWT em httpOnly cookie  (8 horas)     │
 │   Banco       →   Supabase  (PostgreSQL gerenciado)     │
 │   Senhas      →   bcryptjs  (hash + salt)               │
@@ -102,7 +102,7 @@ Cada peça foi escolhida com intenção:
 | **Supabase** | PostgreSQL real, backups automáticos, sem DevOps |
 | **Jose (JWT)** | Edge-compatible — funciona nas Vercel Edge Functions |
 | **bcryptjs** | Senhas nunca saem do servidor em texto plano |
-| **Liquid Glass CSS** | Porque interfaces podem ser bonitas e funcionais ao mesmo tempo |
+| **CSS Variables** | Design system próprio — tema claro/escuro, sem dependências de UI |
 
 <br/>
 
@@ -137,23 +137,23 @@ Nenhuma configuração manual de banco necessária.
 
 ---
 
-## ◈ design — liquid glass
+## ◈ design
 
-O visual foi construído do zero em CSS puro — sem bibliotecas de UI, sem componentes prontos.
+O visual foi construído do zero em CSS puro — sem bibliotecas de UI, sem componentes prontos.  
+Inspirado no minimalismo do Linear e Notion: estrutura clara, hierarquia legível, zero ruído.
 
 ```css
-/* a essência do glass */
-.glass {
-  background    : rgba(255, 255, 255, 0.04);
-  backdrop-filter : blur(24px) saturate(160%);
-  border        : 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow    : 0 8px 32px rgba(0, 0, 0, 0.4),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.15);
-}
+/* o sistema de cores — claro e escuro via atributo */
+:root                { --bg: #fafafa; --accent: #5e6ad2; --fg: #18181b; }
+[data-theme="dark"]  { --bg: #08090b; --accent: #7c8cf8; --fg: #fafafa; }
+
+/* sidebar + conteúdo */
+.app   { display: grid; grid-template-columns: 240px 1fr; height: 100vh; }
+.page  { flex: 1; overflow: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
 ```
 
-A ideia: o vidro deixa passar a luz, mas não desaparece.  
-A interface existe sem gritar. Está lá — elegante, funcional, presente.
+Tema claro/escuro com um clique — persiste via `localStorage`, sem flash na recarga.  
+Cores de avatar (`av-c1` → `av-c8`) atribuídas por hash do ID, sem campo extra no banco.
 
 <br/>
 
@@ -166,9 +166,9 @@ ponto_glass_next/
 │
 ├── app/
 │   ├── page.tsx              ← redirect inteligente (admin/manager → /admin | employee → /ponto)
-│   ├── login/page.tsx        ← autenticação
-│   ├── ponto/page.tsx        ← painel do funcionário
-│   ├── admin/page.tsx        ← painel admin/gerente (tabs filtradas por role)
+│   ├── login/page.tsx        ← autenticação (split-screen com relógio animado)
+│   ├── ponto/page.tsx        ← shell fullscreen do funcionário (ProgressRing, histórico)
+│   ├── admin/page.tsx        ← painel admin/gerente (sidebar, navegação por role)
 │   │
 │   └── api/
 │       ├── auth/
@@ -183,8 +183,6 @@ ponto_glass_next/
 │       └── reports/          ← relatório por período (máx 366 dias / 2000 registros)
 │
 ├── components/
-│   ├── PunchCard.tsx         ← card de ponto com métricas ao vivo (30s)
-│   ├── LiveClock.tsx         ← relógio em tempo real
 │   └── ChangePasswordModal.tsx
 │
 ├── lib/
@@ -338,12 +336,13 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
   ✓  Ganhos por funcionário no painel de status
   ✓  CSV profissional (resumo diário com pausas e ganhos)
   ✓  Admin altera nome de usuário dos funcionários
-  ☐  Inbox de alertas (funcionário sem saída registrada)   → issue #4
+  ✓  Alerta de funcionários sem saída registrada
+  ✓  Dashboard com gráficos de horas por dia e mês
+  ✓  Audit log de alterações administrativas
+  ✓  Redesign Linear/Notion — tema claro/escuro, sidebar, design system próprio
   ☐  Domínio personalizado                                 → issue #5
   ☐  Multi-empresa (tenancy)                               → issue #6
-  ☐  Dashboard com gráficos mensais de horas/ganhos        → issue #8
   ☐  Relatório mensal automático por e-mail                → issue #9
-  ☐  Audit log de alterações administrativas               → issue #10
 ```
 
 <br/>
@@ -363,9 +362,9 @@ MIT — faça o que quiser, mas lembre de onde veio.
 ```
          ╭──────────────────────────────────────────╮
          │                                          │
-         │   feito com  ♥  e  backdropFilter blur   │
+         │   feito com  ♥  e  CSS variables          │
          │                                          │
-         │   o vidro não mente.                     │
+         │   a estrutura não mente.                 │
          │   o tempo não volta.                     │
          │   o ponto, agora, é seu.                 │
          │                                          │
