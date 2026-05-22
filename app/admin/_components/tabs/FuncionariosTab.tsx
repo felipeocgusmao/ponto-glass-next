@@ -17,6 +17,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
   const [rate, setRate] = useState(emp.hourly_rate != null ? String(emp.hourly_rate) : '')
   const [geoMode, setGeoMode] = useState<'required' | 'optional' | 'disabled'>(emp.geo_mode ?? 'optional')
   const [newPassword, setNewPassword] = useState('')
+  const [showNewPwd, setShowNewPwd] = useState(false)
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
   const [saving, setSaving] = useState(false)
@@ -99,7 +100,12 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
       </div>
       <div className="field">
         <label>{t('emp.new_pwd')}</label>
-        <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mín. 6 caracteres" className="input" />
+        <div style={{ position: 'relative' }}>
+          <input type={showNewPwd ? 'text' : 'password'} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mín. 6 caracteres" className="input" style={{ paddingRight: 40 }} />
+          <button type="button" onClick={() => setShowNewPwd(v => !v)} tabIndex={-1} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', fontSize: 16, padding: 0, lineHeight: 1 }}>
+            {showNewPwd ? '🙈' : '👁'}
+          </button>
+        </div>
       </div>
       {err && <div className="alert-inline err">{err}</div>}
       {ok  && <div className="alert-inline ok">{ok}</div>}
@@ -119,6 +125,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<'employee' | 'manager' | 'admin'>('employee')
   const [workdayHours, setWorkdayHours] = useState('8')
   const [lunchMin, setLunchMin] = useState('60')
@@ -203,7 +210,15 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="maria@empresa.com" className="input" />
             </div>
             <div className="form-grid-2">
-              <div className="field"><label>{t('auth.password')}</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mín. 6 chars" className="input" required /></div>
+              <div className="field">
+                <label>{t('auth.password')}</label>
+                <div style={{ position: 'relative' }}>
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Mín. 6 chars" className="input" style={{ paddingRight: 40 }} required />
+                  <button type="button" onClick={() => setShowPassword(v => !v)} tabIndex={-1} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', fontSize: 16, padding: 0, lineHeight: 1 }}>
+                    {showPassword ? '🙈' : '👁'}
+                  </button>
+                </div>
+              </div>
               <div className="field">
                 <label>{t('emp.profile')}</label>
                 <select value={role} onChange={e => setRole(e.target.value as 'employee' | 'manager' | 'admin')} className="input">
