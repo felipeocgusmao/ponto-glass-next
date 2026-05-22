@@ -259,6 +259,41 @@ export default function PontoPage() {
     const i = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(i)
   }, [])
+
+  // Push notifications: 15-min warning + overtime alert
+  useEffect(() => {
+    if (!user || !records.length) return
+    if (typeof window === 'undefined' || Notification.permission !== 'granted') return
+
+    const myRecs = records.filter(r => r.employee_id === user.id)
+    const { state: ws } = getWorkState(myRecs)
+    if (ws !== 'working') return
+
+    const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
+    const targetMin = user.workday_hours * 60
+    const remaining = targetMin - liveMin
+    const overtime = liveMin - targetMin
+
+    const today = new Date().toISOString().split('T')[0]
+    const key15 = `pg.notif.warn15.${today}.${user.id}`
+    const keyOt = `pg.notif.overtime.${today}.${user.id}`
+
+    const notify = (title: string, body: string, tag: string) => {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title, { body, icon: '/icon-192.svg', badge: '/icon-192.svg', tag })
+      }).catch(() => {})
+    }
+
+    if (remaining > 0 && remaining <= 15 && !localStorage.getItem(key15)) {
+      localStorage.setItem(key15, '1')
+      notify('Hora de terminar em breve ⏱', `Faltam ${Math.round(remaining)} min para completar a tua jornada.`, 'end-warning')
+    }
+
+    if (overtime >= 1 && !localStorage.getItem(keyOt)) {
+      localStorage.setItem(keyOt, '1')
+      notify('Jornada concluída 🔔', 'Já completaste a jornada de hoje. Não te esqueças de registar a saída!', 'overtime-alert')
+    }
+  }, [now, records, user])
   useEffect(() => {
     const saved = localStorage.getItem('pg.theme') as 'dark' | 'light' | null
     if (saved) setTheme(saved)
