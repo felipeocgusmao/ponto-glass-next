@@ -296,6 +296,7 @@ const t = {
     'audit.all_actions':   'Todas as ações',
     'audit.none':          'Nenhum registo de auditoria.',
     'audit.by':            'por',
+    'audit.action.employee_login':              '🔑 Login efetuado',
     'audit.action.employee_create':             '👤 Funcionário criado',
     'audit.action.employee_update':             '✏ Funcionário atualizado',
     'audit.action.employee_delete':             '🗑 Funcionário desativado',
@@ -328,6 +329,14 @@ const t = {
     'ponto.reminder':         'Esqueceu de bater saída?',
     'ponto.reminder.body':    'Já passaram {n} min do fim do seu horário.',
     'ponto.reminder.dismiss': 'Já sei, obrigado',
+
+    // ── Profile tab (/ponto) ──────────────────────────────────────────────
+    'tab.perfil':          'Perfil',
+    'profile.title':       'O meu perfil',
+    'profile.email_saved': 'Email guardado!',
+    'profile.save_email':  'Guardar email',
+    'profile.info':        'Informações da conta',
+    'profile.security':    'Segurança',
 
     // ── Kiosk ─────────────────────────────────────────────────────────────
     'kiosk.title':        'Terminal de Ponto',
@@ -629,6 +638,7 @@ const t = {
     'audit.all_actions':   'Todas as ações',
     'audit.none':          'Nenhum registro de auditoria.',
     'audit.by':            'por',
+    'audit.action.employee_login':              '🔑 Login efetuado',
     'audit.action.employee_create':             '👤 Funcionário criado',
     'audit.action.employee_update':             '✏ Funcionário atualizado',
     'audit.action.employee_delete':             '🗑 Funcionário desativado',
@@ -661,6 +671,14 @@ const t = {
     'ponto.reminder':         'Esqueceu de bater saída?',
     'ponto.reminder.body':    'Já passaram {n} min do fim do seu horário.',
     'ponto.reminder.dismiss': 'Já sei, obrigado',
+
+    // ── Profile tab (/ponto) ──────────────────────────────────────────────
+    'tab.perfil':          'Perfil',
+    'profile.title':       'Meu perfil',
+    'profile.email_saved': 'Email salvo!',
+    'profile.save_email':  'Salvar email',
+    'profile.info':        'Informações da conta',
+    'profile.security':    'Segurança',
 
     // ── Kiosk ─────────────────────────────────────────────────────────────
     'kiosk.title':        'Terminal de Ponto',
@@ -961,6 +979,7 @@ const t = {
     'audit.all_actions':   'All actions',
     'audit.none':          'No audit records.',
     'audit.by':            'by',
+    'audit.action.employee_login':              '🔑 Login recorded',
     'audit.action.employee_create':             '👤 Employee created',
     'audit.action.employee_update':             '✏ Employee updated',
     'audit.action.employee_delete':             '🗑 Employee deactivated',
@@ -993,6 +1012,14 @@ const t = {
     'ponto.reminder':         'Did you forget to clock out?',
     'ponto.reminder.body':    '{n} min past your end-of-shift time.',
     'ponto.reminder.dismiss': 'Got it, thanks',
+
+    // ── Profile tab (/ponto) ──────────────────────────────────────────────
+    'tab.perfil':          'Profile',
+    'profile.title':       'My profile',
+    'profile.email_saved': 'Email saved!',
+    'profile.save_email':  'Save email',
+    'profile.info':        'Account info',
+    'profile.security':    'Security',
 
     // ── Kiosk ─────────────────────────────────────────────────────────────
     'kiosk.title':        'Time Clock Terminal',
@@ -1293,6 +1320,7 @@ const t = {
     'audit.all_actions':   'Todas las acciones',
     'audit.none':          'Sin registros de auditoría.',
     'audit.by':            'por',
+    'audit.action.employee_login':              '🔑 Login registrado',
     'audit.action.employee_create':             '👤 Empleado creado',
     'audit.action.employee_update':             '✏ Empleado actualizado',
     'audit.action.employee_delete':             '🗑 Empleado desactivado',
@@ -1322,6 +1350,14 @@ const t = {
     'pwd.save':          'Guardar contraseña',
 
     // ── Reminder banner ───────────────────────────────────────────────────
+    // ── Profile tab (/ponto) ──────────────────────────────────────────────
+    'tab.perfil':          'Perfil',
+    'profile.title':       'Mi perfil',
+    'profile.email_saved': '¡Email guardado!',
+    'profile.save_email':  'Guardar email',
+    'profile.info':        'Información de la cuenta',
+    'profile.security':    'Seguridad',
+
     'ponto.reminder':         '¿Olvidaste fichar la salida?',
     'ponto.reminder.body':    'Llevas {n} min de tu horario.',
     'ponto.reminder.dismiss': 'Ya lo sé, gracias',

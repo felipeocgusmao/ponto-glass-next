@@ -35,6 +35,7 @@ export interface EmployeeProfile extends JWTUser {
   lunch_break_minutes: number
   hourly_rate: number | null
   geo_mode: 'required' | 'optional' | 'disabled'
+  email: string | null
 }
 
 export interface AuditLog {

@@ -34,6 +34,53 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
   }, [])
   useEffect(() => { setReminderDismissed(false) }, [records])
 
+  // Register SW + subscribe to push (so admin gets server-sent pushes too)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapidKey) return
+    navigator.serviceWorker.register('/sw.js').then(async reg => {
+      if (Notification.permission === 'denied') return
+      if (Notification.permission === 'default') {
+        const perm = await Notification.requestPermission()
+        if (perm !== 'granted') return
+      }
+      try {
+        const existing = await reg.pushManager.getSubscription()
+        const sub = existing ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey })
+        await fetch('/api/push-subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub.toJSON()) })
+      } catch { /* non-critical */ }
+    }).catch(() => {})
+  }, [])
+
+  // Local notification: 15-min warning + overtime
+  useEffect(() => {
+    if (!records.length) return
+    if (typeof window === 'undefined' || Notification.permission !== 'granted') return
+    const { state: ws } = getWorkState(records)
+    if (ws !== 'working') return
+    const liveM = calcLiveMin(records, user.lunch_break_minutes)
+    const wMin = user.workday_hours * 60
+    const rem = wMin - liveM
+    const ot = liveM - wMin
+    const today = new Date().toISOString().split('T')[0]
+    const key15 = `pg.notif.warn15.${today}.${user.id}`
+    const keyOt = `pg.notif.overtime.${today}.${user.id}`
+    const notify = (title: string, body: string, tag: string) => {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title, { body, icon: '/icon-192.svg', badge: '/icon-192.svg', tag })
+      }).catch(() => {})
+    }
+    if (rem > 0 && rem <= 15 && !localStorage.getItem(key15)) {
+      localStorage.setItem(key15, '1')
+      notify('Hora de terminar em breve ⏱', `Faltam ${Math.round(rem)} min para completar a tua jornada.`, 'end-warning')
+    }
+    if (ot >= 1 && !localStorage.getItem(keyOt)) {
+      localStorage.setItem(keyOt, '1')
+      notify('Jornada concluída 🔔', 'Já completaste a jornada de hoje. Não te esqueças de registar a saída!', 'overtime-alert')
+    }
+  }, [now, records, user])
+
   const hh = String(now.getHours()).padStart(2, '0')
   const mm = String(now.getMinutes()).padStart(2, '0')
   const ss = String(now.getSeconds()).padStart(2, '0')

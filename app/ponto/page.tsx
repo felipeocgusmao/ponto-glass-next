@@ -8,7 +8,7 @@ import { useLang, LANG_LABELS, type Lang } from '@/lib/LangContext'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
-type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes'
+type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes' | 'perfil'
 
 type CorrectionStatus = 'pending' | 'approved' | 'rejected'
 interface CorrReq { id: string; req_type: string; req_timestamp: string; req_date: string; reason: string | null; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
@@ -106,6 +106,7 @@ function ClockIcon({ size = 18 }: { size?: number }) { return <svg width={size} 
 function HistoryIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> }
 function BankIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg> }
 function EditIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> }
+function UserIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
 
 const LANGS: Lang[] = ['pt-PT', 'pt-BR', 'en', 'es']
 
@@ -135,6 +136,16 @@ export default function PontoPage() {
   const [corrLoaded, setCorrLoaded] = useState(false)
   const [corrLoading, setCorrLoading] = useState(false)
   const [corrBadge, setCorrBadge] = useState(0)
+
+  // profile tab state
+  const [profileEmail, setProfileEmail] = useState('')
+  const [profileEmailSaving, setProfileEmailSaving] = useState(false)
+  const [profileEmailMsg, setProfileEmailMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [pwdCurrent, setPwdCurrent] = useState('')
+  const [pwdNext, setPwdNext] = useState('')
+  const [pwdConfirm, setPwdConfirm] = useState('')
+  const [pwdSaving, setPwdSaving] = useState(false)
+  const [pwdMsg, setPwdMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   // reminder
   const [reminderDismissed, setReminderDismissed] = useState(false)
@@ -228,6 +239,7 @@ export default function PontoPage() {
   }
 
   useEffect(() => { loadUser(); loadRecords() }, [loadUser, loadRecords])
+  useEffect(() => { if (user) setProfileEmail(user.email ?? '') }, [user])
 
   // Register service worker and subscribe to push notifications
   useEffect(() => {
@@ -363,6 +375,31 @@ export default function PontoPage() {
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
+  }
+
+  const saveEmail = async () => {
+    setProfileEmailSaving(true); setProfileEmailMsg(null)
+    try {
+      const res = await fetch('/api/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: profileEmail || null }) })
+      if (res.ok) setProfileEmailMsg({ ok: true, text: t('profile.email_saved') })
+      else { const d = await res.json(); setProfileEmailMsg({ ok: false, text: d.error ?? t('ponto.connect_error') }) }
+    } catch { setProfileEmailMsg({ ok: false, text: t('ponto.connect_error') }) }
+    finally { setProfileEmailSaving(false) }
+  }
+
+  const changePassword = async () => {
+    setPwdMsg(null)
+    if (pwdNext !== pwdConfirm) { setPwdMsg({ ok: false, text: t('pwd.mismatch') }); return }
+    if (pwdNext.length < 6) { setPwdMsg({ ok: false, text: t('pwd.min_chars') }); return }
+    setPwdSaving(true)
+    try {
+      const res = await fetch('/api/auth/password', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: pwdCurrent, newPassword: pwdNext }) })
+      if (res.ok) {
+        setPwdMsg({ ok: true, text: t('pwd.success') })
+        setPwdCurrent(''); setPwdNext(''); setPwdConfirm('')
+      } else { const d = await res.json(); setPwdMsg({ ok: false, text: d.error ?? t('ponto.connect_error') }) }
+    } catch { setPwdMsg({ ok: false, text: t('ponto.connect_error') }) }
+    finally { setPwdSaving(false) }
   }
 
   if (fetchError) return (
@@ -758,6 +795,52 @@ export default function PontoPage() {
             )}
           </div>
         )}
+        {/* ── PERFIL TAB ────────────────────────────────────────────────── */}
+        {tab === 'perfil' && (
+          <div className="emp-card">
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 16 }}>
+              {t('profile.info')}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+              <div className={`avatar size-30 av-c${(user.id.charCodeAt(0) % 8) + 1}`}>{user.name.split(' ').slice(0,2).map(w=>w[0]?.toUpperCase()??'').join('')}</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{user.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>@{user.username}</div>
+              </div>
+            </div>
+
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('emp.email_optional')}</label>
+              <input type="email" className="input" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setProfileEmailMsg(null) }} placeholder="email@empresa.com" />
+            </div>
+            {profileEmailMsg && <div className={`alert-inline ${profileEmailMsg.ok ? 'ok' : 'err'}`} style={{ marginBottom: 8 }}>{profileEmailMsg.text}</div>}
+            <button className="btn-emp" style={{ width: '100%', justifyContent: 'center', marginBottom: 24 }} onClick={saveEmail} disabled={profileEmailSaving}>
+              {profileEmailSaving ? t('pwd.saving') : t('profile.save_email')}
+            </button>
+
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 12 }}>
+              {t('profile.security')}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="field">
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.current_password')}</label>
+                <input type="password" className="input" value={pwdCurrent} onChange={e => { setPwdCurrent(e.target.value); setPwdMsg(null) }} placeholder="••••••" />
+              </div>
+              <div className="field">
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.new_password')}</label>
+                <input type="password" className="input" value={pwdNext} onChange={e => { setPwdNext(e.target.value); setPwdMsg(null) }} placeholder={t('pwd.min_chars')} />
+              </div>
+              <div className="field">
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.confirm_password')}</label>
+                <input type="password" className="input" value={pwdConfirm} onChange={e => { setPwdConfirm(e.target.value); setPwdMsg(null) }} placeholder="••••••" />
+              </div>
+              {pwdMsg && <div className={`alert-inline ${pwdMsg.ok ? 'ok' : 'err'}`}>{pwdMsg.text}</div>}
+              <button className="btn-emp primary-big" onClick={changePassword} disabled={pwdSaving || !pwdCurrent || !pwdNext}>
+                {pwdSaving ? t('pwd.saving') : t('pwd.save')}
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* ── BOTTOM TAB BAR ──────────────────────────────────────────────────── */}
@@ -772,6 +855,7 @@ export default function PontoPage() {
           { id: 'historico', labelKey: 'tab.registros' as const,  Icon: HistoryIcon },
           { id: 'banco',     labelKey: 'tab.banco' as const,      Icon: BankIcon },
           { id: 'correcoes', labelKey: 'tab.correcoes' as const,  Icon: EditIcon },
+          { id: 'perfil',    labelKey: 'tab.perfil' as const,     Icon: UserIcon },
         ] as const).map(({ id, labelKey, Icon }) => (
           <button
             key={id}
