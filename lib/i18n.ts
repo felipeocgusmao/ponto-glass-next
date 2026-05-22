@@ -318,6 +318,29 @@ const t = {
     'pwd.saving':        'A guardar…',
     'pwd.save':          'Guardar palavra-passe',
 
+    // ── Reminder banner ───────────────────────────────────────────────────
+    'ponto.reminder':         'Esqueceu de bater saída?',
+    'ponto.reminder.body':    'Já passaram {n} min do fim do seu horário.',
+    'ponto.reminder.dismiss': 'Já sei, obrigado',
+
+    // ── Kiosk ─────────────────────────────────────────────────────────────
+    'kiosk.title':        'Terminal de Ponto',
+    'kiosk.subtitle':     'Toque no seu nome para registar',
+    'kiosk.working':      'A trabalhar',
+    'kiosk.pause':        'Em pausa',
+    'kiosk.out':          'Encerrado',
+    'kiosk.absent':       'Ausente',
+    'kiosk.punch':        'Registar Ponto',
+    'kiosk.select_type':  'Tipo de registo',
+    'kiosk.confirm':      'Confirmar',
+    'kiosk.cancel':       'Cancelar',
+    'kiosk.success':      'Registo efectuado!',
+    'kiosk.error':        'Erro ao registar',
+    'kiosk.loading':      'A registar…',
+    'kiosk.back':         'Voltar',
+    'kiosk.pdf':          'PDF',
+    'kiosk.no_emp':       'Sem funcionários',
+
     // ── Error states ──────────────────────────────────────────────────────
     'error.connect':        'Erro ao conectar. Verifique a sua conexão.',
   },
@@ -622,6 +645,29 @@ const t = {
     'pwd.saving':        'Salvando…',
     'pwd.save':          'Salvar senha',
 
+    // ── Reminder banner ───────────────────────────────────────────────────
+    'ponto.reminder':         'Esqueceu de bater saída?',
+    'ponto.reminder.body':    'Já passaram {n} min do fim do seu horário.',
+    'ponto.reminder.dismiss': 'Já sei, obrigado',
+
+    // ── Kiosk ─────────────────────────────────────────────────────────────
+    'kiosk.title':        'Terminal de Ponto',
+    'kiosk.subtitle':     'Toque no seu nome para registrar',
+    'kiosk.working':      'Trabalhando',
+    'kiosk.pause':        'Em pausa',
+    'kiosk.out':          'Encerrado',
+    'kiosk.absent':       'Ausente',
+    'kiosk.punch':        'Registrar Ponto',
+    'kiosk.select_type':  'Tipo de registro',
+    'kiosk.confirm':      'Confirmar',
+    'kiosk.cancel':       'Cancelar',
+    'kiosk.success':      'Registro efetuado!',
+    'kiosk.error':        'Erro ao registrar',
+    'kiosk.loading':      'Registrando…',
+    'kiosk.back':         'Voltar',
+    'kiosk.pdf':          'PDF',
+    'kiosk.no_emp':       'Sem funcionários',
+
     'error.connect':        'Erro ao conectar. Verifique sua conexão.',
   },
 
@@ -925,6 +971,29 @@ const t = {
     'pwd.saving':        'Saving…',
     'pwd.save':          'Save password',
 
+    // ── Reminder banner ───────────────────────────────────────────────────
+    'ponto.reminder':         'Did you forget to clock out?',
+    'ponto.reminder.body':    '{n} min past your end-of-shift time.',
+    'ponto.reminder.dismiss': 'Got it, thanks',
+
+    // ── Kiosk ─────────────────────────────────────────────────────────────
+    'kiosk.title':        'Time Clock Terminal',
+    'kiosk.subtitle':     'Tap your name to clock in/out',
+    'kiosk.working':      'Working',
+    'kiosk.pause':        'On break',
+    'kiosk.out':          'Clocked out',
+    'kiosk.absent':       'Absent',
+    'kiosk.punch':        'Clock In / Out',
+    'kiosk.select_type':  'Entry type',
+    'kiosk.confirm':      'Confirm',
+    'kiosk.cancel':       'Cancel',
+    'kiosk.success':      'Entry recorded!',
+    'kiosk.error':        'Error recording entry',
+    'kiosk.loading':      'Recording…',
+    'kiosk.back':         'Back',
+    'kiosk.pdf':          'PDF',
+    'kiosk.no_emp':       'No employees',
+
     'error.connect':        'Connection error. Check your network.',
   },
 
@@ -1227,6 +1296,29 @@ const t = {
     'pwd.min_chars':     'Mín. 6 caracteres',
     'pwd.saving':        'Guardando…',
     'pwd.save':          'Guardar contraseña',
+
+    // ── Reminder banner ───────────────────────────────────────────────────
+    'ponto.reminder':         '¿Olvidaste fichar la salida?',
+    'ponto.reminder.body':    'Llevas {n} min de tu horario.',
+    'ponto.reminder.dismiss': 'Ya lo sé, gracias',
+
+    // ── Kiosk ─────────────────────────────────────────────────────────────
+    'kiosk.title':        'Terminal de Fichaje',
+    'kiosk.subtitle':     'Toca tu nombre para fichar',
+    'kiosk.working':      'Trabajando',
+    'kiosk.pause':        'En pausa',
+    'kiosk.out':          'Salida',
+    'kiosk.absent':       'Ausente',
+    'kiosk.punch':        'Fichar',
+    'kiosk.select_type':  'Tipo de fichaje',
+    'kiosk.confirm':      'Confirmar',
+    'kiosk.cancel':       'Cancelar',
+    'kiosk.success':      '¡Fichaje registrado!',
+    'kiosk.error':        'Error al fichar',
+    'kiosk.loading':      'Fichando…',
+    'kiosk.back':         'Volver',
+    'kiosk.pdf':          'PDF',
+    'kiosk.no_emp':       'Sin empleados',
 
     'error.connect':        'Error de conexión. Comprueba tu red.',
   },

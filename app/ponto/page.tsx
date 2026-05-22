@@ -135,6 +135,9 @@ export default function PontoPage() {
   const [corrLoaded, setCorrLoaded] = useState(false)
   const [corrLoading, setCorrLoading] = useState(false)
   const [corrBadge, setCorrBadge] = useState(0)
+
+  // reminder
+  const [reminderDismissed, setReminderDismissed] = useState(false)
   const [corrDate, setCorrDate] = useState(() => new Date().toISOString().split('T')[0])
   const [corrTime, setCorrTime] = useState(() => { const n = new Date(); return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}` })
   const [corrType, setCorrType] = useState('entrada')
@@ -225,6 +228,33 @@ export default function PontoPage() {
   }
 
   useEffect(() => { loadUser(); loadRecords() }, [loadUser, loadRecords])
+
+  // Register service worker and subscribe to push notifications
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapidKey) return
+
+    navigator.serviceWorker.register('/sw.js').then(async reg => {
+      if (Notification.permission === 'denied') return
+      if (Notification.permission === 'default') {
+        const perm = await Notification.requestPermission()
+        if (perm !== 'granted') return
+      }
+      try {
+        const existing = await reg.pushManager.getSubscription()
+        const sub = existing ?? await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: vapidKey,
+        })
+        await fetch('/api/push-subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sub.toJSON()),
+        })
+      } catch { /* push not critical */ }
+    }).catch(() => { /* sw registration failed */ })
+  }, [])
   useEffect(() => {
     const i = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(i)
@@ -246,6 +276,11 @@ export default function PontoPage() {
     localStorage.setItem('pg.corr_seen', JSON.stringify(ids))
     setCorrBadge(0)
   }, [tab, corrLoaded, corrList])
+
+  // Reset reminder dismissed state when employee punches out / state changes
+  useEffect(() => {
+    setReminderDismissed(false)
+  }, [records])
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
@@ -382,6 +417,33 @@ export default function PontoPage() {
       </header>
 
       <main className="emp-main" style={{ paddingBottom: 72 }}>
+
+        {/* ── OVERTIME REMINDER BANNER ───────────────────────────────────── */}
+        {tab === 'ponto' && state === 'working' && overtime > 15 && !reminderDismissed && (
+          <div style={{
+            background: 'var(--warning-soft, rgba(234,179,8,0.12))',
+            border: '1px solid var(--warning, #ca8a04)',
+            borderRadius: 'var(--r-md)',
+            padding: '10px 14px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            marginBottom: 8,
+          }}>
+            <span style={{ fontSize: 16 }}>⏰</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{t('ponto.reminder')}</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
+                {t('ponto.reminder.body').replace('{n}', String(Math.round(overtime)))}
+              </div>
+            </div>
+            <button
+              onClick={() => setReminderDismissed(true)}
+              className="btn ghost sm"
+              style={{ flexShrink: 0, fontSize: 11 }}
+            >
+              {t('ponto.reminder.dismiss')}
+            </button>
+          </div>
+        )}
 
         {/* ── PONTO TAB ─────────────────────────────────────────────────────── */}
         {tab === 'ponto' && (

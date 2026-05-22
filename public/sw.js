@@ -31,3 +31,30 @@ self.addEventListener('fetch', e => {
       .catch(() => caches.match(request))
   )
 })
+
+self.addEventListener('push', e => {
+  if (!e.data) return
+  let payload
+  try { payload = e.data.json() } catch { payload = { title: 'PontoGlass', body: e.data.text() } }
+  e.waitUntil(
+    self.registration.showNotification(payload.title ?? 'PontoGlass', {
+      body: payload.body ?? '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: payload.tag ?? 'pontoglass',
+      data: payload.url ?? '/ponto',
+    })
+  )
+})
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close()
+  const url = e.notification.data ?? '/ponto'
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const existing = list.find(c => c.url.includes('/ponto'))
+      if (existing) { existing.focus(); return existing.navigate(url) }
+      return clients.openWindow(url)
+    })
+  )
+})
