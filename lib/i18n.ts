@@ -178,6 +178,12 @@ const t = {
     'emp.profile':         'Perfil',
     'emp.name':            'Nome',
     'emp.remove':          'Remover',
+    'emp.error_save':      'Erro ao guardar.',
+    'emp.error_remove':    'Erro ao remover funcionário.',
+    'emp.deactivate_confirm': 'Desativar {name}?',
+    'emp.added_ok':        '{name} adicionado!',
+    'emp.lunch_break':     'almoço',
+    'punch.error_register': 'Erro ao registar.',
 
     // ── Status tab ────────────────────────────────────────────────────────
     'status.on_duty_now':  'Em serviço agora',
@@ -505,6 +511,12 @@ const t = {
     'emp.profile':         'Perfil',
     'emp.name':            'Nome',
     'emp.remove':          'Remover',
+    'emp.error_save':      'Erro ao salvar.',
+    'emp.error_remove':    'Erro ao remover funcionário.',
+    'emp.deactivate_confirm': 'Desativar {name}?',
+    'emp.added_ok':        '{name} adicionado!',
+    'emp.lunch_break':     'almoço',
+    'punch.error_register': 'Erro ao registrar.',
 
     // ── Status tab ────────────────────────────────────────────────────────
     'status.on_duty_now':  'Em serviço agora',
@@ -831,6 +843,12 @@ const t = {
     'emp.profile':         'Profile',
     'emp.name':            'Name',
     'emp.remove':          'Remove',
+    'emp.error_save':      'Error saving.',
+    'emp.error_remove':    'Error removing employee.',
+    'emp.deactivate_confirm': 'Deactivate {name}?',
+    'emp.added_ok':        '{name} added!',
+    'emp.lunch_break':     'lunch',
+    'punch.error_register': 'Error registering.',
 
     // ── Status tab ────────────────────────────────────────────────────────
     'status.on_duty_now':  'On duty now',
@@ -1157,6 +1175,12 @@ const t = {
     'emp.profile':         'Perfil',
     'emp.name':            'Nombre',
     'emp.remove':          'Eliminar',
+    'emp.error_save':      'Error al guardar.',
+    'emp.error_remove':    'Error al eliminar empleado.',
+    'emp.deactivate_confirm': '¿Desactivar a {name}?',
+    'emp.added_ok':        '¡{name} añadido!',
+    'emp.lunch_break':     'almuerzo',
+    'punch.error_register': 'Error al registrar.',
 
     // ── Status tab ────────────────────────────────────────────────────────
     'status.on_duty_now':  'De servicio ahora',

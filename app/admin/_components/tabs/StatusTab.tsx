@@ -54,10 +54,10 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
         setMsg({ id: emp.id, kind: 'success', text: type === 'entrada' ? t('status.registered_in') : t('status.registered_out') })
         await load()
       } else {
-        setMsg({ id: emp.id, kind: 'error', text: data.error ?? 'Erro ao registrar.' })
+        setMsg({ id: emp.id, kind: 'error', text: data.error ?? t('punch.error_register') })
       }
     } catch {
-      setMsg({ id: emp.id, kind: 'error', text: 'Erro de conexão.' })
+      setMsg({ id: emp.id, kind: 'error', text: t('ponto.connect_error') })
     } finally {
       setPunching(null)
       setTimeout(() => setMsg(m => m?.id === emp.id ? null : m), 3_000)

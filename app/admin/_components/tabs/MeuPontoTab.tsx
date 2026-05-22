@@ -67,7 +67,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
     })
     const data = await res.json()
     if (!res.ok) {
-      setToast({ kind: 'err', text: data.error ?? 'Erro ao registrar.' })
+      setToast({ kind: 'err', text: data.error ?? t('punch.error_register') })
       setPunching(false); return
     }
     setToast({ kind: 'ok', text: t('meu.registered') })
