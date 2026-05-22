@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import Providers from './providers'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { Analytics } from '@vercel/analytics/next'
 
 export const viewport: Viewport = {
   themeColor: '#08090b',
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Providers>{children}</Providers>
         <SpeedInsights />
+        <Analytics />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('pg.theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js')`,
