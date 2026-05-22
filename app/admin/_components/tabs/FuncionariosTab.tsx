@@ -37,7 +37,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
       body: JSON.stringify(body),
     })
     const data = await res.json()
-    if (!res.ok) { setErr(data.error ?? 'Erro ao salvar.'); setSaving(false); return }
+    if (!res.ok) { setErr(data.error ?? t('emp.error_save')); setSaving(false); return }
     setOk(newPassword ? t('emp.saved_pwd') : t('emp.saved'))
     setNewPassword('')
     setSaving(false)
@@ -144,16 +144,16 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
     })
     const data = await res.json()
     if (!res.ok) { setErr(data.error); setLoading(false); return }
-    setOk(`${name} adicionado!`)
+    setOk(t('emp.added_ok').replace('{name}', name))
     setName(''); setUsername(''); setEmail(''); setPassword(''); setRole('employee')
     setWorkdayHours('8'); setLunchMin('60'); setRate('')
     setLoading(false); onRefresh()
   }
 
   const handleRemove = async (id: string, empName: string) => {
-    if (!confirm(`Desativar ${empName}?`)) return
+    if (!confirm(t('emp.deactivate_confirm').replace('{name}', empName))) return
     const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' })
-    if (!res.ok) { const data = await res.json(); setErr(data.error ?? 'Erro ao remover funcionário.'); return }
+    if (!res.ok) { const data = await res.json(); setErr(data.error ?? t('emp.error_remove')); return }
     onRefresh()
   }
 
@@ -176,7 +176,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
                       @{emp.username} · {emp.workday_hours}h ·{' '}
-                      {emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min almoço` : 'sem desconto'}
+                      {emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min ${t('emp.lunch_break')}` : t('emp.lunch.none')}
                       {emp.hourly_rate != null && ` · €${Number(emp.hourly_rate).toFixed(2)}/h`}
                       {emp.email && ` · ${emp.email}`}
                     </div>
