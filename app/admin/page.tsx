@@ -127,7 +127,7 @@ export default function AdminPage() {
           {tab === 'banco'        && <BancoHorasTab employees={employees} />}
           {tab === 'feriados'     && <FeriadosTab />}
           {tab === 'relatorios'   && <RelatoriosTab employees={employees} />}
-          {tab === 'correcoes'    && <CorrecoesTab />}
+          {tab === 'correcoes'    && <CorrecoesTab onAction={refreshPendingCount} />}
           {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
         </div>
       </div>
