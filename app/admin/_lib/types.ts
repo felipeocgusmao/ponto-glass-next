@@ -3,6 +3,7 @@
 export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes'
 
 export const ALL_TABS: { id: Tab; label: string }[] = [
+  { id: 'meu_ponto',    label: 'Meu Ponto'  },
   { id: 'dashboard',    label: 'Dashboard'  },
   { id: 'status',       label: 'Status'     },
   { id: 'registros',    label: 'Registros'  },
