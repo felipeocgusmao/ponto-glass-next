@@ -147,6 +147,9 @@ export default function PontoPage() {
   const [pwdSaving, setPwdSaving] = useState(false)
   const [pwdMsg, setPwdMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  // punch-out confirmation
+  const [confirmingOut, setConfirmingOut] = useState(false)
+
   // reminder
   const [reminderDismissed, setReminderDismissed] = useState(false)
   const [corrDate, setCorrDate] = useState(() => new Date().toISOString().split('T')[0])
@@ -163,7 +166,12 @@ export default function PontoPage() {
     try {
       const res = await fetch('/api/me')
       if (!res.ok) { router.push('/login'); return }
-      setUser(await res.json())
+      const profile = await res.json()
+      setUser(profile)
+      if (profile.theme) {
+        setTheme(profile.theme)
+        document.documentElement.setAttribute('data-theme', profile.theme)
+      }
     } catch { setFetchError(true) }
   }, [router])
 
@@ -280,7 +288,7 @@ export default function PontoPage() {
   // Push notifications: 15-min warning + overtime alert
   useEffect(() => {
     if (!user || !records.length) return
-    if (typeof window === 'undefined' || Notification.permission !== 'granted') return
+    if (typeof window === 'undefined' || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
 
     const myRecs = records.filter(r => r.employee_id === user.id)
     const { state: ws } = getWorkState(myRecs)
@@ -339,6 +347,7 @@ export default function PontoPage() {
     setTheme(next)
     document.documentElement.setAttribute('data-theme', next)
     localStorage.setItem('pg.theme', next)
+    fetch('/api/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: next }) }).catch(() => {})
   }
 
   const showToast = (msg: string) => {
@@ -454,6 +463,23 @@ export default function PontoPage() {
     const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
     return sum + Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
   }, 0)
+  // working weekdays in the loaded month with no records = absent
+  const absentDays: string[] = (() => {
+    if (!historyLoaded || historyRecs.length === 0 && sortedDays.length === 0) return []
+    const now2 = new Date()
+    const firstOfMonth = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-01`
+    const todayStr2 = now2.toISOString().split('T')[0]
+    const cur = new Date(firstOfMonth + 'T12:00:00')
+    const end = new Date(todayStr2 + 'T12:00:00')
+    const absent: string[] = []
+    while (cur <= end) {
+      const d = cur.getDay()
+      const iso = cur.toISOString().split('T')[0]
+      if (d !== 0 && d !== 6 && !byDay.has(iso)) absent.push(iso)
+      cur.setDate(cur.getDate() + 1)
+    }
+    return absent
+  })()
 
   return (
     <div className="emp-shell">
@@ -581,8 +607,8 @@ export default function PontoPage() {
                     <button className="btn-emp warn" onClick={() => punch('inicio_almoco')} disabled={punching}><UtensilsIcon size={14}/> {t('ponto.lunch_start')}</button>
                     <button className="btn-emp warn" onClick={() => punch('pausa_cafe')} disabled={punching}><CoffeeIcon size={14}/> {t('ponto.coffee_start')}</button>
                   </div>
-                  <button className="btn-emp danger-big" onClick={() => punch('saída')} disabled={punching}>
-                    <StopIcon size={14}/> {punching ? t('ponto.registering') : t('ponto.punch_out')}
+                  <button className="btn-emp danger-big" onClick={() => setConfirmingOut(true)} disabled={punching}>
+                    <StopIcon size={14}/> {t('ponto.punch_out')}
                   </button>
                 </>
               )}
@@ -662,7 +688,21 @@ export default function PontoPage() {
               </button>
             )}
 
-            {sortedDays.map(date => {
+            {[
+              ...sortedDays.map(date => ({ date, type: 'day' as const })),
+              ...absentDays.map(date => ({ date, type: 'absent' as const })),
+            ].sort((a, b) => b.date.localeCompare(a.date)).map(({ date, type }) => {
+              if (type === 'absent') {
+                const dt = new Date(date + 'T12:00:00')
+                return (
+                  <div key={`absent-${date}`} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)', textTransform: 'capitalize' }}>
+                      {dt.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
+                    </span>
+                    <span className="chip danger" style={{ fontSize: 10 }}>{t('ponto.absent_day')}</span>
+                  </div>
+                )
+              }
               const recs = byDay.get(date)!.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
               const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
               const dayMin = Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
@@ -854,6 +894,35 @@ export default function PontoPage() {
           </div>
         )}
       </main>
+
+      {/* ── PUNCH-OUT CONFIRMATION ──────────────────────────────────────────── */}
+      {confirmingOut && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={() => setConfirmingOut(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--sidebar-bg)', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', padding: '24px 24px 48px', width: '100%', maxWidth: 480 }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg)', marginBottom: 8 }}>{t('ponto.confirm_out')}</div>
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)', marginBottom: 20 }}>{t('ponto.confirm_out.body')}</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn-emp" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmingOut(false)}>
+                {t('common.cancel')}
+              </button>
+              <button
+                className="btn-emp danger-big"
+                style={{ flex: 2, justifyContent: 'center' }}
+                onClick={() => { setConfirmingOut(false); punch('saída') }}
+                disabled={punching}
+              >
+                <StopIcon size={14}/> {t('ponto.confirm_out.yes')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── BOTTOM TAB BAR ──────────────────────────────────────────────────── */}
       <nav style={{

@@ -11,6 +11,7 @@ export interface Employee {
   hourly_rate: number | null
   geo_mode: 'required' | 'optional' | 'disabled'
   lock_profile?: boolean
+  theme?: 'dark' | 'light'
 }
 
 export interface PunchRecord {
@@ -38,6 +39,7 @@ export interface EmployeeProfile extends JWTUser {
   geo_mode: 'required' | 'optional' | 'disabled'
   email: string | null
   lock_profile?: boolean
+  theme?: 'dark' | 'light'
 }
 
 export interface AuditLog {

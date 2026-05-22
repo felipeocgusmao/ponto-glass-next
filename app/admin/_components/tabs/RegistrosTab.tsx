@@ -38,6 +38,16 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
   const handleFromChange = (val: string) => { setFrom(val); if (val > to) setTo(val) }
   const handleToChange   = (val: string) => { setTo(val);   if (val < from) setFrom(val) }
 
+  const setQuickToday = () => { setFrom(today); setTo(today) }
+  const setQuickWeek  = () => {
+    const d = new Date()
+    const diff = d.getDay() === 0 ? -6 : 1 - d.getDay()
+    const mon = new Date(d)
+    mon.setDate(d.getDate() + diff)
+    setFrom(mon.toISOString().split('T')[0])
+    setTo(today)
+  }
+
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
@@ -129,7 +139,21 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
     <>
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SL>{t('reg.filters')}</SL>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <SL style={{ margin: 0 }}>{t('reg.filters')}</SL>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                className={`btn ghost sm${from === today && to === today ? ' active' : ''}`}
+                onClick={setQuickToday}
+                style={{ fontSize: 11 }}
+              >{t('reg.today')}</button>
+              <button
+                className="btn ghost sm"
+                onClick={setQuickWeek}
+                style={{ fontSize: 11 }}
+              >{t('reg.this_week')}</button>
+            </div>
+          </div>
           <div className="form-grid-2">
             <div className="field">
               <label>{t('reg.from')}</label>
