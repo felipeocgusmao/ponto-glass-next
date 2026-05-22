@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import webpush from 'web-push'
+
+if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    `mailto:${process.env.VAPID_EMAIL}`,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  )
+}
 
 const VALID_TYPES = ['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 
@@ -58,5 +67,33 @@ export async function POST(request: NextRequest) {
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Notify admins/managers via push
+  if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    try {
+      const { data: privileged } = await supabase
+        .from('employees')
+        .select('id')
+        .in('role', ['admin', 'manager'])
+        .eq('active', true)
+      if (privileged?.length) {
+        const { data: subs } = await supabase
+          .from('push_subscriptions')
+          .select('subscription')
+          .in('employee_id', privileged.map(e => e.id))
+        const payload = JSON.stringify({
+          title: '📋 Correção pendente',
+          body: `${emp.name} solicitou uma correção de ponto.`,
+          tag: 'correction-pending',
+          url: '/admin',
+        })
+        for (const s of subs ?? []) {
+          if (s.subscription)
+            await webpush.sendNotification(s.subscription as webpush.PushSubscription, payload).catch(() => {})
+        }
+      }
+    } catch { /* non-fatal */ }
+  }
+
   return NextResponse.json(data, { status: 201 })
 }

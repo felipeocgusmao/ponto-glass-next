@@ -31,6 +31,7 @@ export const WORKING_TYPES = ['entrada', 'fim_almoco', 'retorno_cafe']
 export const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 
 export const AUDIT_LABELS: Record<string, string> = {
+  employee_login:               '🔑 Login efetuado',
   employee_create:              '👤 Funcionário criado',
   employee_update:              '✏ Funcionário atualizado',
   employee_delete:              '🗑 Funcionário desativado',

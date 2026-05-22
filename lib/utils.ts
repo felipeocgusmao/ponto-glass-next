@@ -134,7 +134,7 @@ export function todayISO(): string {
 export function exportCSV(
   records: PunchRecord[],
   filename: string,
-  employees: { id: string; hourly_rate: number | null; lunch_break_minutes: number }[] = [],
+  employees: { id: string; name?: string; hourly_rate: number | null; lunch_break_minutes: number }[] = [],
 ): void {
   const empMap = new Map(employees.map(e => [e.id, e]))
   const SEP = ';'
@@ -176,8 +176,8 @@ export function exportCSV(
   }).forEach(empId => {
     const empDays = byEmp.get(empId)!
     const sampleRec = Array.from(empDays.values())[0]?.[0]
-    const empName = sampleRec?.employee_name ?? empId
     const emp = empMap.get(empId)
+    const empName = emp?.name ?? sampleRec?.employee_name ?? empId
     const rate = emp?.hourly_rate ?? null
     const autoLunch = emp?.lunch_break_minutes ?? 0
 

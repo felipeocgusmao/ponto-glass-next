@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { createJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { rateLimit } from '@/lib/rateLimit'
+import { logAudit } from '@/lib/audit'
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
@@ -56,6 +57,8 @@ export async function POST(request: NextRequest) {
     username: employee.username,
     role: employee.role,
   })
+
+  logAudit({ id: employee.id, name: employee.name }, 'employee_login', null, { ip, username: employee.username })
 
   const res = NextResponse.json({ success: true, role: employee.role })
   res.cookies.set('ponto_token', token, {

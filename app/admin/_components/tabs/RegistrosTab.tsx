@@ -98,9 +98,12 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
     finally { setEditSaving(false) }
   }
 
+  const empName = (r: { employee_id: string; employee_name: string }) =>
+    employees.find(e => e.id === r.employee_id)?.name ?? r.employee_name
+
   const exportExcel = () => {
     const rows = records.map(r => ({
-      Funcionário: r.employee_name,
+      Funcionário: empName(r),
       Data: r.date,
       Hora: new Date(r.timestamp).toLocaleTimeString('pt-BR'),
       Tipo: tagLabel(r.type),
@@ -183,7 +186,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                       <div key={r.id}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{r.employee_name}</div>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{empName(r)}</div>
                             <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 3 }}>
                               {new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
                               {' · '}

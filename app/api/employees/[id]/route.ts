@@ -18,7 +18,7 @@ export async function PATCH(
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { name: new_name, username: new_username, email, role, workday_hours, lunch_break_minutes, hourly_rate, new_password, geo_mode } = await request.json()
+  const { name: new_name, username: new_username, email, role, workday_hours, lunch_break_minutes, hourly_rate, new_password, geo_mode, lock_profile } = await request.json()
 
   const updates: Record<string, unknown> = {}
 
@@ -97,6 +97,10 @@ export async function PATCH(
     updates.email = trimmedEmail
   }
 
+  if (lock_profile !== undefined) {
+    updates.lock_profile = Boolean(lock_profile)
+  }
+
   if (Object.keys(updates).length === 0)
     return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 })
 
@@ -104,7 +108,7 @@ export async function PATCH(
     .from('employees')
     .update(updates)
     .eq('id', params.id)
-    .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode')
+    .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, lock_profile')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
