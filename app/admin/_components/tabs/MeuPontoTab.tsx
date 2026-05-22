@@ -237,8 +237,8 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
           {state === 'working' && (
             <>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => punch('inicio_almoco')} disabled={punching} className="btn-emp warn"><UtensilsIcon /> {t('ponto.lunch_start')}</button>
-                <button onClick={() => punch('pausa_cafe')} disabled={punching} className="btn-emp warn"><CoffeeIcon /> {t('ponto.coffee_start')}</button>
+                <button onClick={() => punch('inicio_almoco')} disabled={punching} className="btn-emp warn" style={{ flex: 1 }}><UtensilsIcon /> {t('ponto.lunch_start')}</button>
+                <button onClick={() => punch('pausa_cafe')} disabled={punching} className="btn-emp warn" style={{ flex: 1 }}><CoffeeIcon /> {t('ponto.coffee_start')}</button>
               </div>
               <button onClick={() => punch('saída')} disabled={punching} className="btn-emp danger-big">
                 <StopIcon /> {punching ? t('ponto.registering') : t('ponto.punch_out')}
