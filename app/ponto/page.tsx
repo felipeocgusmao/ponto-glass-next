@@ -267,6 +267,7 @@ export default function PontoPage() {
     if (!vapidKey) return
 
     navigator.serviceWorker.register('/sw.js').then(async reg => {
+      if (typeof Notification === 'undefined') return
       if (Notification.permission === 'denied') return
       if (Notification.permission === 'default') {
         const perm = await Notification.requestPermission()
