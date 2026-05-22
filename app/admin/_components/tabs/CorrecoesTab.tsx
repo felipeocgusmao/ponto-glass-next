@@ -16,13 +16,14 @@ function fmtDate(d: string) {
   return `${day}/${m}/${y}`
 }
 
-export function CorrecoesTab() {
+export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
   const { t } = useLang()
   const [items, setItems] = useState<CorrectionRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
   const [rejectNote, setRejectNote] = useState('')
   const [rejectTarget, setRejectTarget] = useState<string | null>(null)
+  const [bulkApproving, setBulkApproving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -47,9 +48,25 @@ export function CorrecoesTab() {
         setRejectTarget(null)
         setRejectNote('')
         await load()
+        onAction?.()
       }
     } catch { /* silent */ }
     finally { setActionId(null) }
+  }
+
+  const approveAll = async () => {
+    if (!confirm(`Aprovar todas as ${pending.length} correcções pendentes?`)) return
+    setBulkApproving(true)
+    for (const cr of pending) {
+      await fetch(`/api/correction-requests/${cr.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      }).catch(() => {})
+    }
+    await load()
+    onAction?.()
+    setBulkApproving(false)
   }
 
   const pending = items.filter(i => i.status === 'pending')
@@ -57,7 +74,18 @@ export function CorrecoesTab() {
 
   if (loading) return (
     <div className="card">
-      <div style={{ padding: 20 }}><div className="alert-inline info">{t('common.loading')}</div></div>
+      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {[0,1,2].map(i => (
+          <div key={i} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="skeleton skeleton-title" style={{ width: '40%' }} />
+            <div className="skeleton skeleton-text" style={{ width: '60%' }} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <div className="skeleton" style={{ height: 28, flex: 1, borderRadius: 'var(--r-sm)' }} />
+              <div className="skeleton" style={{ height: 28, flex: 1, borderRadius: 'var(--r-sm)' }} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 
@@ -66,7 +94,14 @@ export function CorrecoesTab() {
       {/* ── PENDING ─────────────────────────────────────────────────────── */}
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
-          <SL>{t('admin.corr.pending')} {pending.length > 0 && `· ${pending.length}`}</SL>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <SL style={{ margin: 0 }}>{t('admin.corr.pending')} {pending.length > 0 && `· ${pending.length}`}</SL>
+            {pending.length > 1 && (
+              <button onClick={approveAll} disabled={bulkApproving || !!actionId} className="btn primary sm">
+                {bulkApproving ? 'A aprovar…' : `✓ Aprovar todas (${pending.length})`}
+              </button>
+            )}
+          </div>
 
           {pending.length === 0 && (
             <div className="alert-inline ok" style={{ marginTop: 8 }}>{t('admin.corr.none_pending')}</div>

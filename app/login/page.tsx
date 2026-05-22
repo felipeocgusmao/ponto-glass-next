@@ -126,8 +126,24 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [forgotMode, setForgotMode] = useState(false)
+  const [forgotUsername, setForgotUsername] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotDone, setForgotDone] = useState(false)
   const pwdRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setForgotLoading(true)
+    await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: forgotUsername }),
+    })
+    setForgotLoading(false)
+    setForgotDone(true)
+  }
 
   useEffect(() => {
     const saved = localStorage.getItem('pg.remembered_user') ?? ''
@@ -174,6 +190,42 @@ export default function LoginPage() {
             <div className="login-sub">{t('login.subtitle')}</div>
           </div>
 
+          {forgotMode ? (
+            <div className="login-form">
+              {forgotDone ? (
+                <>
+                  <div className="alert-inline ok" style={{ marginBottom: 8 }}>
+                    Se o username existir e tiver email associado, receberás um link em breve.
+                  </div>
+                  <button onClick={() => { setForgotMode(false); setForgotDone(false); setForgotUsername('') }}
+                    className="btn ghost" style={{ width: '100%', justifyContent: 'center' }}>
+                    ← Voltar ao login
+                  </button>
+                </>
+              ) : (
+                <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ marginBottom: 4 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg)', marginBottom: 4 }}>Recuperar acesso</div>
+                    <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Insere o teu username e receberás um email com o link para redefinir a senha.</div>
+                  </div>
+                  <div className="field">
+                    <label>{t('auth.username')}</label>
+                    <input className="input" placeholder="seu.usuario" value={forgotUsername}
+                      onChange={e => setForgotUsername(e.target.value)} autoFocus style={{ height: 38 }} required />
+                  </div>
+                  <button type="submit" disabled={forgotLoading} className="btn primary"
+                    style={{ width: '100%', justifyContent: 'center', height: 40 }}>
+                    {forgotLoading ? <><SpinnerIcon /> A enviar…</> : 'Enviar link de recuperação'}
+                  </button>
+                  <button type="button" onClick={() => setForgotMode(false)} className="btn ghost"
+                    style={{ width: '100%', justifyContent: 'center' }}>
+                    ← Voltar ao login
+                  </button>
+                </form>
+              )}
+            </div>
+          ) : (
+
           <form onSubmit={handleSubmit} className="login-form">
             <div className="field">
               <label>{t('auth.username')}</label>
@@ -213,7 +265,12 @@ export default function LoginPage() {
               <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/>
               <span>{t('login.remember')}</span>
             </label>
+            <button type="button" onClick={() => { setForgotMode(true); setForgotUsername(username) }}
+              style={{ background: 'none', border: 'none', color: 'var(--fg-muted)', fontSize: 12, cursor: 'pointer', padding: 0, textAlign: 'left', textDecoration: 'underline' }}>
+              Esqueci a senha
+            </button>
           </form>
+          )}
 
           <div className="login-footer">
             <span className="login-secure"><LockIcon size={11}/> {t('login.secure')}</span>
