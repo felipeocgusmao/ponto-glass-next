@@ -280,7 +280,7 @@ export default function PontoPage() {
   // Push notifications: 15-min warning + overtime alert
   useEffect(() => {
     if (!user || !records.length) return
-    if (typeof window === 'undefined' || Notification.permission !== 'granted') return
+    if (typeof window === 'undefined' || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
 
     const myRecs = records.filter(r => r.employee_id === user.id)
     const { state: ws } = getWorkState(myRecs)
