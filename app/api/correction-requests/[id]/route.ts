@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import webpush from 'web-push'
+import { sendCorrectionEmail } from '@/lib/email'
 
 if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -102,6 +103,25 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       }
     } catch { /* push failure is non-fatal */ }
   }
+
+  // Send email notification if employee has an email address
+  try {
+    const { data: empData } = await supabase
+      .from('employees')
+      .select('email, name')
+      .eq('id', cr.employee_id)
+      .maybeSingle()
+
+    if (empData?.email) {
+      await sendCorrectionEmail({
+        to: empData.email,
+        employeeName: empData.name,
+        approved: action === 'approve',
+        reviewerName: user.name,
+        note,
+      })
+    }
+  } catch { /* email failure is non-fatal */ }
 
   return NextResponse.json(data)
 }

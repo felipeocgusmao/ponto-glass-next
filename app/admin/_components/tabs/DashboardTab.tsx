@@ -136,11 +136,32 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
   })
 
   if (loading) return (
-    <div className="card">
-      <div style={{ padding: 20 }}>
-        <div className="alert-inline info">{t('dash.loading')}</div>
+    <>
+      <div className="card">
+        <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="skeleton" style={{ height: 22, width: '40%' }} />
+              <div className="skeleton skeleton-text" style={{ width: '70%' }} />
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+      <div className="card">
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
+              <div className="skeleton skeleton-avatar" style={{ width: 32, height: 32 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="skeleton skeleton-title" style={{ width: '45%' }} />
+                <div className="skeleton skeleton-text" style={{ width: '30%' }} />
+              </div>
+              <div className="skeleton" style={{ width: 48, height: 20, borderRadius: 99 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   )
 
   return (

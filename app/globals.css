@@ -648,3 +648,11 @@ select.input { padding-right: 24px; appearance: none; background-image: url("dat
 .alert-inline.ok { background: var(--success-soft); color: var(--success-fg); }
 .alert-inline.warn { background: var(--warning-soft); color: var(--warning-fg); }
 .alert-inline.info { background: var(--surface-2); color: var(--fg-muted); border: 1px solid var(--border); }
+.alert-inline.info { background: var(--surface-2); color: var(--fg-muted); }
+
+/* ─── Skeleton loading ─── */
+@keyframes pg-shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+.skeleton { border-radius: var(--r-sm); background: var(--surface-2); background-image: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 800px 100%; animation: pg-shimmer 1.4s ease infinite; }
+.skeleton-text { height: 12px; }
+.skeleton-title { height: 14px; }
+.skeleton-avatar { border-radius: 50%; flex-shrink: 0; }
