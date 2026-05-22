@@ -86,7 +86,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         .from('push_subscriptions')
         .select('subscription')
         .eq('employee_id', cr.employee_id)
-        .single()
+        .maybeSingle()
 
       if (sub?.subscription) {
         const approved = action === 'approve'
