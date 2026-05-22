@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.43.1",
     "@types/web-push": "^3.6.4",
+    "@vercel/speed-insights": "^2.0.0",
     "bcryptjs": "^2.4.3",
     "jose": "^5.2.3",
     "next": "14.2.3",
