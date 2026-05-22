@@ -19,6 +19,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [truncated, setTruncated] = useState(false)
+  const [dayExceptions, setDayExceptions] = useState<string[]>([])
 
   const handleFromChange = (val: string) => { setFrom(val); if (val > to) setTo(val) }
   const handleToChange   = (val: string) => { setTo(val);   if (val < from) setFrom(val) }
@@ -28,11 +29,18 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
     try {
       const params = new URLSearchParams({ from, to })
       if (filterEmpId !== 'all') params.set('employeeId', filterEmpId)
-      const res = await fetch(`/api/reports?${params}`)
+      const [res, excRes] = await Promise.all([
+        fetch(`/api/reports?${params}`),
+        fetch(`/api/day-exceptions?from=${from}&to=${to}`),
+      ])
       if (!res.ok) { const d = await res.json(); setError(d.error ?? t('error.connect')); return }
       const data: PunchRecord[] = await res.json()
       setRecords(data)
       setTruncated(data.length >= 2000)
+      if (excRes.ok) {
+        const exc: { date: string }[] = await excRes.json()
+        setDayExceptions(exc.map(e => e.date))
+      }
       setLoaded(true)
     } catch { setError(t('error.connect')) }
     finally { setLoading(false) }
@@ -77,37 +85,41 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                 {t('relat.truncated')}
               </div>
             )}
-            {records.length === 0
+            {records.length === 0 && filterEmpId === 'all'
               ? <div className="alert-inline info">{t('relat.none')}</div>
               : (
                 <>
-                  <SL>{Object.keys(byEmp).length} {t('emp.active')} · {records.length} {t('common.records')}</SL>
-                  {Object.entries(byEmp).map(([empId, { name, records: recs }]) => {
-                    const emp = employees.find(e => e.id === empId)
-                    const overtime = calcOvertimePeriod(recs)
-                    return (
-                      <div key={empId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{recs.length} {t('common.records')}</div>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{calcHours(recs)}</div>
-                          {overtime !== null && (
-                            <span className={`chip ${overtime >= 0 ? 'success' : 'danger'}`} style={{ fontSize: 10 }}>
-                              {overtime >= 0 ? '+' : ''}{fmtMinutes(Math.abs(overtime))}
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => openPayslip(name, `${from} ${t('relat.period_to')} ${to}`, recs, emp?.workday_hours ?? 8, emp?.lunch_break_minutes ?? 60, emp?.hourly_rate ?? null)}
-                          className="btn ghost sm icon" title={t('relat.payslip')}
-                        >📄</button>
-                      </div>
-                    )
-                  })}
+                  {records.length > 0 && (
+                    <>
+                      <SL>{Object.keys(byEmp).length} {t('emp.active')} · {records.length} {t('common.records')}</SL>
+                      {Object.entries(byEmp).map(([empId, { name, records: recs }]) => {
+                        const emp = employees.find(e => e.id === empId)
+                        const overtime = calcOvertimePeriod(recs)
+                        return (
+                          <div key={empId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{name}</div>
+                              <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{recs.length} {t('common.records')}</div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{calcHours(recs)}</div>
+                              {overtime !== null && (
+                                <span className={`chip ${overtime >= 0 ? 'success' : 'danger'}`} style={{ fontSize: 10 }}>
+                                  {overtime >= 0 ? '+' : ''}{fmtMinutes(Math.abs(overtime))}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => openPayslip(name, `${from} ${t('relat.period_to')} ${to}`, recs, emp?.workday_hours ?? 8, emp?.lunch_break_minutes ?? 60, emp?.hourly_rate ?? null)}
+                              className="btn ghost sm icon" title={t('relat.payslip')}
+                            >📄</button>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )}
 
-                  {(() => {
+                  {records.length > 0 && (() => {
                     const workingDays = getWorkingDays(from, to)
                     if (workingDays.length < 2) return null
                     const byDateEmp = new Map<string, Map<string, PunchRecord[]>>()
@@ -150,7 +162,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                   })()}
 
                   {(() => {
-                    const workingDays = getWorkingDays(from, to)
+                    const workingDays = getWorkingDays(from, to).filter(d => !dayExceptions.includes(d))
                     if (workingDays.length === 0) return null
                     const targetEmps = filterEmpId === 'all' ? employees : employees.filter(e => e.id === filterEmpId)
                     const presentDates = new Map<string, Set<string>>()
@@ -188,13 +200,17 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                     )
                   })()}
 
-                  <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '16px 0' }} />
-                  <button
-                    onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })))}
-                    className="btn primary" style={{ width: '100%', justifyContent: 'center' }}
-                  >
-                    {t('relat.export_csv')}
-                  </button>
+                  {records.length > 0 && (
+                    <>
+                      <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '16px 0' }} />
+                      <button
+                        onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })))}
+                        className="btn primary" style={{ width: '100%', justifyContent: 'center' }}
+                      >
+                        {t('relat.export_csv')}
+                      </button>
+                    </>
+                  )}
                 </>
               )
             }

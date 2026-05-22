@@ -14,8 +14,10 @@ async function requirePrivileged() {
 }
 
 export async function GET(request: NextRequest) {
-  const actor = await requirePrivileged()
-  if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const token = cookies().get('ponto_token')?.value
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try { await verifyJWT(token) }
+  catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
 
   const { searchParams } = new URL(request.url)
   const from = searchParams.get('from')
