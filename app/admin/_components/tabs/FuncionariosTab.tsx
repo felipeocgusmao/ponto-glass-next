@@ -184,7 +184,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => setEditingId(editingId === emp.id ? null : emp.id)} className="btn ghost sm icon" title="Configurações">⚙</button>
-                  {emp.username !== 'admin' && (
+                  {emp.role !== 'admin' && (
                     <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">{t('emp.remove')}</button>
                   )}
                 </div>
