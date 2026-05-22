@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('employees')
-    .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email')
+    .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, lock_profile')
     .eq('id', user.id)
     .single()
 

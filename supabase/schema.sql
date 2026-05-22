@@ -140,3 +140,7 @@ CREATE TABLE IF NOT EXISTS correction_requests (
 
 CREATE INDEX IF NOT EXISTS idx_corrections_employee ON correction_requests(employee_id);
 CREATE INDEX IF NOT EXISTS idx_corrections_status   ON correction_requests(status);
+
+-- v7 → v8: lock_profile — admin can prevent employees from changing their password
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS lock_profile BOOLEAN NOT NULL DEFAULT false;

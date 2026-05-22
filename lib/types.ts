@@ -10,6 +10,7 @@ export interface Employee {
   lunch_break_minutes: number
   hourly_rate: number | null
   geo_mode: 'required' | 'optional' | 'disabled'
+  lock_profile?: boolean
 }
 
 export interface PunchRecord {
@@ -36,6 +37,7 @@ export interface EmployeeProfile extends JWTUser {
   hourly_rate: number | null
   geo_mode: 'required' | 'optional' | 'disabled'
   email: string | null
+  lock_profile?: boolean
 }
 
 export interface AuditLog {

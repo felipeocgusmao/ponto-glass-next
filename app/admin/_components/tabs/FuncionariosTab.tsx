@@ -134,6 +134,20 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
   const [ok, setOk] = useState('')
   const [loading, setLoading] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [lockingId, setLockingId] = useState<string | null>(null)
+
+  const handleToggleLock = async (emp: Employee) => {
+    setLockingId(emp.id)
+    try {
+      const res = await fetch(`/api/employees/${emp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lock_profile: !emp.lock_profile }),
+      })
+      if (res.ok) onRefresh()
+    } catch { /* non-fatal */ }
+    finally { setLockingId(null) }
+  }
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setOk(''); setLoading(true)
@@ -173,6 +187,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
                       {emp.name}
                       {emp.role === 'admin' && <span className="chip accent" style={{ fontSize: 10 }}>Admin</span>}
                       {emp.role === 'manager' && <span className="chip accent" style={{ fontSize: 10 }}>{t('auth.role.manager')}</span>}
+                      {emp.lock_profile && <span className="chip danger" style={{ fontSize: 10 }}>{t('emp.profile_locked')}</span>}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
                       @{emp.username} · {emp.workday_hours}h ·{' '}
@@ -183,6 +198,15 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => handleToggleLock(emp)}
+                    disabled={lockingId === emp.id}
+                    className={`btn ghost sm icon${emp.lock_profile ? ' danger' : ''}`}
+                    title={emp.lock_profile ? t('emp.unlock_profile') : t('emp.lock_profile')}
+                    style={{ opacity: lockingId === emp.id ? 0.5 : 1 }}
+                  >
+                    {emp.lock_profile ? '🔒' : '🔓'}
+                  </button>
                   <button onClick={() => setEditingId(editingId === emp.id ? null : emp.id)} className="btn ghost sm icon" title="Configurações">⚙</button>
                   {emp.role !== 'admin' && (
                     <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">{t('emp.remove')}</button>

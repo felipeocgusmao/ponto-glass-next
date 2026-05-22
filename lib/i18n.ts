@@ -184,6 +184,9 @@ const t = {
     'emp.added_ok':        '{name} adicionado!',
     'emp.lunch_break':     'almoço',
     'punch.error_register': 'Erro ao registar.',
+    'emp.lock_profile':    'Bloquear edição de perfil',
+    'emp.unlock_profile':  'Desbloquear edição de perfil',
+    'emp.profile_locked':  'perfil bloqueado',
 
     // ── Status tab ────────────────────────────────────────────────────────
     'status.on_duty_now':  'Em serviço agora',
@@ -526,6 +529,9 @@ const t = {
     'emp.added_ok':        '{name} adicionado!',
     'emp.lunch_break':     'almoço',
     'punch.error_register': 'Erro ao registrar.',
+    'emp.lock_profile':    'Bloquear edição de perfil',
+    'emp.unlock_profile':  'Desbloquear edição de perfil',
+    'emp.profile_locked':  'perfil bloqueado',
 
     // ── Status tab ────────────────────────────────────────────────────────
     'status.on_duty_now':  'Em serviço agora',
@@ -867,6 +873,9 @@ const t = {
     'emp.added_ok':        '{name} added!',
     'emp.lunch_break':     'lunch',
     'punch.error_register': 'Error registering.',
+    'emp.lock_profile':    'Lock profile editing',
+    'emp.unlock_profile':  'Unlock profile editing',
+    'emp.profile_locked':  'profile locked',
 
     // ── Status tab ────────────────────────────────────────────────────────
     'status.on_duty_now':  'On duty now',
@@ -1208,6 +1217,9 @@ const t = {
     'emp.added_ok':        '¡{name} añadido!',
     'emp.lunch_break':     'almuerzo',
     'punch.error_register': 'Error al registrar.',
+    'emp.lock_profile':    'Bloquear edición de perfil',
+    'emp.unlock_profile':  'Desbloquear edición de perfil',
+    'emp.profile_locked':  'perfil bloqueado',
 
     // ── Status tab ────────────────────────────────────────────────────────
     'status.on_duty_now':  'De servicio ahora',

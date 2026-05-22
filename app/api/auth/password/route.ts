@@ -22,11 +22,14 @@ export async function PUT(request: NextRequest) {
 
   const { data: emp } = await supabase
     .from('employees')
-    .select('password_hash')
+    .select('password_hash, lock_profile')
     .eq('id', user.id)
     .single()
 
   if (!emp) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
+
+  if (emp.lock_profile === true)
+    return NextResponse.json({ error: 'Edição de perfil bloqueada pelo administrador.' }, { status: 403 })
 
   const match = await bcrypt.compare(currentPassword, emp.password_hash)
   if (!match) return NextResponse.json({ error: 'Senha atual incorreta' }, { status: 400 })

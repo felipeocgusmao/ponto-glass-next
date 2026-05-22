@@ -40,7 +40,9 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
 
   const byEmp: Record<string, { name: string; records: PunchRecord[] }> = {}
   records.forEach(r => {
-    if (!byEmp[r.employee_id]) byEmp[r.employee_id] = { name: r.employee_name, records: [] }
+    const currentName = employees.find(e => e.id === r.employee_id)?.name ?? r.employee_name
+    if (!byEmp[r.employee_id]) byEmp[r.employee_id] = { name: currentName, records: [] }
+    else byEmp[r.employee_id].name = currentName
     byEmp[r.employee_id].records.push(r)
   })
 
@@ -188,7 +190,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
 
                   <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '16px 0' }} />
                   <button
-                    onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })))}
+                    onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })))}
                     className="btn primary" style={{ width: '100%', justifyContent: 'center' }}
                   >
                     {t('relat.export_csv')}

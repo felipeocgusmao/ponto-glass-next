@@ -272,6 +272,11 @@ export default function PontoPage() {
     return () => clearInterval(i)
   }, [])
 
+  useEffect(() => {
+    const iv = setInterval(loadRecords, 30_000)
+    return () => clearInterval(iv)
+  }, [loadRecords])
+
   // Push notifications: 15-min warning + overtime alert
   useEffect(() => {
     if (!user || !records.length) return
@@ -821,24 +826,31 @@ export default function PontoPage() {
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 12 }}>
               {t('profile.security')}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.current_password')}</label>
-                <input type="password" className="input" value={pwdCurrent} onChange={e => { setPwdCurrent(e.target.value); setPwdMsg(null) }} placeholder="••••••" />
+            {user.lock_profile ? (
+              <div className="alert-inline info" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>🔒</span>
+                <span>{t('emp.profile_locked').charAt(0).toUpperCase() + t('emp.profile_locked').slice(1)}</span>
               </div>
-              <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.new_password')}</label>
-                <input type="password" className="input" value={pwdNext} onChange={e => { setPwdNext(e.target.value); setPwdMsg(null) }} placeholder={t('pwd.min_chars')} />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="field">
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.current_password')}</label>
+                  <input type="password" className="input" value={pwdCurrent} onChange={e => { setPwdCurrent(e.target.value); setPwdMsg(null) }} placeholder="••••••" />
+                </div>
+                <div className="field">
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.new_password')}</label>
+                  <input type="password" className="input" value={pwdNext} onChange={e => { setPwdNext(e.target.value); setPwdMsg(null) }} placeholder={t('pwd.min_chars')} />
+                </div>
+                <div className="field">
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.confirm_password')}</label>
+                  <input type="password" className="input" value={pwdConfirm} onChange={e => { setPwdConfirm(e.target.value); setPwdMsg(null) }} placeholder="••••••" />
+                </div>
+                {pwdMsg && <div className={`alert-inline ${pwdMsg.ok ? 'ok' : 'err'}`}>{pwdMsg.text}</div>}
+                <button className="btn-emp primary-big" onClick={changePassword} disabled={pwdSaving || !pwdCurrent || !pwdNext}>
+                  {pwdSaving ? t('pwd.saving') : t('pwd.save')}
+                </button>
               </div>
-              <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.confirm_password')}</label>
-                <input type="password" className="input" value={pwdConfirm} onChange={e => { setPwdConfirm(e.target.value); setPwdMsg(null) }} placeholder="••••••" />
-              </div>
-              {pwdMsg && <div className={`alert-inline ${pwdMsg.ok ? 'ok' : 'err'}`}>{pwdMsg.text}</div>}
-              <button className="btn-emp primary-big" onClick={changePassword} disabled={pwdSaving || !pwdCurrent || !pwdNext}>
-                {pwdSaving ? t('pwd.saving') : t('pwd.save')}
-              </button>
-            </div>
+            )}
           </div>
         )}
       </main>
