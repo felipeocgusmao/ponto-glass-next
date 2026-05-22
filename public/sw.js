@@ -1,5 +1,5 @@
-const CACHE = 'pontoglass-v1'
-const STATIC = ['/', '/ponto', '/login']
+const CACHE = 'pontoglass-v2'
+const STATIC = ['/login']
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -20,15 +20,18 @@ self.addEventListener('fetch', e => {
   if (request.method !== 'GET') return
   const url = new URL(request.url)
   if (url.pathname.startsWith('/api/')) return
+  if (url.pathname === '/ponto' || url.pathname === '/admin' || url.pathname === '/kiosk') return
 
   e.respondWith(
     fetch(request)
       .then(res => {
-        const clone = res.clone()
-        caches.open(CACHE).then(c => c.put(request, clone))
+        if (res.ok || res.type === 'opaque') {
+          const clone = res.clone()
+          caches.open(CACHE).then(c => c.put(request, clone))
+        }
         return res
       })
-      .catch(() => caches.match(request))
+      .catch(() => caches.match(request).then(r => r ?? fetch(request)))
   )
 })
 
