@@ -3,8 +3,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { SL } from '../../_lib/helpers'
+import { useLang } from '@/lib/LangContext'
+import type { TranslationKey } from '@/lib/i18n'
 
 export function RegistrosTab({ employees }: { employees: Employee[] }) {
+  const { t } = useLang()
   const today = new Date().toISOString().split('T')[0]
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
@@ -38,26 +41,26 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
       if (empId !== 'all') params.set('employeeId', empId)
       const res = await fetch(`/api/reports?${params}`)
       if (res.ok) setRecords(await res.json())
-      else { const d = await res.json(); setError(d.error ?? 'Erro ao carregar registros.') }
-    } catch { setError('Erro ao conectar.') }
+      else { const d = await res.json(); setError(d.error ?? t('error.connect')) }
+    } catch { setError(t('error.connect')) }
     finally { setLoading(false) }
-  }, [from, to, empId])
+  }, [from, to, empId, t])
 
   useEffect(() => { load() }, [load])
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Apagar este registro?')) return
+    if (!confirm(t('reg.del_confirm'))) return
     setDeleting(id)
     try {
       const res = await fetch(`/api/records/${id}`, { method: 'DELETE' })
       if (res.ok) setRecords(prev => prev.filter(r => r.id !== id))
-      else { const d = await res.json(); setError(d.error ?? 'Erro ao apagar.') }
-    } catch { setError('Erro de conexão.') }
+      else { const d = await res.json(); setError(d.error ?? t('error.connect')) }
+    } catch { setError(t('error.connect')) }
     finally { setDeleting(null) }
   }
 
   const handleAdd = async () => {
-    if (!newEmpId || !newTs) { setNewErr('Preencha todos os campos.'); return }
+    if (!newEmpId || !newTs) { setNewErr(t('reg.fill_all')); return }
     setNewSaving(true); setNewErr(''); setNewOk('')
     try {
       const res = await fetch('/api/records', {
@@ -67,10 +70,10 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
       })
       const data = await res.json()
       if (res.ok) {
-        setNewOk('Registo adicionado!'); setNewTs(''); setNewEmpId(''); setNewType('entrada')
+        setNewOk(t('reg.added')); setNewTs(''); setNewEmpId(''); setNewType('entrada')
         await load()
-      } else { setNewErr(data.error ?? 'Erro ao adicionar.') }
-    } catch { setNewErr('Erro de conexão.') }
+      } else { setNewErr(data.error ?? t('error.connect')) }
+    } catch { setNewErr(t('error.connect')) }
     finally { setNewSaving(false); setTimeout(() => setNewOk(''), 2000) }
   }
 
@@ -86,36 +89,39 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
         const updated = await res.json()
         setRecords(prev => prev.map(r => r.id === id ? { ...r, timestamp: updated.timestamp, date: updated.date } : r))
         setEditingId(null)
-      } else { const d = await res.json(); setError(d.error ?? 'Erro ao salvar.') }
-    } catch { setError('Erro de conexão.') }
+      } else { const d = await res.json(); setError(d.error ?? t('error.connect')) }
+    } catch { setError(t('error.connect')) }
     finally { setEditSaving(false) }
   }
 
-  const tagLabel: Record<string, string> = {
-    entrada: 'Entrada', 'saída': 'Saída',
-    inicio_almoco: 'Almoço', fim_almoco: 'Ret. Almoço',
-    pausa_cafe: 'Café', retorno_cafe: 'Ret. Café',
+  const tagLabel = (type: string): string => {
+    const map: Record<string, TranslationKey> = {
+      entrada: 'punch.entrada', 'saída': 'punch.saída',
+      inicio_almoco: 'punch.inicio_almoco', fim_almoco: 'punch.fim_almoco',
+      pausa_cafe: 'punch.pausa_cafe', retorno_cafe: 'punch.retorno_cafe',
+    }
+    return map[type] ? t(map[type]) : type
   }
 
   return (
     <>
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SL>Filtros</SL>
+          <SL>{t('reg.filters')}</SL>
           <div className="form-grid-2">
             <div className="field">
-              <label>De</label>
+              <label>{t('reg.from')}</label>
               <input type="date" value={from} onChange={e => handleFromChange(e.target.value)} className="input" />
             </div>
             <div className="field">
-              <label>Até</label>
+              <label>{t('reg.to')}</label>
               <input type="date" value={to} onChange={e => handleToChange(e.target.value)} className="input" />
             </div>
           </div>
           <div className="field">
-            <label>Funcionário</label>
+            <label>{t('reg.employee')}</label>
             <select value={empId} onChange={e => setEmpId(e.target.value)} className="input">
-              <option value="all">Todos</option>
+              <option value="all">{t('reg.all')}</option>
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
@@ -126,12 +132,12 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
         <div style={{ padding: '16px 20px' }}>
           {error && <div className="alert-inline err" style={{ marginBottom: 12 }}>{error}</div>}
           {loading
-            ? <div className="alert-inline info">Carregando...</div>
+            ? <div className="alert-inline info">{t('common.loading')}</div>
             : records.length === 0
-              ? <div className="alert-inline info">Nenhum registro para este filtro.</div>
+              ? <div className="alert-inline info">{t('reg.none')}</div>
               : (
                 <>
-                  <SL>{records.length} registro(s)</SL>
+                  <SL>{records.length} {t('common.records')}</SL>
                   {records.map(r => {
                     const isEditing = editingId === r.id
                     return (
@@ -147,16 +153,16 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                             <span className={`chip ${r.type === 'entrada' ? 'success' : r.type === 'saída' ? 'danger' : 'warn'}`} style={{ fontSize: 11 }}>
-                              {tagLabel[r.type] ?? r.type}
+                              {tagLabel(r.type)}
                             </span>
                             {r.latitude && r.longitude && (
                               <a href={`https://maps.google.com/?q=${r.latitude},${r.longitude}`} target="_blank" rel="noopener noreferrer"
-                                style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none' }} title="Ver localização">📍</a>
+                                style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none' }} title={t('reg.location')}>📍</a>
                             )}
                             <button onClick={() => { setEditingId(r.id); setEditTs(toLocalInput(r.timestamp)) }}
-                              disabled={editSaving} className="btn ghost sm icon" title="Editar horário">✏</button>
+                              disabled={editSaving} className="btn ghost sm icon" title={t('common.edit')}>✏</button>
                             <button onClick={() => handleDelete(r.id)} disabled={deleting === r.id}
-                              className="btn ghost sm icon" title="Apagar">{deleting === r.id ? '…' : '✕'}</button>
+                              className="btn ghost sm icon" title={t('common.delete')}>{deleting === r.id ? '…' : '✕'}</button>
                           </div>
                         </div>
                         {isEditing && (
@@ -179,35 +185,35 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
 
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SL>Novo registo manual</SL>
+          <SL>{t('reg.new_record')}</SL>
           <div className="field">
-            <label>Funcionário</label>
+            <label>{t('reg.employee')}</label>
             <select value={newEmpId} onChange={e => setNewEmpId(e.target.value)} className="input">
-              <option value="">Selecionar...</option>
+              <option value="">{t('reg.select')}</option>
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
           <div className="form-grid-2">
             <div className="field">
-              <label>Tipo</label>
+              <label>{t('reg.type')}</label>
               <select value={newType} onChange={e => setNewType(e.target.value)} className="input">
-                <option value="entrada">Entrada</option>
-                <option value="saída">Saída</option>
-                <option value="inicio_almoco">Almoço</option>
-                <option value="fim_almoco">Ret. Almoço</option>
-                <option value="pausa_cafe">Café</option>
-                <option value="retorno_cafe">Ret. Café</option>
+                <option value="entrada">{t('punch.entrada')}</option>
+                <option value="saída">{t('punch.saída')}</option>
+                <option value="inicio_almoco">{t('punch.inicio_almoco')}</option>
+                <option value="fim_almoco">{t('punch.fim_almoco')}</option>
+                <option value="pausa_cafe">{t('punch.pausa_cafe')}</option>
+                <option value="retorno_cafe">{t('punch.retorno_cafe')}</option>
               </select>
             </div>
             <div className="field">
-              <label>Data e hora</label>
+              <label>{t('reg.datetime')}</label>
               <input type="datetime-local" value={newTs} onChange={e => setNewTs(e.target.value)} className="input" />
             </div>
           </div>
           {newErr && <div className="alert-inline err">{newErr}</div>}
           {newOk  && <div className="alert-inline ok">{newOk}</div>}
           <button onClick={handleAdd} disabled={newSaving} className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>
-            {newSaving ? 'A adicionar...' : '+ Adicionar registo'}
+            {newSaving ? t('reg.adding') : t('reg.add_btn')}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLang } from '@/lib/LangContext'
 
 function EyeOffIcon({ size = 14 }: { size?: number }) {
   return (
@@ -118,6 +119,7 @@ function BrandPanel() {
 }
 
 export default function LoginPage() {
+  const { t } = useLang()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPwd, setShowPwd] = useState(false)
@@ -134,7 +136,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim() || !password) { setError('Preencha usuário e senha.'); return }
+    if (!username.trim() || !password) { setError(t('login.fill_fields')); return }
     setLoading(true); setError('')
 
     const res = await fetch('/api/auth/login', {
@@ -145,7 +147,7 @@ export default function LoginPage() {
     const data = await res.json()
 
     if (!res.ok) {
-      setError(data.error ?? 'Usuário ou senha incorretos.')
+      setError(data.error ?? t('auth.invalid'))
       setLoading(false)
       return
     }
@@ -168,20 +170,20 @@ export default function LoginPage() {
           </div>
 
           <div className="login-heading">
-            <div className="login-title">Bem-vindo de volta</div>
-            <div className="login-sub">Entre na sua conta para continuar.</div>
+            <div className="login-title">{t('login.welcome')}</div>
+            <div className="login-sub">{t('login.subtitle')}</div>
           </div>
 
           <form onSubmit={handleSubmit} className="login-form">
             <div className="field">
-              <label>Usuário</label>
+              <label>{t('auth.username')}</label>
               <input className="input" placeholder="seu.usuario" value={username}
                 onChange={e => setUsername(e.target.value)} disabled={loading}
                 autoFocus={!username} autoComplete="username" style={{ height: 38 }}/>
             </div>
 
             <div className="field">
-              <label>Senha</label>
+              <label>{t('auth.password')}</label>
               <div className="login-pwd-wrap">
                 <input ref={pwdRef} className="input" type={showPwd ? 'text' : 'password'}
                   placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
@@ -189,7 +191,7 @@ export default function LoginPage() {
                   style={{ height: 38, paddingRight: 38, width: '100%' }}/>
                 <button type="button" className="login-pwd-toggle"
                   onClick={() => { setShowPwd(s => !s); pwdRef.current?.focus() }}
-                  title={showPwd ? 'Ocultar senha' : 'Mostrar senha'} tabIndex={-1}>
+                  title={showPwd ? t('auth.password') : t('auth.password')} tabIndex={-1}>
                   {showPwd ? <EyeIcon size={14}/> : <EyeOffIcon size={14}/>}
                 </button>
               </div>
@@ -204,17 +206,17 @@ export default function LoginPage() {
 
             <button type="submit" className="btn primary lg" disabled={loading}
               style={{ width: '100%', justifyContent: 'center', height: 40 }}>
-              {loading ? <><SpinnerIcon /> Entrando…</> : <>Entrar <ArrowRightIcon size={13}/></>}
+              {loading ? <><SpinnerIcon /> {t('auth.logging_in')}</> : <>{t('auth.login')} <ArrowRightIcon size={13}/></>}
             </button>
 
             <label className="login-remember">
               <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/>
-              <span>Lembrar meu usuário neste dispositivo</span>
+              <span>{t('login.remember')}</span>
             </label>
           </form>
 
           <div className="login-footer">
-            <span className="login-secure"><LockIcon size={11}/> Conexão segura · JWT em cookie httpOnly</span>
+            <span className="login-secure"><LockIcon size={11}/> {t('login.secure')}</span>
             <span className="muted" style={{ fontSize: 11 }}>v0.6.0</span>
           </div>
         </div>

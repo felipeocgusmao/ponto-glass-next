@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Employee, HourBankAdjustment } from '@/lib/types'
 import { fmtMinutes } from '@/lib/utils'
 import { SL } from '../../_lib/helpers'
+import { useLang } from '@/lib/LangContext'
 
 export function BancoHorasTab({ employees }: { employees: Employee[] }) {
+  const { t } = useLang()
   const [balances, setBalances] = useState<Map<string, { balanceMin: number; adjustments: HourBankAdjustment[] }>>(new Map())
   const [selectedEmp, setSelectedEmp] = useState('')
   const [minutes, setMinutes] = useState('')
@@ -31,25 +33,25 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setOk(''); setSaving(true)
     const mins = Number(minutes)
-    if (!selectedEmp) { setErr('Selecione um funcionário.'); setSaving(false); return }
-    if (isNaN(mins) || mins === 0) { setErr('Minutos inválidos.'); setSaving(false); return }
-    if (!reason.trim()) { setErr('Motivo obrigatório.'); setSaving(false); return }
+    if (!selectedEmp) { setErr(t('hbank.select_emp')); setSaving(false); return }
+    if (isNaN(mins) || mins === 0) { setErr(t('hbank.invalid_min')); setSaving(false); return }
+    if (!reason.trim()) { setErr(t('hbank.reason_req')); setSaving(false); return }
     const res = await fetch('/api/hour-bank', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ employeeId: selectedEmp, minutes: mins, reason: reason.trim(), date }),
     })
     const data = await res.json()
-    if (!res.ok) { setErr(data.error ?? 'Erro ao salvar.'); setSaving(false); return }
-    setOk('Ajuste registado!'); setMinutes(''); setReason(''); setSaving(false)
+    if (!res.ok) { setErr(data.error ?? t('error.connect')); setSaving(false); return }
+    setOk(t('hbank.saved')); setMinutes(''); setReason(''); setSaving(false)
     await loadAll()
     setTimeout(() => setOk(''), 3000)
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remover este ajuste?')) return
+    if (!confirm(t('hbank.del_confirm'))) return
     const res = await fetch(`/api/hour-bank/${id}`, { method: 'DELETE' })
-    if (!res.ok) { const d = await res.json(); setErr(d.error ?? 'Erro ao remover.'); return }
+    if (!res.ok) { const d = await res.json(); setErr(d.error ?? t('error.connect')); return }
     await loadAll()
   }
 
@@ -57,8 +59,8 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
     <>
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
-          <SL>Saldos actuais</SL>
-          {employees.length === 0 && <div className="alert-inline info">Nenhum funcionário.</div>}
+          <SL>{t('hbank.balances')}</SL>
+          {employees.length === 0 && <div className="alert-inline info">{t('hbank.none_emp')}</div>}
           {employees.map(emp => {
             const info = balances.get(emp.id)
             const bal = info?.balanceMin
@@ -79,33 +81,33 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
 
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
-          <SL>Novo ajuste manual</SL>
+          <SL>{t('hbank.new_adj')}</SL>
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
             <div className="field">
-              <label>Funcionário</label>
+              <label>{t('reg.employee')}</label>
               <select value={selectedEmp} onChange={e => setSelectedEmp(e.target.value)} className="input">
-                <option value="">Selecionar...</option>
+                <option value="">{t('hbank.select')}</option>
                 {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
             <div className="form-grid-2">
               <div className="field">
-                <label>Minutos (positivo = crédito)</label>
-                <input type="number" value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="ex: 60 ou -30" className="input" />
+                <label>{t('hbank.minutes')}</label>
+                <input type="number" value={minutes} onChange={e => setMinutes(e.target.value)} placeholder={t('hbank.minutes_ph')} className="input" />
               </div>
               <div className="field">
-                <label>Data</label>
+                <label>{t('hbank.date')}</label>
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className="input" />
               </div>
             </div>
             <div className="field">
-              <label>Motivo</label>
-              <input value={reason} onChange={e => setReason(e.target.value)} placeholder="ex: Banco de horas acordado" className="input" />
+              <label>{t('hbank.reason')}</label>
+              <input value={reason} onChange={e => setReason(e.target.value)} placeholder={t('hbank.reason_ph')} className="input" />
             </div>
             {err && <div className="alert-inline err">{err}</div>}
             {ok  && <div className="alert-inline ok">{ok}</div>}
             <button type="submit" disabled={saving} className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>
-              {saving ? 'Salvando...' : '+ Registar ajuste'}
+              {saving ? t('hbank.saving') : t('hbank.add_btn')}
             </button>
           </form>
         </div>
@@ -118,7 +120,7 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
         return (
           <div className="card">
             <div style={{ padding: '16px 20px' }}>
-              <SL>Ajustes de {empName}</SL>
+              <SL>{t('hbank.adj_of')} {empName}</SL>
               {adjs.map(a => (
                 <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>

@@ -134,6 +134,7 @@ export default function PontoPage() {
   const [corrList, setCorrList] = useState<CorrReq[]>([])
   const [corrLoaded, setCorrLoaded] = useState(false)
   const [corrLoading, setCorrLoading] = useState(false)
+  const [corrBadge, setCorrBadge] = useState(0)
   const [corrDate, setCorrDate] = useState(() => new Date().toISOString().split('T')[0])
   const [corrTime, setCorrTime] = useState(() => { const n = new Date(); return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}` })
   const [corrType, setCorrType] = useState('entrada')
@@ -187,7 +188,15 @@ export default function PontoPage() {
     setCorrLoading(true)
     try {
       const res = await fetch('/api/correction-requests')
-      if (res.ok) { setCorrList(await res.json()); setCorrLoaded(true) }
+      if (res.ok) {
+        const list: CorrReq[] = await res.json()
+        setCorrList(list)
+        setCorrLoaded(true)
+        const seenRaw = localStorage.getItem('pg.corr_seen')
+        const seen: Set<string> = seenRaw ? new Set(JSON.parse(seenRaw)) : new Set()
+        const newResolved = list.filter(c => c.status !== 'pending' && !seen.has(c.id))
+        setCorrBadge(newResolved.length)
+      }
     } catch { /* keep */ }
     finally { setCorrLoading(false) }
   }, [corrLoaded])
@@ -230,6 +239,13 @@ export default function PontoPage() {
     if (tab === 'banco') loadBank()
     if (tab === 'correcoes') loadCorrections()
   }, [tab, loadHistory, loadBank, loadCorrections])
+
+  useEffect(() => {
+    if (tab !== 'correcoes' || !corrLoaded) return
+    const ids = corrList.filter(c => c.status !== 'pending').map(c => c.id)
+    localStorage.setItem('pg.corr_seen', JSON.stringify(ids))
+    setCorrBadge(0)
+  }, [tab, corrLoaded, corrList])
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
@@ -670,7 +686,18 @@ export default function PontoPage() {
               transition: 'color 0.15s',
             }}
           >
-            <Icon size={20} />
+            <div style={{ position: 'relative', display: 'inline-flex' }}>
+              <Icon size={20} />
+              {id === 'correcoes' && corrBadge > 0 && (
+                <span style={{
+                  position: 'absolute', top: -3, right: -5,
+                  minWidth: 14, height: 14, borderRadius: 7,
+                  background: 'var(--danger-fg)', color: '#fff',
+                  fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 3px', lineHeight: 1,
+                }}>{corrBadge}</span>
+              )}
+            </div>
             <span style={{ fontSize: 10, fontWeight: tab === id ? 600 : 400, letterSpacing: '0.02em' }}>{t(labelKey)}</span>
           </button>
         ))}
