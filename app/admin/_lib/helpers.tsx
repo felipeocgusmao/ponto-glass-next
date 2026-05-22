@@ -7,9 +7,9 @@ import { EXPLICIT_BREAK_TYPES } from './types'
 
 export function empColor(id: string): number { return (id.charCodeAt(0) % 8) + 1 }
 
-export function SL({ children }: { children: React.ReactNode }) {
+export function SL({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 12 }}>
+    <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 12, ...style }}>
       {children}
     </div>
   )

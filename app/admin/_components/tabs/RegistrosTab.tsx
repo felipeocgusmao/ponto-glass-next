@@ -5,6 +5,9 @@ import type { Employee, PunchRecord } from '@/lib/types'
 import { SL } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
+import * as XLSX from 'xlsx'
+
+const PAGE_SIZE = 25
 
 export function RegistrosTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
@@ -25,6 +28,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTs, setEditTs] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  const [page, setPage] = useState(1)
 
   const toLocalInput = (ts: string) => {
     const d = new Date(ts)
@@ -46,7 +50,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
     finally { setLoading(false) }
   }, [from, to, empId, t])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(); setPage(1) }, [load])
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('reg.del_confirm'))) return
@@ -94,6 +98,21 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
     finally { setEditSaving(false) }
   }
 
+  const exportExcel = () => {
+    const rows = records.map(r => ({
+      Funcionário: r.employee_name,
+      Data: r.date,
+      Hora: new Date(r.timestamp).toLocaleTimeString('pt-BR'),
+      Tipo: tagLabel(r.type),
+      Latitude: r.latitude ?? '',
+      Longitude: r.longitude ?? '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Registos')
+    XLSX.writeFile(wb, `registos_${from}_${to}.xlsx`)
+  }
+
   const tagLabel = (type: string): string => {
     const map: Record<string, TranslationKey> = {
       entrada: 'punch.entrada', 'saída': 'punch.saída',
@@ -132,13 +151,33 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
         <div style={{ padding: '16px 20px' }}>
           {error && <div className="alert-inline err" style={{ marginBottom: 12 }}>{error}</div>}
           {loading
-            ? <div className="alert-inline info">{t('common.loading')}</div>
+            ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {[0,1,2,3,4].map(i => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div className="skeleton skeleton-title" style={{ width: '35%' }} />
+                      <div className="skeleton skeleton-text" style={{ width: '50%' }} />
+                    </div>
+                    <div className="skeleton" style={{ width: 56, height: 20, borderRadius: 99 }} />
+                  </div>
+                ))}
+              </div>
+            )
             : records.length === 0
               ? <div className="alert-inline info">{t('reg.none')}</div>
-              : (
+              : (() => {
+                const totalPages = Math.ceil(records.length / PAGE_SIZE)
+                const paged = records.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                return (
                 <>
-                  <SL>{records.length} {t('common.records')}</SL>
-                  {records.map(r => {
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <SL style={{ margin: 0 }}>{records.length} {t('common.records')}</SL>
+                    <button onClick={exportExcel} className="btn ghost sm" title="Exportar Excel">
+                      ⬇ Excel
+                    </button>
+                  </div>
+                  {paged.map(r => {
                     const isEditing = editingId === r.id
                     return (
                       <div key={r.id}>
@@ -177,8 +216,16 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                       </div>
                     )
                   })}
+                  {totalPages > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 12 }}>
+                      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn ghost sm">‹ Ant</button>
+                      <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{page} / {totalPages}</span>
+                      <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn ghost sm">Próx ›</button>
+                    </div>
+                  )}
                 </>
-              )
+                )
+              })()
           }
         </div>
       </div>
