@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('employees')
-    .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, lock_profile')
+    .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, lock_profile, theme')
     .eq('id', user.id)
     .single()
 
@@ -30,10 +30,13 @@ export async function PATCH(request: NextRequest) {
   try { user = await verifyJWT(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
-  const { email } = await request.json()
+  const { email, theme } = await request.json()
+  const updates: Record<string, unknown> = {}
+  if (email !== undefined) updates.email = email?.trim() || null
+  if (theme === 'dark' || theme === 'light') updates.theme = theme
   const { error } = await supabase
     .from('employees')
-    .update({ email: email?.trim() || null })
+    .update(updates)
     .eq('id', user.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
