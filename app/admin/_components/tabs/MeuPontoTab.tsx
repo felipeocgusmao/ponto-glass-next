@@ -14,7 +14,7 @@ function RefreshIcon() { return <svg width="13" height="13" viewBox="0 0 24 24" 
 export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
   const { t } = useLang()
   const [records, setRecords] = useState<PunchRecord[]>([])
-  const [now, setNow] = useState(new Date())
+  const [now, setNow] = useState<Date | null>(null)
   const [punching, setPunching] = useState(false)
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [reminderDismissed, setReminderDismissed] = useState(false)
@@ -29,6 +29,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
 
   useEffect(() => { loadRecords() }, [loadRecords])
   useEffect(() => {
+    setNow(new Date())
     const iv = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(iv)
   }, [])
@@ -40,6 +41,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     if (!vapidKey) return
     navigator.serviceWorker.register('/sw.js').then(async reg => {
+      if (typeof Notification === 'undefined') return
       if (Notification.permission === 'denied') return
       if (Notification.permission === 'default') {
         const perm = await Notification.requestPermission()
@@ -56,7 +58,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
   // Local notification: 15-min warning + overtime
   useEffect(() => {
     if (!records.length) return
-    if (typeof window === 'undefined' || Notification.permission !== 'granted') return
+    if (typeof window === 'undefined' || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
     const { state: ws } = getWorkState(records)
     if (ws !== 'working') return
     const liveM = calcLiveMin(records, user.lunch_break_minutes)
@@ -81,10 +83,10 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
     }
   }, [now, records, user])
 
-  const hh = String(now.getHours()).padStart(2, '0')
-  const mm = String(now.getMinutes()).padStart(2, '0')
-  const ss = String(now.getSeconds()).padStart(2, '0')
-  const greeting = now.getHours() < 12 ? t('ponto.greeting.morning') : now.getHours() < 19 ? t('ponto.greeting.afternoon') : t('ponto.greeting.evening')
+  const hh = now ? String(now.getHours()).padStart(2, '0') : '--'
+  const mm = now ? String(now.getMinutes()).padStart(2, '0') : '--'
+  const ss = now ? String(now.getSeconds()).padStart(2, '0') : '--'
+  const greeting = now && now.getHours() < 12 ? t('ponto.greeting.morning') : now && now.getHours() < 19 ? t('ponto.greeting.afternoon') : t('ponto.greeting.evening')
 
   const { state, since } = getWorkState(records)
   const isOut = state === 'off' && records.some(r => r.type === 'saída')
@@ -172,7 +174,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
             {greeting}, <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{user.name.split(' ')[0]}</span>
           </div>
           <div style={{ fontSize: 12, color: 'var(--fg-subtle)', marginTop: 2, textTransform: 'capitalize' }}>
-            {now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' })}
+            {now ? now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' }) : ''}
           </div>
         </div>
 

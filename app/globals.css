@@ -141,6 +141,7 @@ ul, ol { list-style: none; }
   display: grid;
   grid-template-columns: var(--sidebar-w, 240px) 1fr;
   height: 100vh;
+  height: 100dvh;
   background: var(--bg-app);
   transition: grid-template-columns 0.2s ease;
 }
