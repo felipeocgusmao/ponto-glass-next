@@ -114,7 +114,7 @@ export default function PontoPage() {
   const { lang, setLang, t } = useLang()
   const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [records, setRecords] = useState<PunchRecord[]>([])
-  const [now, setNow] = useState(new Date())
+  const [now, setNow] = useState<Date | null>(null)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [punching, setPunching] = useState(false)
   const [toast, setToast] = useState('')
@@ -153,8 +153,8 @@ export default function PontoPage() {
 
   // reminder
   const [reminderDismissed, setReminderDismissed] = useState(false)
-  const [corrDate, setCorrDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [corrTime, setCorrTime] = useState(() => { const n = new Date(); return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}` })
+  const [corrDate, setCorrDate] = useState('')
+  const [corrTime, setCorrTime] = useState('')
   const [corrType, setCorrType] = useState('entrada')
   const [corrReason, setCorrReason] = useState('')
   const [corrSubmitting, setCorrSubmitting] = useState(false)
@@ -259,6 +259,11 @@ export default function PontoPage() {
 
   useEffect(() => { loadUser(); loadRecords() }, [loadUser, loadRecords])
   useEffect(() => { if (user) setProfileEmail(user.email ?? '') }, [user])
+  useEffect(() => {
+    const n = new Date()
+    setCorrDate(n.toISOString().split('T')[0])
+    setCorrTime(`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`)
+  }, [])
 
   // Register service worker and subscribe to push notifications
   useEffect(() => {
@@ -288,6 +293,7 @@ export default function PontoPage() {
     }).catch(() => { /* sw registration failed */ })
   }, [])
   useEffect(() => {
+    setNow(new Date())
     const i = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(i)
   }, [])
@@ -458,10 +464,10 @@ export default function PontoPage() {
   const overtime = Math.max(0, liveMin - targetMin)
   const earnings = user.hourly_rate ? (liveMin / 60) * user.hourly_rate : null
 
-  const hh = String(now.getHours()).padStart(2, '0')
-  const mm = String(now.getMinutes()).padStart(2, '0')
-  const ss = String(now.getSeconds()).padStart(2, '0')
-  const greeting = now.getHours() < 12 ? t('ponto.greeting.morning') : now.getHours() < 19 ? t('ponto.greeting.afternoon') : t('ponto.greeting.evening')
+  const hh = now ? String(now.getHours()).padStart(2, '0') : '--'
+  const mm = now ? String(now.getMinutes()).padStart(2, '0') : '--'
+  const ss = now ? String(now.getSeconds()).padStart(2, '0') : '--'
+  const greeting = now && now.getHours() < 12 ? t('ponto.greeting.morning') : now && now.getHours() < 19 ? t('ponto.greeting.afternoon') : t('ponto.greeting.evening')
 
   // ── History tab helpers ──────────────────────────────────────────────────────
   const byDay = new Map<string, PunchRecord[]>()
@@ -569,7 +575,7 @@ export default function PontoPage() {
                 <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{user.name.split(' ')[0]}</span>
               </div>
               <div className="emp-greeting-date" style={{ textTransform: 'capitalize' }}>
-                {now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' })}
+                {now ? now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' }) : ''}
               </div>
             </div>
 
