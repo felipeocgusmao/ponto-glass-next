@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useLang } from '@/lib/LangContext'
 
 function LockIcon() {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -13,6 +14,7 @@ function CheckIcon() {
 }
 
 export default function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const { t } = useLang()
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -23,7 +25,7 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErr('')
-    if (next !== confirm) { setErr('As senhas não coincidem.'); return }
+    if (next !== confirm) { setErr(t('pwd.mismatch')); return }
     setLoading(true)
     const res = await fetch('/api/auth/password', {
       method: 'PUT',
@@ -42,7 +44,7 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
       <div className="login-modal" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 15 }}>
-            <LockIcon /> Trocar Senha
+            <LockIcon /> {t('auth.change_password')}
           </div>
           <button onClick={onClose} className="btn ghost sm icon"><XIcon /></button>
         </div>
@@ -52,31 +54,31 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
             <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--success-soft)', color: 'var(--success-fg)', display: 'grid', placeItems: 'center' }}>
               <CheckIcon />
             </div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--success-fg)' }}>Senha alterada com sucesso!</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--success-fg)' }}>{t('pwd.success')}</div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div className="field">
-              <label>Senha atual</label>
+              <label>{t('auth.current_password')}</label>
               <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)}
                 className="input" autoComplete="current-password" required style={{ height: 34, width: '100%' }}/>
             </div>
             <div className="field">
-              <label>Nova senha</label>
+              <label>{t('auth.new_password')}</label>
               <input type="password" value={next} onChange={(e) => setNext(e.target.value)}
-                placeholder="Mín. 6 caracteres" className="input" autoComplete="new-password"
+                placeholder={t('pwd.min_chars')} className="input" autoComplete="new-password"
                 required style={{ height: 34, width: '100%' }}/>
             </div>
             <div className="field">
-              <label>Confirmar nova senha</label>
+              <label>{t('auth.confirm_password')}</label>
               <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
                 className="input" autoComplete="new-password" required style={{ height: 34, width: '100%' }}/>
             </div>
             {err && <div className="login-alert err">{err}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-              <button type="button" onClick={onClose} className="btn">Cancelar</button>
+              <button type="button" onClick={onClose} className="btn">{t('common.cancel')}</button>
               <button type="submit" disabled={loading} className="btn primary">
-                {loading ? 'Salvando…' : 'Salvar senha'}
+                {loading ? t('pwd.saving') : t('pwd.save')}
               </button>
             </div>
           </form>

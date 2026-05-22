@@ -4,8 +4,10 @@ import { useState, useCallback } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { exportCSV, fmtMinutes, calcOvertimePeriod, calcHours, calcNetMinutes, calcTimeBreakdown } from '@/lib/utils'
 import { SL, getWorkingDays, openPayslip } from '../../_lib/helpers'
+import { useLang } from '@/lib/LangContext'
 
 export function RelatoriosTab({ employees }: { employees: Employee[] }) {
+  const { t } = useLang()
   const now = new Date()
   const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   const todayStr = now.toISOString().split('T')[0]
@@ -27,14 +29,14 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
       const params = new URLSearchParams({ from, to })
       if (filterEmpId !== 'all') params.set('employeeId', filterEmpId)
       const res = await fetch(`/api/reports?${params}`)
-      if (!res.ok) { const d = await res.json(); setError(d.error ?? 'Erro.'); return }
+      if (!res.ok) { const d = await res.json(); setError(d.error ?? t('error.connect')); return }
       const data: PunchRecord[] = await res.json()
       setRecords(data)
       setTruncated(data.length >= 2000)
       setLoaded(true)
-    } catch { setError('Erro ao conectar.') }
+    } catch { setError(t('error.connect')) }
     finally { setLoading(false) }
-  }, [from, to, filterEmpId])
+  }, [from, to, filterEmpId, t])
 
   const byEmp: Record<string, { name: string; records: PunchRecord[] }> = {}
   records.forEach(r => {
@@ -46,21 +48,21 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
     <>
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SL>Período</SL>
+          <SL>{t('relat.period')}</SL>
           <div className="form-grid-2">
-            <div className="field"><label>De</label><input type="date" value={from} onChange={e => handleFromChange(e.target.value)} className="input" /></div>
-            <div className="field"><label>Até</label><input type="date" value={to} onChange={e => handleToChange(e.target.value)} className="input" /></div>
+            <div className="field"><label>{t('relat.from')}</label><input type="date" value={from} onChange={e => handleFromChange(e.target.value)} className="input" /></div>
+            <div className="field"><label>{t('relat.to')}</label><input type="date" value={to} onChange={e => handleToChange(e.target.value)} className="input" /></div>
           </div>
           <div className="field">
-            <label>Funcionário</label>
+            <label>{t('relat.employee')}</label>
             <select value={filterEmpId} onChange={e => setFilterEmpId(e.target.value)} className="input">
-              <option value="all">Todos</option>
+              <option value="all">{t('relat.all')}</option>
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
           {error && <div className="alert-inline err">{error}</div>}
           <button onClick={load} disabled={loading} className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>
-            {loading ? 'Gerando...' : 'Gerar Relatório'}
+            {loading ? t('relat.generating') : t('relat.generate_btn')}
           </button>
         </div>
       </div>
@@ -70,14 +72,14 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
           <div style={{ padding: '16px 20px' }}>
             {truncated && (
               <div className="alert-inline warn" style={{ marginBottom: 12 }}>
-                Resultado limitado a 2000 registros. Refine o período.
+                {t('relat.truncated')}
               </div>
             )}
             {records.length === 0
-              ? <div className="alert-inline info">Nenhum registro no período.</div>
+              ? <div className="alert-inline info">{t('relat.none')}</div>
               : (
                 <>
-                  <SL>{Object.keys(byEmp).length} pessoa(s) · {records.length} registros</SL>
+                  <SL>{Object.keys(byEmp).length} {t('emp.active')} · {records.length} {t('common.records')}</SL>
                   {Object.entries(byEmp).map(([empId, { name, records: recs }]) => {
                     const emp = employees.find(e => e.id === empId)
                     const overtime = calcOvertimePeriod(recs)
@@ -85,7 +87,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                       <div key={empId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{recs.length} registros</div>
+                          <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{recs.length} {t('common.records')}</div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{calcHours(recs)}</div>
@@ -96,8 +98,8 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                           )}
                         </div>
                         <button
-                          onClick={() => openPayslip(name, `${from} a ${to}`, recs, emp?.workday_hours ?? 8, emp?.lunch_break_minutes ?? 60, emp?.hourly_rate ?? null)}
-                          className="btn ghost sm icon" title="Gerar holerite PDF"
+                          onClick={() => openPayslip(name, `${from} ${t('relat.period_to')} ${to}`, recs, emp?.workday_hours ?? 8, emp?.lunch_break_minutes ?? 60, emp?.hourly_rate ?? null)}
+                          className="btn ghost sm icon" title={t('relat.payslip')}
                         >📄</button>
                       </div>
                     )
@@ -128,12 +130,12 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                     const maxMin = Math.max(...chartData.map(d => d.min), 1)
                     return (
                       <div style={{ marginTop: 20 }}>
-                        <SL>Horas por dia</SL>
+                        <SL>{t('relat.hours_per_day')}</SL>
                         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 64 }}>
                           {chartData.map(({ date, min }) => {
                             const pct = Math.min(100, (min / maxMin) * 100)
                             const d = new Date(date + 'T12:00:00')
-                            const label = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`
+                            const label = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}: ${min > 0 ? fmtMinutes(min) : t('relat.no_records')}`
                             return (
                               <div key={date} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} title={label}>
                                 <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: pct > 0 ? `${pct}%` : 3, background: min === 0 ? 'var(--border)' : 'var(--accent)', opacity: min === 0 ? 1 : 0.5 }} />
@@ -159,13 +161,13 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                       .filter(a => a.dates.length > 0)
                     return (
                       <div style={{ marginTop: 20 }}>
-                        <SL>Faltas / Ausências</SL>
+                        <SL>{t('relat.absences')}</SL>
                         {absences.length === 0
-                          ? <div className="alert-inline ok" style={{ fontSize: 12 }}>Sem ausências no período.</div>
+                          ? <div className="alert-inline ok" style={{ fontSize: 12 }}>{t('relat.no_absences')}</div>
                           : absences.map(({ empName, dates }) => (
                             <div key={empName} style={{ marginBottom: 8 }}>
                               <div style={{ fontSize: 13, color: 'var(--fg-muted)', marginBottom: 4 }}>
-                                {empName} <span style={{ color: 'var(--danger-fg)' }}>({dates.length} falta{dates.length > 1 ? 's' : ''})</span>
+                                {empName} <span style={{ color: 'var(--danger-fg)' }}>({dates.length} {dates.length > 1 ? t('relat.faults') : t('relat.fault')})</span>
                               </div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                 {dates.map(d => {
@@ -189,7 +191,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                     onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })))}
                     className="btn primary" style={{ width: '100%', justifyContent: 'center' }}
                   >
-                    ⬇ Exportar CSV
+                    {t('relat.export_csv')}
                   </button>
                 </>
               )
