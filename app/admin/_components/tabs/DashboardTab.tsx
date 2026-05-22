@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { fmtMinutes, calcOvertimePeriod, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES } from '@/lib/utils'
+import { fmtMinutes, calcOvertimePeriod, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES, openPayslip } from '@/lib/utils'
 import { SL, getWorkingDays } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
@@ -265,6 +265,15 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                         {bank >= 0 ? '+' : '-'}{fmtMinutes(Math.abs(bank))}
                       </span>
                     )}
+                    <button
+                      className="btn ghost sm"
+                      style={{ fontSize: 10, padding: '2px 7px' }}
+                      title={t('dash.month_progress') + ' PDF'}
+                      onClick={() => {
+                        const period = now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+                        openPayslip(emp.name, period, empRecs, emp.workday_hours, emp.lunch_break_minutes ?? 60, emp.hourly_rate ?? null)
+                      }}
+                    >PDF</button>
                   </div>
                 </div>
                 <div style={{ width: '100%', background: 'var(--border)', borderRadius: 999, height: 4 }}>

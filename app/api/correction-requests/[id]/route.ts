@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import webpush from 'web-push'
+
+if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    `mailto:${process.env.VAPID_EMAIL}`,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  )
+}
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const token = cookies().get('ponto_token')?.value
@@ -69,5 +78,30 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Send push notification to the employee if they have a subscription
+  if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    try {
+      const { data: sub } = await supabase
+        .from('push_subscriptions')
+        .select('subscription')
+        .eq('employee_id', cr.employee_id)
+        .single()
+
+      if (sub?.subscription) {
+        const approved = action === 'approve'
+        const payload = JSON.stringify({
+          title: approved ? 'Correcção aprovada ✓' : 'Correcção rejeitada',
+          body: approved
+            ? `A sua correcção de ponto foi aprovada por ${user.name}.`
+            : `A sua correcção de ponto foi rejeitada.${note ? ` Motivo: ${note}` : ''}`,
+          tag: 'correction',
+          url: '/ponto',
+        })
+        await webpush.sendNotification(sub.subscription as webpush.PushSubscription, payload)
+      }
+    } catch { /* push failure is non-fatal */ }
+  }
+
   return NextResponse.json(data)
 }
