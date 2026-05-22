@@ -53,17 +53,29 @@ export function fmtMin(min: number): string {
   return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`
 }
 
-export function ProgressRing({ pct, overtime }: { pct: number; overtime: boolean }) {
+export function ProgressRing({ pct, overtime, label }: { pct: number; overtime: boolean; label?: string }) {
   const r = 42, c = 2 * Math.PI * r
   const offset = c * (1 - Math.min(1, pct / 100))
   return (
-    <svg width="100" height="100" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
+    <svg width="100" height="100" viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
       <circle cx="50" cy="50" r={r} fill="none" stroke="var(--border)" strokeWidth="6"/>
       <circle cx="50" cy="50" r={r} fill="none"
         stroke={overtime ? 'var(--warning-fg)' : pct >= 100 ? 'var(--success-fg)' : 'var(--accent)'}
         strokeWidth="6" strokeDasharray={c} strokeDashoffset={offset}
         strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s linear' }}
+        transform="rotate(-90 50 50)"
       />
+      <text x="50" y="49" textAnchor="middle" dominantBaseline="middle"
+        fontSize="16" fontWeight="600" fill="var(--fg)"
+        fontFamily="var(--font-mono)" letterSpacing="-0.02em">
+        {Math.round(Math.min(pct, 999))}%
+      </text>
+      {label && (
+        <text x="50" y="64" textAnchor="middle"
+          fontSize="7" fill="var(--fg-subtle)" fontWeight="600" letterSpacing="0.05em">
+          {label}
+        </text>
+      )}
     </svg>
   )
 }
