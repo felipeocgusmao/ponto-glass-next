@@ -125,6 +125,7 @@ export default function PontoPage() {
   const [historyRecs, setHistoryRecs] = useState<PunchRecord[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [historyExceptions, setHistoryExceptions] = useState<string[]>([])
 
   // bank tab state
   const [bankBalance, setBankBalance] = useState<number | null>(null)
@@ -189,8 +190,18 @@ export default function PontoPage() {
       const now = new Date()
       const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
       const to = now.toISOString().split('T')[0]
-      const res = await fetch(`/api/reports?from=${from}&to=${to}`)
-      if (res.ok) { setHistoryRecs(await res.json()); setHistoryLoaded(true) }
+      const [res, excRes] = await Promise.all([
+        fetch(`/api/reports?from=${from}&to=${to}`),
+        fetch(`/api/day-exceptions?from=${from}&to=${to}`),
+      ])
+      if (res.ok) {
+        setHistoryRecs(await res.json())
+        if (excRes.ok) {
+          const exc: { date: string }[] = await excRes.json()
+          setHistoryExceptions(exc.map(e => e.date))
+        }
+        setHistoryLoaded(true)
+      }
     } catch { /* keep */ }
     finally { setHistoryLoading(false) }
   }, [historyLoaded])
@@ -475,7 +486,7 @@ export default function PontoPage() {
     while (cur <= end) {
       const d = cur.getDay()
       const iso = cur.toISOString().split('T')[0]
-      if (d !== 0 && d !== 6 && !byDay.has(iso)) absent.push(iso)
+      if (d !== 0 && d !== 6 && !byDay.has(iso) && !historyExceptions.includes(iso)) absent.push(iso)
       cur.setDate(cur.getDate() + 1)
     }
     return absent
@@ -862,6 +873,29 @@ export default function PontoPage() {
             <button className="btn-emp" style={{ width: '100%', justifyContent: 'center', marginBottom: 24 }} onClick={saveEmail} disabled={profileEmailSaving}>
               {profileEmailSaving ? t('pwd.saving') : t('profile.save_email')}
             </button>
+
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 8 }}>
+              {t('profile.theme')}
+            </div>
+            <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 3, gap: 2, marginBottom: 24 }}>
+              {(['dark', 'light'] as const).map(th => (
+                <button
+                  key={th}
+                  onClick={() => { if (theme !== th) toggleTheme() }}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    background: theme === th ? 'var(--accent)' : 'none',
+                    border: 'none', cursor: 'pointer', padding: '8px',
+                    borderRadius: 6, fontSize: 13, fontWeight: theme === th ? 600 : 400,
+                    color: theme === th ? '#fff' : 'var(--fg-muted)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {th === 'dark' ? <MoonIcon size={13}/> : <SunIcon size={13}/>}
+                  {t(th === 'dark' ? 'profile.theme.dark' : 'profile.theme.light')}
+                </button>
+              ))}
+            </div>
 
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 12 }}>
               {t('profile.security')}
