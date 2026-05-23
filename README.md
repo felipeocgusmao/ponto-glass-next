@@ -89,6 +89,8 @@ Existe **um URL** e **uma senha**.
 │   Auth        →   JWT em httpOnly cookie  (8 horas)     │
 │   Banco       →   Supabase  (PostgreSQL gerenciado)     │
 │   Senhas      →   bcryptjs  (hash + salt)               │
+│   Push        →   Web Push API  (VAPID)                 │
+│   Email       →   Nodemailer  (SMTP — opcional)         │
 │   Deploy      →   Vercel  (Edge Network global)         │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
@@ -103,6 +105,8 @@ Cada peça foi escolhida com intenção:
 | **Jose (JWT)** | Edge-compatible — funciona nas Vercel Edge Functions |
 | **bcryptjs** | Senhas nunca saem do servidor em texto plano |
 | **CSS Variables** | Design system próprio — tema claro/escuro, sem dependências de UI |
+| **Web Push / VAPID** | Notificações nativas no celular sem app store |
+| **Nodemailer** | Alertas de correção por e-mail, configuração opcional |
 
 <br/>
 
@@ -117,13 +121,17 @@ Cada peça foi escolhida com intenção:
   ● Status: dentro / pausa / fora      ● Ver quem está em serviço agora     ● Cadastrar e remover funcionários
   ● Registrar entrada / saída          ● Ver ganhos de cada funcionário      ● Configurar jornada (4–10h)
   ● Pausas: Almoço / Café / Retorno    ● Registrar ponto por funcionário    ● Configurar desconto de almoço
-  ● Horas trabalhadas ao vivo (30s)    ● Histórico de registros             ● Definir valor/hora em €
-  ● Ganhos do dia em tempo real        ● Relatórios por período             ● Redefinir senha de qualquer usuário
-  ● Desconto de almoço automático*     ● Exportar CSV profissional          ● Alterar nome de usuário
-  ● Horas extras acumuladas                                                 ● Criar usuários (funcionário/gerente/admin)
-  ● Notificações de fim de jornada
-  ● Troca de senha
-  ● Histórico do dia
+  ● Horas trabalhadas ao vivo          ● Histórico de registros             ● Definir valor/hora em €
+  ● Ganhos do dia em tempo real        ● Banco de horas por funcionário     ● Redefinir senha de qualquer usuário
+  ● Desconto de almoço automático*     ● Relatórios por período             ● Alterar nome de usuário
+  ● Horas extras acumuladas            ● Exportar CSV profissional          ● Criar usuários (funcionário/gerente/admin)
+  ● Banco de horas pessoal             ● Gerir feriados e folgas            ● Audit log de ações administrativas
+  ● Solicitar correção de registo      ● Aprovar/rejeitar correções         ● Gerir solicitações de correção
+  ● Notificações push de fim jornada   ● Dashboard com gráficos             ● Configurar geo por funcionário
+  ● Histórico mensal                   ● Alerta de saídas em falta          ● Bloquear perfil de funcionário
+  ● Trocar senha                       ● Quiosque de ponto                  ● Ajustar banco de horas manualmente
+  ● Selector de idioma (PT/BR/EN/ES)
+  ● Tema claro/escuro (persiste)
 ```
 
 *\*desconto automático só se aplica quando pausas explícitas não foram registradas (fallback legado)*
@@ -132,6 +140,8 @@ Cada peça foi escolhida com intenção:
 Nenhuma configuração manual de banco necessária.
 
 **Recuperação de emergência:** rota `/api/auth/recover` com `RECOVERY_SECRET` para quando o admin perde o acesso.
+
+**Modo Quiosque:** página `/kiosk` para tablet/ecrã compartilhado — qualquer funcionário bate o ponto sem fazer login individual.
 
 <br/>
 
@@ -147,13 +157,31 @@ Inspirado no minimalismo do Linear e Notion: estrutura clara, hierarquia legíve
 :root                { --bg: #fafafa; --accent: #5e6ad2; --fg: #18181b; }
 [data-theme="dark"]  { --bg: #08090b; --accent: #7c8cf8; --fg: #fafafa; }
 
-/* sidebar + conteúdo */
-.app   { display: grid; grid-template-columns: 240px 1fr; height: 100vh; }
+/* sidebar + conteúdo — 100dvh para iOS Safari (barra de endereço dinâmica) */
+.app   { display: grid; grid-template-columns: 240px 1fr; height: 100vh; height: 100dvh; }
 .page  { flex: 1; overflow: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
 ```
 
-Tema claro/escuro com um clique — persiste via `localStorage`, sem flash na recarga.  
-Cores de avatar (`av-c1` → `av-c8`) atribuídas por hash do ID, sem campo extra no banco.
+Tema claro/escuro com um clique — persiste via `localStorage` e no banco por funcionário.  
+Cores de avatar (`av-c1` → `av-c8`) atribuídas por hash do ID, sem campo extra no banco.  
+Interface totalmente responsiva: sidebar retrátil em mobile, layout adaptado a 768px.
+
+<br/>
+
+---
+
+## ◈ i18n
+
+O sistema suporta 4 idiomas, selecionável por cada utilizador:
+
+| Código | Idioma |
+|--------|--------|
+| `pt-PT` | Português (Portugal) — padrão |
+| `pt-BR` | Português (Brasil) |
+| `en` | English |
+| `es` | Español |
+
+A deteção é automática (via `navigator.language` + `localStorage`). Todas as strings estão em `/lib/i18n.ts`.
 
 <br/>
 
@@ -165,22 +193,47 @@ Cores de avatar (`av-c1` → `av-c8`) atribuídas por hash do ID, sem campo extr
 ponto_glass_next/
 │
 ├── app/
-│   ├── page.tsx              ← redirect inteligente (admin/manager → /admin | employee → /ponto)
-│   ├── login/page.tsx        ← autenticação (split-screen com relógio animado)
-│   ├── ponto/page.tsx        ← shell fullscreen do funcionário (ProgressRing, histórico)
-│   ├── admin/page.tsx        ← painel admin/gerente (sidebar, navegação por role)
+│   ├── page.tsx                  ← redirect inteligente (admin/manager → /admin | employee → /ponto)
+│   ├── login/page.tsx            ← autenticação (split-screen com relógio animado)
+│   ├── reset-password/page.tsx   ← reset de senha via link de e-mail
+│   ├── ponto/page.tsx            ← shell fullscreen do funcionário (relógio, histórico, banco, correções)
+│   ├── kiosk/page.tsx            ← modo quiosque (tablet compartilhado, sem login individual)
+│   ├── admin/page.tsx            ← painel admin/gerente (sidebar, 10 abas por role)
+│   │   └── _components/tabs/
+│   │       ├── MeuPontoTab       ← ponto do admin/gerente logado
+│   │       ├── DashboardTab      ← gráficos de horas por dia e mês
+│   │       ├── StatusTab         ← status ao vivo de todos os funcionários
+│   │       ├── RegistrosTab      ← histórico de registros com filtros
+│   │       ├── FuncionariosTab   ← CRUD completo de funcionários
+│   │       ├── BancoHorasTab     ← saldo e ajustes manuais do banco de horas
+│   │       ├── FeriadosTab       ← gerir feriados e dias de folga
+│   │       ├── RelatoriosTab     ← relatórios por período + exportação CSV
+│   │       ├── CorrecoesTab      ← aprovar/rejeitar solicitações de correção
+│   │       └── AuditoriaTab      ← audit log de ações administrativas
 │   │
 │   └── api/
 │       ├── auth/
-│       │   ├── login/        ← bcrypt + JWT + cookie + rate limit
-│       │   ├── logout/       ← limpa cookie
-│       │   └── recover/      ← reset de emergência via RECOVERY_SECRET
-│       ├── me/               ← perfil completo do usuário logado
-│       ├── punch/            ← registra entrada/saída (admin/gerente podem registrar por outros)
-│       ├── records/          ← lista registros (filtros por data / funcionário)
-│       ├── employees/        ← CRUD funcionários + configurações individuais
-│       │   └── [id]/         ← PATCH (jornada, almoço, valor/hora, senha) / DELETE
-│       └── reports/          ← relatório por período (máx 366 dias / 2000 registros)
+│       │   ├── login/            ← bcrypt + JWT + cookie + rate limit
+│       │   ├── logout/           ← limpa cookie
+│       │   ├── password/         ← troca de senha autenticada
+│       │   ├── forgot-password/  ← envia link de reset por e-mail
+│       │   ├── reset-password/   ← valida token e redefine senha
+│       │   └── recover/          ← reset de emergência via RECOVERY_SECRET
+│       ├── me/                   ← perfil completo + PATCH (tema, e-mail, geo_mode)
+│       ├── punch/                ← registra ponto (admin pode registrar por outros)
+│       ├── records/              ← lista / edita / remove registros
+│       │   └── [id]/
+│       ├── employees/            ← CRUD funcionários + configurações individuais
+│       │   └── [id]/
+│       ├── hour-bank/            ← saldo do banco de horas + ajustes manuais
+│       │   └── [id]/
+│       ├── correction-requests/  ← criar / listar / aprovar / rejeitar correções
+│       │   └── [id]/
+│       ├── day-exceptions/       ← feriados e dias de folga (global ou por funcionário)
+│       │   └── [id]/
+│       ├── push-subscribe/       ← regista subscription VAPID do browser
+│       ├── audit/                ← audit log (admin only)
+│       └── reports/              ← relatório por período (máx 366 dias)
 │
 ├── components/
 │   └── ChangePasswordModal.tsx
@@ -189,11 +242,16 @@ ponto_glass_next/
 │   ├── auth.ts               ← createJWT / verifyJWT
 │   ├── supabase.ts           ← cliente Supabase (service_role)
 │   ├── rateLimit.ts          ← rate limiter em memória (login / recover)
-│   ├── types.ts              ← Employee, EmployeeProfile, PunchRecord, JWTUser
+│   ├── audit.ts              ← helper de audit log
+│   ├── email.ts              ← Nodemailer (envio de e-mails)
+│   ├── i18n.ts               ← traduções PT-PT / PT-BR / EN / ES
+│   ├── LangContext.tsx        ← contexto React de idioma
+│   ├── types.ts              ← Employee, EmployeeProfile, PunchRecord, CorrectionRequest…
 │   └── utils.ts              ← calcHours, calcNetMinutes, calcEarnings, fmtMinutes…
 │
 ├── middleware.ts              ← RBAC: protege rotas por role (admin/manager/employee)
-└── supabase/schema.sql        ← schema do banco com RLS habilitado
+├── public/sw.js               ← Service Worker (cache + push notifications)
+└── supabase/schema.sql        ← schema do banco com RLS + migrações comentadas
 ```
 
 <br/>
@@ -220,17 +278,36 @@ cp .env.example .env.local
 
 Edite `.env.local`:
 ```env
+# Supabase (obrigatório)
 NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key
+
+# JWT (obrigatório) — openssl rand -base64 32
 JWT_SECRET=sua-chave-secreta-minimo-32-caracteres
+
+# Recuperação de emergência (recomendado)
 RECOVERY_SECRET=chave-de-recuperacao-de-emergencia
+
+# Web Push / PWA (opcional — desativa notificações push se omitido)
+# Gere: node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys()))"
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_EMAIL=mailto:admin@empresa.com
+
+# E-mail (opcional — desativa alertas por e-mail se omitido)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=PontoGlass <noreply@empresa.com>
+NEXT_PUBLIC_APP_URL=https://ponto-glass-next.vercel.app
 ```
 
 **4. Crie o banco**
 
 Execute `supabase/schema.sql` no SQL Editor do seu projeto Supabase.
 
-> **Banco já existente?** O arquivo inclui blocos de migração comentados (v1→v2, v2→v3, v3→v4) — execute apenas os blocos correspondentes à versão que você já tem.
+> **Banco já existente?** O arquivo inclui blocos de migração comentados (v1→v2, v2→v3…) — execute apenas os blocos correspondentes à versão que você já tem.
 
 **5. Rode**
 ```bash
@@ -271,12 +348,16 @@ employees (
   id                  UUID  PRIMARY KEY,
   name                TEXT,
   username            TEXT  UNIQUE,
+  email               TEXT,           ← para recuperação de senha
   password_hash       TEXT,           ← bcrypt, nunca texto puro
   role                TEXT,           ← 'admin' | 'manager' | 'employee'
   active              BOOLEAN,        ← soft delete
   workday_hours       DECIMAL(4,2),   ← jornada configurável (padrão 8h)
   lunch_break_minutes INT,            ← desconto de almoço (padrão 60min)
   hourly_rate         DECIMAL(10,2),  ← valor/hora em € (opcional)
+  geo_mode            TEXT,           ← 'required' | 'optional' | 'disabled'
+  lock_profile        BOOLEAN,        ← impede o funcionário de alterar perfil
+  theme               TEXT,           ← 'dark' | 'light' (persiste no banco)
   created_at          TIMESTAMPTZ
 )
 
@@ -289,13 +370,76 @@ records (
                                       'inicio_almoco' | 'fim_almoco'
                                       'pausa_cafe'    | 'retorno_cafe'
   timestamp     TIMESTAMPTZ,
-  date          DATE               ← índice de busca por dia
+  date          DATE,              ← índice de busca por dia
+  latitude      DECIMAL,           ← opcional (geo_mode)
+  longitude     DECIMAL
+)
+
+-- banco de horas (ajustes manuais)
+hour_bank_adjustments (
+  id          UUID  PRIMARY KEY,
+  employee_id UUID  → employees.id,
+  minutes     INT,                 ← positivo (crédito) ou negativo (débito)
+  reason      TEXT,
+  date        DATE,
+  created_by  UUID,
+  created_at  TIMESTAMPTZ
+)
+
+-- solicitações de correção de registo
+correction_requests (
+  id             UUID  PRIMARY KEY,
+  employee_id    UUID  → employees.id,
+  employee_name  TEXT,
+  req_type       TEXT,             ← tipo de ponto solicitado
+  req_timestamp  TIMESTAMPTZ,      ← timestamp solicitado
+  req_date       DATE,
+  reason         TEXT,
+  status         TEXT,             ← 'pending' | 'approved' | 'rejected'
+  reviewer_id    UUID,
+  reviewer_name  TEXT,
+  reviewer_note  TEXT,
+  created_at     TIMESTAMPTZ,
+  resolved_at    TIMESTAMPTZ
+)
+
+-- feriados e dias de folga
+day_exceptions (
+  id          UUID  PRIMARY KEY,
+  date        DATE,
+  type        TEXT,                ← 'holiday' | 'day_off'
+  description TEXT,
+  employee_id UUID,                ← NULL = global; UUID = só esse funcionário
+  created_by  UUID,
+  created_at  TIMESTAMPTZ
+)
+
+-- subscriptions de push notifications
+push_subscriptions (
+  id          UUID  PRIMARY KEY,
+  employee_id UUID  → employees.id,
+  endpoint    TEXT  UNIQUE,
+  p256dh      TEXT,
+  auth        TEXT,
+  created_at  TIMESTAMPTZ
+)
+
+-- audit log
+audit_logs (
+  id          UUID  PRIMARY KEY,
+  actor_id    UUID,
+  actor_name  TEXT,
+  action      TEXT,
+  target_id   UUID,
+  target_name TEXT,
+  details     JSONB,
+  created_at  TIMESTAMPTZ
 )
 ```
 
 > O arquivo `supabase/schema.sql` inclui os scripts de migração para bancos existentes.
 
-RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servidor.
+RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servidor.
 
 <br/>
 
@@ -314,6 +458,10 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
   ✓  Soft delete — nenhum dado é apagado permanentemente
   ✓  Proteção ao último administrador (não pode ser removido)
   ✓  Recuperação de emergência via RECOVERY_SECRET
+  ✓  Geolocalização opcional/obrigatória/desativada por funcionário
+  ✓  Lock de perfil — admin pode impedir que o funcionário altere os próprios dados
+  ✓  Push notifications via VAPID (chave privada nunca sai do servidor)
+  ✓  Reset de senha por e-mail com token de uso único e expiração
 ```
 
 <br/>
@@ -325,11 +473,11 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
 ```
   ✓  Trocar senha dentro do sistema
   ✓  Horas extras calculadas automaticamente
-  ✓  Notificações de fim de jornada e hora extra
+  ✓  Notificações push de fim de jornada e hora extra (PWA)
   ✓  Histórico e relatórios por período
   ✓  Ganhos do dia em tempo real (EUR)
   ✓  PWA — ícone na tela inicial do celular
-  ✓  Layout responsivo mobile + desktop
+  ✓  Layout responsivo mobile + desktop (iOS Safari incluído)
   ✓  Admin registra ponto por funcionário
   ✓  Papel "gerente" (acesso intermediário)
   ✓  Pausas explícitas: Almoço / Pausa Café / Retorno
@@ -340,6 +488,15 @@ RLS habilitado em ambas as tabelas — acesso via `service_role` apenas no servi
   ✓  Dashboard com gráficos de horas por dia e mês
   ✓  Audit log de alterações administrativas
   ✓  Redesign Linear/Notion — tema claro/escuro, sidebar, design system próprio
+  ✓  Banco de horas com ajustes manuais
+  ✓  Solicitações de correção de registo (funcionário solicita, admin aprova)
+  ✓  Feriados e dias de folga (global e por funcionário)
+  ✓  Geolocalização por registo (configurável por funcionário)
+  ✓  Modo quiosque (tablet partilhado, sem login individual)
+  ✓  i18n — PT-PT / PT-BR / EN / ES
+  ✓  Reset de senha por e-mail
+  ✓  Tema claro/escuro persistido no banco por funcionário
+  ✓  Lock de perfil por funcionário
   ☐  Domínio personalizado                                 → issue #5
   ☐  Multi-empresa (tenancy)                               → issue #6
   ☐  Relatório mensal automático por e-mail                → issue #9

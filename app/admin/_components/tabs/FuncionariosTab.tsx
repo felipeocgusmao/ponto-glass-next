@@ -16,6 +16,9 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
   const [lunchMin, setLunchMin] = useState(String(emp.lunch_break_minutes))
   const [rate, setRate] = useState(emp.hourly_rate != null ? String(emp.hourly_rate) : '')
   const [geoMode, setGeoMode] = useState<'required' | 'optional' | 'disabled'>(emp.geo_mode ?? 'optional')
+  const [expectedStart, setExpectedStart] = useState(emp.expected_start ?? '')
+  const [expectedEnd, setExpectedEnd] = useState(emp.expected_end ?? '')
+  const [shiftStart, setShiftStart] = useState(emp.shift_start ?? '00:00')
   const [newPassword, setNewPassword] = useState('')
   const [showNewPwd, setShowNewPwd] = useState(false)
   const [err, setErr] = useState('')
@@ -30,6 +33,9 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
     if (email !== (emp.email ?? '')) body.email = email || null
     if (role !== emp.role) body.role = role
     if (geoMode !== (emp.geo_mode ?? 'optional')) body.geo_mode = geoMode
+    if (expectedStart !== (emp.expected_start ?? '')) body.expected_start = expectedStart || null
+    if (expectedEnd !== (emp.expected_end ?? '')) body.expected_end = expectedEnd || null
+    if (shiftStart !== (emp.shift_start ?? '00:00')) body.shift_start = shiftStart
     if (newPassword) body.new_password = newPassword
     const res = await fetch(`/api/employees/${emp.id}`, {
       method: 'PATCH',
@@ -97,6 +103,24 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
           <option value="required">{t('emp.geo.required')}</option>
           <option value="disabled">{t('emp.geo.disabled')}</option>
         </select>
+      </div>
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 2 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 8 }}>{t('emp.schedule')}</div>
+        <div className="form-grid-2">
+          <div className="field">
+            <label>{t('emp.expected_start')}</label>
+            <input type="time" value={expectedStart} onChange={e => setExpectedStart(e.target.value)} className="input" />
+          </div>
+          <div className="field">
+            <label>{t('emp.expected_end')}</label>
+            <input type="time" value={expectedEnd} onChange={e => setExpectedEnd(e.target.value)} className="input" />
+          </div>
+        </div>
+        <div className="field">
+          <label>{t('emp.shift_start')}</label>
+          <input type="time" value={shiftStart} onChange={e => setShiftStart(e.target.value)} className="input" />
+          <div style={{ fontSize: 10, color: 'var(--fg-subtle)', marginTop: 3 }}>{t('emp.shift_start.hint')}</div>
+        </div>
       </div>
       <div className="field">
         <label>{t('emp.new_pwd')}</label>

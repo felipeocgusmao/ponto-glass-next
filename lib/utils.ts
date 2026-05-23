@@ -244,6 +244,135 @@ export function exportCSV(
   URL.revokeObjectURL(url)
 }
 
+export async function exportPDF(
+  records: PunchRecord[],
+  filename: string,
+  employees: { id: string; name?: string; hourly_rate: number | null; lunch_break_minutes: number }[],
+  period: string,
+): Promise<void> {
+  const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
+
+  const empMap = new Map(employees.map(e => [e.id, e]))
+  const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+  const byEmp = new Map<string, Map<string, PunchRecord[]>>()
+  records.forEach(r => {
+    if (!byEmp.has(r.employee_id)) byEmp.set(r.employee_id, new Map())
+    const em = byEmp.get(r.employee_id)!
+    if (!em.has(r.date)) em.set(r.date, [])
+    em.get(r.date)!.push(r)
+  })
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.getWidth()
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(18)
+  doc.text('PontoGlass — Relatório de Ponto', 14, 18)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(100)
+  doc.text(`Período: ${period}`, 14, 25)
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}`, 14, 30)
+  doc.setTextColor(0)
+
+  let grandTotalMin = 0
+  let grandTotalEarnings = 0
+  let yPos = 38
+
+  const empIds = Array.from(byEmp.keys()).sort((a, b) => {
+    const na = empMap.get(a)?.name ?? ''
+    const nb = empMap.get(b)?.name ?? ''
+    return na.localeCompare(nb, 'pt')
+  })
+
+  for (const empId of empIds) {
+    const emp = empMap.get(empId)
+    const empDays = byEmp.get(empId)!
+    const sampleName = Array.from(empDays.values())[0]?.[0]?.employee_name ?? empId
+    const empName = emp?.name ?? sampleName
+    const rate = emp?.hourly_rate ?? null
+    const autoLunch = emp?.lunch_break_minutes ?? 0
+    const hasRate = rate != null
+
+    const rows: (string | number)[][] = []
+    let empTotalMin = 0
+    let empTotalEarnings = 0
+
+    Array.from(empDays.keys()).sort().forEach(date => {
+      const day = [...empDays.get(date)!].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      const explicit = day.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
+      const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
+      const netMin = explicit ? workedMin : Math.max(0, calcNetMinutes(day, autoLunch))
+      const dispLunch = explicit ? lunchMin : autoLunch
+      const dispCoffee = explicit ? coffeeMin : 0
+
+      const [y, m, dNum] = date.split('-').map(Number)
+      const dow = DAYS_PT[new Date(y, m - 1, dNum).getDay()]
+      const dateLabel = `${String(dNum).padStart(2,'0')}/${String(m).padStart(2,'0')} (${dow})`
+      const entries = day.filter(r => r.type === 'entrada').map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+      const exits   = day.filter(r => r.type === 'saída').map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+      const dayEarnings = rate && netMin > 0 ? netMin / 60 * rate : 0
+
+      const row: (string | number)[] = [
+        dateLabel,
+        entries.join(' / ') || '-',
+        exits.join(' / ') || '-',
+        dispLunch > 0 ? String(dispLunch) : '-',
+        dispCoffee > 0 ? String(dispCoffee) : '-',
+        netMin > 0 ? fmtMinutes(netMin) : '-',
+      ]
+      if (hasRate) {
+        row.push(rate!.toFixed(2))
+        row.push(netMin > 0 ? dayEarnings.toFixed(2) : '-')
+      }
+      rows.push(row)
+      empTotalMin += netMin
+      empTotalEarnings += dayEarnings
+    })
+
+    const totalRow: (string | number)[] = ['TOTAL', '', '', '', '', fmtMinutes(empTotalMin)]
+    if (hasRate) { totalRow.push(''); totalRow.push(empTotalEarnings.toFixed(2) + ' €') }
+
+    const head: string[] = ['Data', 'Entrada', 'Saída', 'Almoço (min)', 'Café (min)', 'Horas']
+    if (hasRate) { head.push('€/hora'); head.push('Ganhos (€)') }
+
+    if (yPos > 240) { doc.addPage(); yPos = 20 }
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.text(empName, 14, yPos)
+    yPos += 5
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [head],
+      body: rows,
+      foot: [totalRow],
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [94, 106, 210], textColor: 255, fontStyle: 'bold' },
+      footStyles: { fillColor: [240, 240, 240], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { left: 14, right: 14 },
+      tableWidth: pageW - 28,
+    })
+
+    yPos = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
+    grandTotalMin += empTotalMin
+    grandTotalEarnings += empTotalEarnings
+  }
+
+  if (empIds.length > 1) {
+    if (yPos > 250) { doc.addPage(); yPos = 20 }
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.text(`TOTAL GERAL: ${fmtMinutes(grandTotalMin)}${grandTotalEarnings > 0 ? ` · ${grandTotalEarnings.toFixed(2)} €` : ''}`, 14, yPos)
+  }
+
+  doc.save(filename)
+}
+
 export function openPayslip(
   empName: string, period: string, recs: PunchRecord[],
   workdayHours: number, lunchMin: number, hourlyRate: number | null,

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { EmployeeProfile, PunchRecord } from '@/lib/types'
+import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
+import { CalendarView } from './_components/CalendarView'
 import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, openPayslip } from '@/lib/utils'
 import { useLang, LANG_LABELS, type Lang } from '@/lib/LangContext'
 
@@ -126,6 +127,8 @@ export default function PontoPage() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [historyExceptions, setHistoryExceptions] = useState<string[]>([])
+  const [historyExceptionsFull, setHistoryExceptionsFull] = useState<DayException[]>([])
+  const [calendarView, setCalendarView] = useState(false)
 
   // bank tab state
   const [bankBalance, setBankBalance] = useState<number | null>(null)
@@ -197,8 +200,9 @@ export default function PontoPage() {
       if (res.ok) {
         setHistoryRecs(await res.json())
         if (excRes.ok) {
-          const exc: { date: string }[] = await excRes.json()
+          const exc: DayException[] = await excRes.json()
           setHistoryExceptions(exc.map(e => e.date))
+          setHistoryExceptionsFull(exc)
         }
         setHistoryLoaded(true)
       }
@@ -676,10 +680,32 @@ export default function PontoPage() {
         {tab === 'historico' && (
           <div className="emp-card">
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 8 }}>
-                {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase' }}>
+                  {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
+                </div>
+                <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 6, padding: '2px 3px', gap: 1 }}>
+                  <button
+                    onClick={() => setCalendarView(false)}
+                    style={{
+                      background: !calendarView ? 'var(--accent)' : 'none',
+                      border: 'none', cursor: 'pointer', padding: '3px 8px',
+                      borderRadius: 4, fontSize: 10, fontWeight: 600,
+                      color: !calendarView ? '#fff' : 'var(--fg-muted)', transition: 'all 0.15s',
+                    }}
+                  >{t('calendar.list_view')}</button>
+                  <button
+                    onClick={() => setCalendarView(true)}
+                    style={{
+                      background: calendarView ? 'var(--accent)' : 'none',
+                      border: 'none', cursor: 'pointer', padding: '3px 8px',
+                      borderRadius: 4, fontSize: 10, fontWeight: 600,
+                      color: calendarView ? '#fff' : 'var(--fg-muted)', transition: 'all 0.15s',
+                    }}
+                  >{t('calendar.calendar_view')}</button>
+                </div>
               </div>
-              {totalMonthMin > 0 && (
+              {!calendarView && totalMonthMin > 0 && (
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                   <span style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--fg)' }}>{fmtMinutes(totalMonthMin)}</span>
                   <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('history.worked_month')}</span>
@@ -689,69 +715,83 @@ export default function PontoPage() {
 
             {historyLoading && <div className="alert-inline info">{t('common.loading')}</div>}
 
-            {!historyLoading && sortedDays.length === 0 && (
-              <div className="alert-inline info">{t('history.no_records')}</div>
+            {calendarView && !historyLoading && (
+              <CalendarView
+                records={historyRecs}
+                exceptions={historyExceptionsFull}
+                year={new Date().getFullYear()}
+                month={new Date().getMonth()}
+                lunchBreakMinutes={user.lunch_break_minutes}
+              />
             )}
 
-            {!historyLoading && historyRecs.length > 0 && (
-              <button
-                className="btn-emp"
-                style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
-                onClick={() => {
-                  const period = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
-                  openPayslip(user.name, period, historyRecs, user.workday_hours, user.lunch_break_minutes, user.hourly_rate)
-                }}
-              >
-                {t('history.export_payslip')}
-              </button>
-            )}
+            {!calendarView && (
+              <>
+                {!historyLoading && sortedDays.length === 0 && (
+                  <div className="alert-inline info">{t('history.no_records')}</div>
+                )}
 
-            {[
-              ...sortedDays.map(date => ({ date, type: 'day' as const })),
-              ...absentDays.map(date => ({ date, type: 'absent' as const })),
-            ].sort((a, b) => b.date.localeCompare(a.date)).map(({ date, type }) => {
-              if (type === 'absent') {
-                const dt = new Date(date + 'T12:00:00')
-                return (
-                  <div key={`absent-${date}`} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)', textTransform: 'capitalize' }}>
-                      {dt.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
-                    </span>
-                    <span className="chip danger" style={{ fontSize: 10 }}>{t('ponto.absent_day')}</span>
-                  </div>
-                )
-              }
-              const recs = byDay.get(date)!.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-              const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
-              const dayMin = Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
-              const dt = new Date(date + 'T12:00:00')
-              const isToday = date === new Date().toISOString().split('T')[0]
-              return (
-                <div key={date} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: isToday ? 'var(--accent)' : 'var(--fg)', textTransform: 'capitalize' }}>
-                        {dt.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
-                      </span>
-                      {isToday && <span className="chip accent" style={{ fontSize: 9, marginLeft: 6 }}>hoje</span>}
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)', color: dayMin > 0 ? 'var(--fg)' : 'var(--fg-subtle)' }}>
-                      {dayMin > 0 ? fmtMinutes(dayMin) : '—'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {recs.map(r => (
-                      <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span className={`chip ${PUNCH_TONE[r.type] ?? ''} outline`} style={{ fontSize: 10 }}>
-                          {t(`punch.${r.type}` as Parameters<typeof t>[0]) || PUNCH_LABEL_PT[r.type] || r.type}
+                {!historyLoading && historyRecs.length > 0 && (
+                  <button
+                    className="btn-emp"
+                    style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
+                    onClick={() => {
+                      const period = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+                      openPayslip(user.name, period, historyRecs, user.workday_hours, user.lunch_break_minutes, user.hourly_rate)
+                    }}
+                  >
+                    {t('history.export_payslip')}
+                  </button>
+                )}
+
+                {[
+                  ...sortedDays.map(date => ({ date, type: 'day' as const })),
+                  ...absentDays.map(date => ({ date, type: 'absent' as const })),
+                ].sort((a, b) => b.date.localeCompare(a.date)).map(({ date, type }) => {
+                  if (type === 'absent') {
+                    const dt = new Date(date + 'T12:00:00')
+                    return (
+                      <div key={`absent-${date}`} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)', textTransform: 'capitalize' }}>
+                          {dt.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
                         </span>
-                        <span className="muted tnum" style={{ fontSize: 10 }}>{fmtTime(r.timestamp)}</span>
+                        <span className="chip danger" style={{ fontSize: 10 }}>{t('ponto.absent_day')}</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
+                    )
+                  }
+                  const recs = byDay.get(date)!.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                  const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
+                  const dayMin = Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
+                  const dt = new Date(date + 'T12:00:00')
+                  const isToday = date === new Date().toISOString().split('T')[0]
+                  return (
+                    <div key={date} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <div>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: isToday ? 'var(--accent)' : 'var(--fg)', textTransform: 'capitalize' }}>
+                            {dt.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
+                          </span>
+                          {isToday && <span className="chip accent" style={{ fontSize: 9, marginLeft: 6 }}>hoje</span>}
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)', color: dayMin > 0 ? 'var(--fg)' : 'var(--fg-subtle)' }}>
+                          {dayMin > 0 ? fmtMinutes(dayMin) : '—'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {recs.map(r => (
+                          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span className={`chip ${PUNCH_TONE[r.type] ?? ''} outline`} style={{ fontSize: 10 }}>
+                              {t(`punch.${r.type}` as Parameters<typeof t>[0]) || PUNCH_LABEL_PT[r.type] || r.type}
+                            </span>
+                            <span className="muted tnum" style={{ fontSize: 10 }}>{fmtTime(r.timestamp)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
+            )}
           </div>
         )}
 

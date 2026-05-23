@@ -12,6 +12,9 @@ export interface Employee {
   geo_mode: 'required' | 'optional' | 'disabled'
   lock_profile?: boolean
   theme?: 'dark' | 'light'
+  expected_start?: string | null
+  expected_end?: string | null
+  shift_start?: string
 }
 
 export interface PunchRecord {
@@ -23,6 +26,7 @@ export interface PunchRecord {
   date: string
   latitude?: number | null
   longitude?: number | null
+  comment?: string | null
 }
 
 export interface JWTUser {
