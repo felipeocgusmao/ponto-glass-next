@@ -18,25 +18,37 @@ export async function PATCH(
   if (!['admin', 'manager'].includes(user.role))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { timestamp } = await request.json()
-  const parsed = new Date(timestamp)
-  if (!timestamp || isNaN(parsed.getTime()))
-    return NextResponse.json({ error: 'Timestamp inválido' }, { status: 400 })
+  const body = await request.json()
+  const updates: Record<string, unknown> = {}
 
-  const date = parsed.toISOString().split('T')[0]
+  if (body.timestamp !== undefined) {
+    const parsed = new Date(body.timestamp)
+    if (!body.timestamp || isNaN(parsed.getTime()))
+      return NextResponse.json({ error: 'Timestamp inválido' }, { status: 400 })
+    updates.timestamp = parsed.toISOString()
+    updates.date = parsed.toISOString().split('T')[0]
+  }
+
+  if (body.comment !== undefined) {
+    updates.comment = body.comment ? String(body.comment).slice(0, 500) : null
+  }
+
+  if (Object.keys(updates).length === 0)
+    return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('records')
-    .update({ timestamp: parsed.toISOString(), date })
+    .update(updates)
     .eq('id', params.id)
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  await logAudit(user, 'record_update', { id: data.employee_id, name: data.employee_name }, {
-    recordId: params.id, newTimestamp: parsed.toISOString(),
-  })
+  const auditDetails: Record<string, unknown> = { recordId: params.id }
+  if (updates.timestamp) auditDetails.newTimestamp = updates.timestamp
+  if (updates.comment !== undefined) auditDetails.comment = updates.comment
+  await logAudit(user, 'record_update', { id: data.employee_id, name: data.employee_name }, auditDetails)
 
   return NextResponse.json(data)
 }

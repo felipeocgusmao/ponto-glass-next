@@ -4,6 +4,17 @@ import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 
+function calcWorkDate(punchTime: Date, shiftStart: string): string {
+  const [sh] = shiftStart.split(':').map(Number)
+  if (sh === 0) return punchTime.toISOString().split('T')[0]
+  const nowUtcMin = punchTime.getUTCHours() * 60 + punchTime.getUTCMinutes()
+  const shiftStartMin = sh * 60 + Number(shiftStart.split(':')[1] ?? 0)
+  if (nowUtcMin >= shiftStartMin) return punchTime.toISOString().split('T')[0]
+  const d = new Date(punchTime)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().split('T')[0]
+}
+
 export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,6 +29,7 @@ export async function POST(request: NextRequest) {
 
   let empId = user.id
   let empName = user.name
+  let empShiftStart = '00:00'
   const onBehalf = targetId && targetId !== user.id
 
   if (onBehalf) {
@@ -25,16 +37,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const { data: emp } = await supabase
       .from('employees')
-      .select('id, name')
+      .select('id, name, shift_start')
       .eq('id', targetId)
       .eq('active', true)
       .single()
     if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
     empId = emp.id
     empName = emp.name
+    empShiftStart = emp.shift_start ?? '00:00'
+  } else {
+    const { data: empData } = await supabase
+      .from('employees')
+      .select('shift_start')
+      .eq('id', empId)
+      .single()
+    empShiftStart = empData?.shift_start ?? '00:00'
   }
 
   const now = new Date()
+  const workDate = calcWorkDate(now, empShiftStart)
   const geoFields = (typeof latitude === 'number' && typeof longitude === 'number')
     ? { latitude, longitude }
     : {}
@@ -46,7 +67,7 @@ export async function POST(request: NextRequest) {
       employee_name: empName,
       type,
       timestamp: now.toISOString(),
-      date: now.toISOString().split('T')[0],
+      date: workDate,
       ...geoFields,
     })
     .select()

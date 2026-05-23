@@ -144,3 +144,12 @@ CREATE INDEX IF NOT EXISTS idx_corrections_status   ON correction_requests(statu
 -- v7 → v8: lock_profile — admin can prevent employees from changing their password
 ALTER TABLE employees
   ADD COLUMN IF NOT EXISTS lock_profile BOOLEAN NOT NULL DEFAULT false;
+
+-- v8 → v9: schedule fields + night shift + record comments
+ALTER TABLE records    ADD COLUMN IF NOT EXISTS comment TEXT;
+ALTER TABLE employees  ADD COLUMN IF NOT EXISTS expected_start TIME;
+ALTER TABLE employees  ADD COLUMN IF NOT EXISTS expected_end   TIME;
+ALTER TABLE employees  ADD COLUMN IF NOT EXISTS shift_start    TIME NOT NULL DEFAULT '00:00';
+-- shift_start: UTC hour at which a new workday begins.
+-- '00:00' = normal day shift (no date rollback).
+-- '22:00' = night shift starting at 22:00 UTC — punches before 22:00 UTC belong to the previous day.

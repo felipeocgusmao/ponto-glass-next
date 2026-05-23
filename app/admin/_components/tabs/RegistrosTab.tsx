@@ -28,6 +28,9 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTs, setEditTs] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  const [commentingId, setCommentingId] = useState<string | null>(null)
+  const [commentText, setCommentText] = useState('')
+  const [commentSaving, setCommentSaving] = useState(false)
   const [page, setPage] = useState(1)
 
   const toLocalInput = (ts: string) => {
@@ -106,6 +109,22 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
       } else { const d = await res.json(); setError(d.error ?? t('error.connect')) }
     } catch { setError(t('error.connect')) }
     finally { setEditSaving(false) }
+  }
+
+  const handleSaveComment = async (id: string) => {
+    setCommentSaving(true)
+    try {
+      const res = await fetch(`/api/records/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: commentText || null }),
+      })
+      if (res.ok) {
+        setRecords(prev => prev.map(r => r.id === id ? { ...r, comment: commentText || null } : r))
+        setCommentingId(null)
+      } else { const d = await res.json(); setError(d.error ?? t('error.connect')) }
+    } catch { setError(t('error.connect')) }
+    finally { setCommentSaving(false) }
   }
 
   const empName = (r: { employee_id: string; employee_name: string }) =>
@@ -206,9 +225,10 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                   </div>
                   {paged.map(r => {
                     const isEditing = editingId === r.id
+                    const isCommenting = commentingId === r.id
                     return (
                       <div key={r.id}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: isEditing || isCommenting ? 'none' : '1px solid var(--border)' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{empName(r)}</div>
                             <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 3 }}>
@@ -216,6 +236,11 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                               {' · '}
                               {new Date(r.timestamp).toLocaleTimeString('pt-BR')}
                             </div>
+                            {r.comment && (
+                              <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2, fontStyle: 'italic' }}>
+                                💬 {r.comment}
+                              </div>
+                            )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                             <span className={`chip ${r.type === 'entrada' ? 'success' : r.type === 'saída' ? 'danger' : 'warn'}`} style={{ fontSize: 11 }}>
@@ -225,14 +250,25 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                               <a href={`https://maps.google.com/?q=${r.latitude},${r.longitude}`} target="_blank" rel="noopener noreferrer"
                                 style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none' }} title={t('reg.location')}>📍</a>
                             )}
+                            <button onClick={() => { setCommentingId(isCommenting ? null : r.id); setCommentText(r.comment ?? '') }}
+                              className={`btn ghost sm icon${r.comment ? ' active' : ''}`} title={t('reg.add_comment')}>💬</button>
                             <button onClick={() => { setEditingId(r.id); setEditTs(toLocalInput(r.timestamp)) }}
                               disabled={editSaving} className="btn ghost sm icon" title={t('common.edit')}>✏</button>
                             <button onClick={() => handleDelete(r.id)} disabled={deleting === r.id}
                               className="btn ghost sm icon" title={t('common.delete')}>{deleting === r.id ? '…' : '✕'}</button>
                           </div>
                         </div>
+                        {isCommenting && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                            <input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder={t('reg.add_comment')} maxLength={500} className="input" style={{ flex: 1, fontSize: 13 }} />
+                            <button onClick={() => handleSaveComment(r.id)} disabled={commentSaving} className="btn primary sm">
+                              {commentSaving ? '…' : 'OK'}
+                            </button>
+                            <button onClick={() => setCommentingId(null)} className="btn ghost sm">✕</button>
+                          </div>
+                        )}
                         {isEditing && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                             <input type="datetime-local" value={editTs} onChange={e => setEditTs(e.target.value)} className="input" style={{ flex: 1, fontSize: 13 }} />
                             <button onClick={() => handleEdit(r.id)} disabled={editSaving} className="btn primary sm">
                               {editSaving ? '…' : 'OK'}

@@ -368,6 +368,25 @@ const t = {
     'kiosk.pdf':          'PDF',
     'kiosk.no_emp':       'Sem funcionários',
 
+    // ── Schedule / shift ─────────────────────────────────────────────────
+    'emp.schedule':          'Horário',
+    'emp.expected_start':    'Entrada prevista',
+    'emp.expected_end':      'Saída prevista',
+    'emp.shift_start':       'Início de turno (UTC)',
+    'emp.shift_start.hint':  '00:00 = turno normal · 22:00 = noturno',
+
+    // ── Record comment ────────────────────────────────────────────────────
+    'reg.comment':           'Nota',
+    'reg.add_comment':       'Adicionar nota',
+    'reg.comment_saved':     'Nota guardada',
+
+    // ── PDF export ────────────────────────────────────────────────────────
+    'relat.export_pdf':      'Exportar PDF',
+
+    // ── Calendar view ─────────────────────────────────────────────────────
+    'calendar.list_view':      'Lista',
+    'calendar.calendar_view':  'Calendário',
+
     // ── Error states ──────────────────────────────────────────────────────
     'error.connect':        'Erro ao conectar. Verifique a sua conexão.',
   },
@@ -722,6 +741,17 @@ const t = {
     'kiosk.pdf':          'PDF',
     'kiosk.no_emp':       'Sem funcionários',
 
+    'emp.schedule':          'Horário',
+    'emp.expected_start':    'Entrada prevista',
+    'emp.expected_end':      'Saída prevista',
+    'emp.shift_start':       'Início de turno (UTC)',
+    'emp.shift_start.hint':  '00:00 = turno normal · 22:00 = noturno',
+    'reg.comment':           'Nota',
+    'reg.add_comment':       'Adicionar nota',
+    'reg.comment_saved':     'Nota salva',
+    'relat.export_pdf':      'Exportar PDF',
+    'calendar.list_view':      'Lista',
+    'calendar.calendar_view':  'Calendário',
     'error.connect':        'Erro ao conectar. Verifique sua conexão.',
   },
 
@@ -1075,6 +1105,17 @@ const t = {
     'kiosk.pdf':          'PDF',
     'kiosk.no_emp':       'No employees',
 
+    'emp.schedule':          'Schedule',
+    'emp.expected_start':    'Expected clock-in',
+    'emp.expected_end':      'Expected clock-out',
+    'emp.shift_start':       'Shift start (UTC)',
+    'emp.shift_start.hint':  '00:00 = day shift · 22:00 = night shift',
+    'reg.comment':           'Note',
+    'reg.add_comment':       'Add note',
+    'reg.comment_saved':     'Note saved',
+    'relat.export_pdf':      'Export PDF',
+    'calendar.list_view':      'List',
+    'calendar.calendar_view':  'Calendar',
     'error.connect':        'Connection error. Check your network.',
   },
 
@@ -1428,6 +1469,17 @@ const t = {
     'kiosk.pdf':          'PDF',
     'kiosk.no_emp':       'Sin empleados',
 
+    'emp.schedule':          'Horario',
+    'emp.expected_start':    'Entrada prevista',
+    'emp.expected_end':      'Salida prevista',
+    'emp.shift_start':       'Inicio de turno (UTC)',
+    'emp.shift_start.hint':  '00:00 = turno normal · 22:00 = nocturno',
+    'reg.comment':           'Nota',
+    'reg.add_comment':       'Añadir nota',
+    'reg.comment_saved':     'Nota guardada',
+    'relat.export_pdf':      'Exportar PDF',
+    'calendar.list_view':      'Lista',
+    'calendar.calendar_view':  'Calendario',
     'error.connect':        'Error de conexión. Comprueba tu red.',
   },
 } as const

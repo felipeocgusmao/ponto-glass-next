@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { exportCSV, fmtMinutes, calcOvertimePeriod, calcHours, calcNetMinutes, calcTimeBreakdown } from '@/lib/utils'
+import { exportCSV, exportPDF, fmtMinutes, calcOvertimePeriod, calcHours, calcNetMinutes, calcTimeBreakdown } from '@/lib/utils'
 import { SL, getWorkingDays, openPayslip } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 
@@ -203,12 +203,20 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                   {records.length > 0 && (
                     <>
                       <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '16px 0' }} />
-                      <button
-                        onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })))}
-                        className="btn primary" style={{ width: '100%', justifyContent: 'center' }}
-                      >
-                        {t('relat.export_csv')}
-                      </button>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })))}
+                          className="btn primary" style={{ flex: 1, justifyContent: 'center' }}
+                        >
+                          {t('relat.export_csv')}
+                        </button>
+                        <button
+                          onClick={() => exportPDF(records, `ponto_${from}_${to}.pdf`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })), `${from} a ${to}`)}
+                          className="btn" style={{ flex: 1, justifyContent: 'center' }}
+                        >
+                          {t('relat.export_pdf')}
+                        </button>
+                      </div>
                     </>
                   )}
                 </>
