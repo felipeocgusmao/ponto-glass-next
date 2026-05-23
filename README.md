@@ -91,6 +91,8 @@ Existe **um URL** e **uma senha**.
 │   Senhas      →   bcryptjs  (hash + salt)               │
 │   Push        →   Web Push API  (VAPID)                 │
 │   Email       →   Nodemailer  (SMTP — opcional)         │
+│   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
+│   Cron        →   Vercel Cron Jobs  (ausências)         │
 │   Deploy      →   Vercel  (Edge Network global)         │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
@@ -107,6 +109,8 @@ Cada peça foi escolhida com intenção:
 | **CSS Variables** | Design system próprio — tema claro/escuro, sem dependências de UI |
 | **Web Push / VAPID** | Notificações nativas no celular sem app store |
 | **Nodemailer** | Alertas de correção por e-mail, configuração opcional |
+| **jsPDF + AutoTable** | Geração de PDF no cliente, sem dependências de servidor |
+| **Vercel Cron Jobs** | Tarefa agendada diária para alertas de ausência |
 
 <br/>
 
@@ -125,13 +129,14 @@ Cada peça foi escolhida com intenção:
   ● Ganhos do dia em tempo real        ● Banco de horas por funcionário     ● Redefinir senha de qualquer usuário
   ● Desconto de almoço automático*     ● Relatórios por período             ● Alterar nome de usuário
   ● Horas extras acumuladas            ● Exportar CSV profissional          ● Criar usuários (funcionário/gerente/admin)
-  ● Banco de horas pessoal             ● Gerir feriados e folgas            ● Audit log de ações administrativas
-  ● Solicitar correção de registo      ● Aprovar/rejeitar correções         ● Gerir solicitações de correção
-  ● Notificações push de fim jornada   ● Dashboard com gráficos             ● Configurar geo por funcionário
-  ● Histórico mensal                   ● Alerta de saídas em falta          ● Bloquear perfil de funcionário
-  ● Trocar senha                       ● Quiosque de ponto                  ● Ajustar banco de horas manualmente
-  ● Selector de idioma (PT/BR/EN/ES)
-  ● Tema claro/escuro (persiste)
+  ● Banco de horas pessoal             ● Exportar PDF profissional          ● Audit log de ações administrativas
+  ● Solicitar correção de registo      ● Gerir feriados e folgas            ● Gerir solicitações de correção
+  ● Notificações push de fim jornada   ● Aprovar/rejeitar correções         ● Configurar geo por funcionário
+  ● Histórico mensal (lista)           ● Dashboard com gráficos             ● Bloquear perfil de funcionário
+  ● Vista calendário mensal            ● Alerta de saídas em falta          ● Ajustar banco de horas manualmente
+  ● Trocar senha                       ● Quiosque de ponto                  ● Definir horário esperado por func.
+  ● Selector de idioma (PT/BR/EN/ES)   ● Push de ausência (cron 09h UTC)    ● Comentário em qualquer registo
+  ● Tema claro/escuro (persiste)       ● Comentários em registos
 ```
 
 *\*desconto automático só se aplica quando pausas explícitas não foram registradas (fallback legado)*
@@ -197,6 +202,8 @@ ponto_glass_next/
 │   ├── login/page.tsx            ← autenticação (split-screen com relógio animado)
 │   ├── reset-password/page.tsx   ← reset de senha via link de e-mail
 │   ├── ponto/page.tsx            ← shell fullscreen do funcionário (relógio, histórico, banco, correções)
+│   │   └── _components/
+│   │       └── CalendarView      ← grelha de mês com dias coloridos (trabalhado/ausente/feriado)
 │   ├── kiosk/page.tsx            ← modo quiosque (tablet compartilhado, sem login individual)
 │   ├── admin/page.tsx            ← painel admin/gerente (sidebar, 10 abas por role)
 │   │   └── _components/tabs/
@@ -207,7 +214,7 @@ ponto_glass_next/
 │   │       ├── FuncionariosTab   ← CRUD completo de funcionários
 │   │       ├── BancoHorasTab     ← saldo e ajustes manuais do banco de horas
 │   │       ├── FeriadosTab       ← gerir feriados e dias de folga
-│   │       ├── RelatoriosTab     ← relatórios por período + exportação CSV
+│   │       ├── RelatoriosTab     ← relatórios por período + exportação CSV e PDF
 │   │       ├── CorrecoesTab      ← aprovar/rejeitar solicitações de correção
 │   │       └── AuditoriaTab      ← audit log de ações administrativas
 │   │
@@ -221,10 +228,12 @@ ponto_glass_next/
 │       │   └── recover/          ← reset de emergência via RECOVERY_SECRET
 │       ├── me/                   ← perfil completo + PATCH (tema, e-mail, geo_mode)
 │       ├── punch/                ← registra ponto (admin pode registrar por outros)
-│       ├── records/              ← lista / edita / remove registros
+│       ├── records/              ← lista / edita / remove registros + comentários
 │       │   └── [id]/
-│       ├── employees/            ← CRUD funcionários + configurações individuais
+│       ├── employees/            ← CRUD funcionários + horário esperado + turno noturno
 │       │   └── [id]/
+│       ├── cron/
+│       │   └── absence-check/    ← push de ausência (protegido por CRON_SECRET)
 │       ├── hour-bank/            ← saldo do banco de horas + ajustes manuais
 │       │   └── [id]/
 │       ├── correction-requests/  ← criar / listar / aprovar / rejeitar correções
@@ -251,7 +260,8 @@ ponto_glass_next/
 │
 ├── middleware.ts              ← RBAC: protege rotas por role (admin/manager/employee)
 ├── public/sw.js               ← Service Worker (cache + push notifications)
-└── supabase/schema.sql        ← schema do banco com RLS + migrações comentadas
+├── vercel.json                ← Vercel Cron Jobs (absence-check às 09:00 UTC dias úteis)
+└── supabase/schema.sql        ← schema do banco com RLS + migrações comentadas (v1→v9)
 ```
 
 <br/>
@@ -287,6 +297,10 @@ JWT_SECRET=sua-chave-secreta-minimo-32-caracteres
 
 # Recuperação de emergência (recomendado)
 RECOVERY_SECRET=chave-de-recuperacao-de-emergencia
+
+# Cron de ausências (obrigatório para o alerta automático de ausência funcionar)
+# Gere: openssl rand -base64 32
+CRON_SECRET=chave-secreta-do-cron
 
 # Web Push / PWA (opcional — desativa notificações push se omitido)
 # Gere: node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys()))"
@@ -358,6 +372,9 @@ employees (
   geo_mode            TEXT,           ← 'required' | 'optional' | 'disabled'
   lock_profile        BOOLEAN,        ← impede o funcionário de alterar perfil
   theme               TEXT,           ← 'dark' | 'light' (persiste no banco)
+  expected_start      TIME,           ← hora de entrada esperada (horas flexíveis)
+  expected_end        TIME,           ← hora de saída esperada (horas flexíveis)
+  shift_start         TIME,           ← início do turno UTC (00:00 = normal; 22:00 = noturno)
   created_at          TIMESTAMPTZ
 )
 
@@ -370,9 +387,10 @@ records (
                                       'inicio_almoco' | 'fim_almoco'
                                       'pausa_cafe'    | 'retorno_cafe'
   timestamp     TIMESTAMPTZ,
-  date          DATE,              ← índice de busca por dia
+  date          DATE,              ← índice de busca por dia (ajustado para turno noturno)
   latitude      DECIMAL,           ← opcional (geo_mode)
-  longitude     DECIMAL
+  longitude     DECIMAL,
+  comment       TEXT               ← nota livre do admin/gerente (≤ 500 chars)
 )
 
 -- banco de horas (ajustes manuais)
@@ -497,9 +515,16 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Reset de senha por e-mail
   ✓  Tema claro/escuro persistido no banco por funcionário
   ✓  Lock de perfil por funcionário
-  ☐  Domínio personalizado                                 → issue #5
+  ✓  Exportação PDF (relatório A4 com cabeçalho, tabelas por funcionário e totais)
+  ✓  Notificação push de ausência (cron 09:00 UTC dias úteis, protegido por CRON_SECRET)
+  ✓  Vista calendário mensal no histórico do funcionário (cores por estado do dia)
+  ✓  Turno noturno (shift_start UTC — entrada 22h creditada no dia anterior)
+  ✓  Horas flexíveis (expected_start / expected_end por funcionário)
+  ✓  Comentário em registo (nota livre do admin/gerente, ≤ 500 chars)
+  ☐  Domínio personalizado por empresa                     → issue #5
   ☐  Multi-empresa (tenancy)                               → issue #6
   ☐  Relatório mensal automático por e-mail                → issue #9
+  ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
 
 <br/>
