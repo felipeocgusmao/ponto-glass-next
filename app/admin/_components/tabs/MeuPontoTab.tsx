@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { EmployeeProfile, PunchRecord } from '@/lib/types'
 import { getWorkState, calcLiveMin, fmtMin, ProgressRing, getGeo } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
@@ -19,12 +19,15 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [reminderDismissed, setReminderDismissed] = useState(false)
 
+  const fetchSeq = useRef(0)
+
   const loadRecords = useCallback(async () => {
+    const seq = ++fetchSeq.current
     const res = await fetch('/api/records?today=true')
-    if (res.ok) {
-      const all: PunchRecord[] = await res.json()
-      setRecords(all.filter(r => r.employee_id === user.id))
-    }
+    if (!res.ok) return
+    const all: PunchRecord[] = await res.json()
+    // Ignore out-of-order responses so a stale reload can't revert a newer state.
+    if (seq === fetchSeq.current) setRecords(all.filter(r => r.employee_id === user.id))
   }, [user.id])
 
   useEffect(() => { loadRecords() }, [loadRecords])
@@ -121,6 +124,9 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
     }
     setToast({ kind: 'ok', text: t('meu.registered') })
     setPunching(false)
+    // Optimistic update from the inserted record, so the state flips immediately
+    // even if the follow-up reload is slow, fails, or arrives stale.
+    if (data?.id) setRecords(prev => [...prev.filter(r => r.id !== data.id), data])
     loadRecords()
     setTimeout(() => setToast(null), 2500)
   }
