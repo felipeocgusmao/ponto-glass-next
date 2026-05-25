@@ -5,6 +5,21 @@ export const WORKDAY_MINUTES = 8 * 60
 const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 export const WORKING_TYPES  = ['entrada', 'fim_almoco', 'retorno_cafe']
 
+// Work date for a punch, honouring an employee's shift_start (UTC hour at which
+// a new workday begins). For night shifts (e.g. 22:00), punches before that UTC
+// time belong to the previous calendar day. Both the punch write path and the
+// "today" read filter MUST use this so they agree across the midnight UTC boundary.
+export function calcWorkDate(punchTime: Date, shiftStart = '00:00'): string {
+  const [sh] = shiftStart.split(':').map(Number)
+  if (sh === 0) return punchTime.toISOString().split('T')[0]
+  const nowUtcMin = punchTime.getUTCHours() * 60 + punchTime.getUTCMinutes()
+  const shiftStartMin = sh * 60 + Number(shiftStart.split(':')[1] ?? 0)
+  if (nowUtcMin >= shiftStartMin) return punchTime.toISOString().split('T')[0]
+  const d = new Date(punchTime)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().split('T')[0]
+}
+
 // ─── Legacy pair-based (entrada/saída only) ────────────────────────────────────
 function pairMinutes(records: PunchRecord[]): number {
   const ins = records

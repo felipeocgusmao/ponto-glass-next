@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
+import { calcWorkDate } from '@/lib/utils'
 
 const VALID_TYPES = ['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 
@@ -22,14 +23,32 @@ export async function GET(request: NextRequest) {
 
   let query = supabase.from('records').select('*').order('timestamp', { ascending: true })
 
-  if (!isPrivileged) {
-    query = query.eq('employee_id', user.id)
-  } else if (employeeId && employeeId !== 'all') {
-    query = query.eq('employee_id', employeeId)
-  }
+  // Scope: a non-privileged user only sees themselves; an admin/manager sees a
+  // specific employee when employeeId is given (and not 'all'), otherwise everyone.
+  const singleEmpId = !isPrivileged
+    ? user.id
+    : (employeeId && employeeId !== 'all' ? employeeId : null)
+
+  if (singleEmpId) query = query.eq('employee_id', singleEmpId)
 
   if (today) {
-    query = query.eq('date', new Date().toISOString().split('T')[0])
+    // "Today" must mean the current *work date*, which is shift-aware: a night-shift
+    // employee punching after midnight UTC is filed under the day the shift began.
+    // Match how /api/punch dates records, or in-progress shifts vanish after midnight.
+    if (singleEmpId) {
+      const { data: emp } = await supabase
+        .from('employees').select('shift_start').eq('id', singleEmpId).single()
+      query = query.eq('date', calcWorkDate(new Date(), emp?.shift_start ?? '00:00'))
+    } else {
+      const { data: emps } = await supabase
+        .from('employees').select('id, shift_start').eq('active', true)
+      const now = new Date()
+      const clauses = (emps ?? []).map(
+        e => `and(employee_id.eq.${e.id},date.eq.${calcWorkDate(now, e.shift_start ?? '00:00')})`
+      )
+      if (clauses.length === 0) return NextResponse.json([])
+      query = query.or(clauses.join(','))
+    }
   } else if (date) {
     query = query.eq('date', date)
   }
