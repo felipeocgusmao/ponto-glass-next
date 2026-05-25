@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { WORKING_TYPES, calcTimeBreakdown, calcNetMinutes, fmtMinutes } from '@/lib/utils'
@@ -67,6 +67,7 @@ export default function KioskPage() {
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const [now, setNow] = useState(new Date())
+  const recsSeq = useRef(0)
 
   useEffect(() => {
     const i = setInterval(() => setNow(new Date()), 1000)
@@ -74,6 +75,7 @@ export default function KioskPage() {
   }, [])
 
   const load = useCallback(async () => {
+    const seq = ++recsSeq.current
     try {
       const [meRes, empRes, recRes] = await Promise.all([
         fetch('/api/me'),
@@ -85,7 +87,11 @@ export default function KioskPage() {
       if (!['admin', 'manager'].includes(me.role)) { router.push('/ponto'); return }
       setAuthOk(true)
       if (empRes.ok) setEmployees(await empRes.json())
-      if (recRes.ok) setTodayRecs(await recRes.json())
+      if (recRes.ok) {
+        const recs = await recRes.json()
+        // Ignore out-of-order responses so a stale reload can't revert a newer state.
+        if (seq === recsSeq.current) setTodayRecs(recs)
+      }
     } catch { /* silent */ }
     finally { setLoading(false) }
   }, [router])
@@ -122,9 +128,17 @@ export default function KioskPage() {
         body: JSON.stringify({ type: punchType, employeeId: selected.id }),
       })
       if (res.ok) {
+        // Optimistic update from the inserted record, so the tile state updates
+        // immediately even if the follow-up reload is slow, fails, or arrives stale.
+        const rec: PunchRecord = await res.json()
+        setTodayRecs(prev => [...prev.filter(r => r.id !== rec.id), rec])
         setResult({ ok: true, msg: t('kiosk.success') })
+        const seq = ++recsSeq.current
         const updated = await fetch('/api/records?today=true')
-        if (updated.ok) setTodayRecs(await updated.json())
+        if (updated.ok) {
+          const recs = await updated.json()
+          if (seq === recsSeq.current) setTodayRecs(recs)
+        }
         setTimeout(closeModal, 1400)
       } else {
         const d = await res.json()
