@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
 import { CalendarView } from './_components/CalendarView'
@@ -164,6 +164,7 @@ export default function PontoPage() {
   const [corrMsg, setCorrMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const router = useRouter()
+  const fetchSeq = useRef(0)
 
   const loadUser = useCallback(async () => {
     setFetchError(false)
@@ -180,9 +181,13 @@ export default function PontoPage() {
   }, [router])
 
   const loadRecords = useCallback(async () => {
+    const seq = ++fetchSeq.current
     try {
       const res = await fetch('/api/records?today=true')
-      if (res.ok) setRecords(await res.json())
+      if (!res.ok) return
+      const data = await res.json()
+      // Ignore out-of-order responses: a slow, stale reload must not revert a newer state.
+      if (seq === fetchSeq.current) setRecords(data)
     } catch { /* keep */ }
   }, [])
 
@@ -397,9 +402,13 @@ export default function PontoPage() {
         body: JSON.stringify({ type, ...(geo ? { latitude: geo.lat, longitude: geo.lng } : {}) }),
       })
       if (res.ok) {
-        await loadRecords()
+        // Optimistic update from the server's inserted record, so the state flips
+        // immediately even if the follow-up reload is slow, fails, or arrives stale.
+        const rec: PunchRecord = await res.json()
+        setRecords(prev => [...prev.filter(r => r.id !== rec.id), rec])
         setHistoryLoaded(false) // invalidate history cache
         showToast(type === 'entrada' ? t('ponto.registered_in') : type === 'saída' ? t('ponto.registered_out') : PUNCH_LABEL_PT[type])
+        loadRecords() // reconcile in the background (guarded against stale responses)
       } else {
         const d = await res.json()
         showToast(d.error ?? 'Erro ao registrar')
