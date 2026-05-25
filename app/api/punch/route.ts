@@ -3,17 +3,7 @@ import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
-
-function calcWorkDate(punchTime: Date, shiftStart: string): string {
-  const [sh] = shiftStart.split(':').map(Number)
-  if (sh === 0) return punchTime.toISOString().split('T')[0]
-  const nowUtcMin = punchTime.getUTCHours() * 60 + punchTime.getUTCMinutes()
-  const shiftStartMin = sh * 60 + Number(shiftStart.split(':')[1] ?? 0)
-  if (nowUtcMin >= shiftStartMin) return punchTime.toISOString().split('T')[0]
-  const d = new Date(punchTime)
-  d.setUTCDate(d.getUTCDate() - 1)
-  return d.toISOString().split('T')[0]
-}
+import { calcWorkDate } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
