@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Employee, HourBankAdjustment } from '@/lib/types'
-import { fmtMinutes } from '@/lib/utils'
+import { fmtMinutes, businessDate } from '@/lib/utils'
 import { SL } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 
@@ -12,7 +12,7 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
   const [selectedEmp, setSelectedEmp] = useState('')
   const [minutes, setMinutes] = useState('')
   const [reason, setReason] = useState('')
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(() => businessDate())
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
   const [saving, setSaving] = useState(false)

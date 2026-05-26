@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
+import { calcWorkDate } from '@/lib/utils'
 
 export async function PATCH(
   request: NextRequest,
@@ -25,8 +26,15 @@ export async function PATCH(
     const parsed = new Date(body.timestamp)
     if (!body.timestamp || isNaN(parsed.getTime()))
       return NextResponse.json({ error: 'Timestamp inválido' }, { status: 400 })
+    // Re-derive the work date in the business timezone, honouring the employee's shift,
+    // so an edited punch stays filed under the day it was actually worked.
+    const { data: rec } = await supabase
+      .from('records').select('employee_id').eq('id', params.id).single()
+    const { data: emp } = rec
+      ? await supabase.from('employees').select('shift_start').eq('id', rec.employee_id).maybeSingle()
+      : { data: null }
     updates.timestamp = parsed.toISOString()
-    updates.date = parsed.toISOString().split('T')[0]
+    updates.date = calcWorkDate(parsed, emp?.shift_start ?? '00:00')
   }
 
   if (body.comment !== undefined) {

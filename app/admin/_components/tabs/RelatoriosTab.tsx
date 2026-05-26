@@ -2,16 +2,15 @@
 
 import { useState, useCallback } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { exportCSV, exportPDF, fmtMinutes, calcOvertimePeriod, calcHours, calcNetMinutes, calcTimeBreakdown } from '@/lib/utils'
+import { exportCSV, exportPDF, fmtMinutes, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, calcTimeBreakdown, businessDate } from '@/lib/utils'
 import { SL, getWorkingDays, openPayslip } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 
 export function RelatoriosTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
-  const now = new Date()
-  // UTC for both, matching how records.date is stored (see DashboardTab note).
-  const firstOfMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
-  const todayStr = now.toISOString().split('T')[0]
+  // Range endpoints use the business-timezone day, matching how records.date is stored.
+  const todayStr = businessDate()
+  const firstOfMonth = `${todayStr.slice(0, 7)}-01`
   const [from, setFrom] = useState(firstOfMonth)
   const [to, setTo] = useState(todayStr)
   const [filterEmpId, setFilterEmpId] = useState('all')
@@ -95,7 +94,9 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                       <SL>{Object.keys(byEmp).length} {t('emp.active')} · {records.length} {t('common.records')}</SL>
                       {Object.entries(byEmp).map(([empId, { name, records: recs }]) => {
                         const emp = employees.find(e => e.id === empId)
-                        const overtime = calcOvertimePeriod(recs)
+                        const lunch = emp?.lunch_break_minutes ?? 0
+                        const workedMin = calcWorkedMinutesPeriod(recs, lunch)
+                        const overtime = calcOvertimePeriod(recs, (emp?.workday_hours ?? 8) * 60, lunch)
                         return (
                           <div key={empId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -103,7 +104,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                               <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{recs.length} {t('common.records')}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{calcHours(recs)}</div>
+                              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{workedMin > 0 ? fmtMinutes(workedMin) : '—'}</div>
                               {overtime !== null && (
                                 <span className={`chip ${overtime >= 0 ? 'success' : 'danger'}`} style={{ fontSize: 10 }}>
                                   {overtime >= 0 ? '+' : ''}{fmtMinutes(Math.abs(overtime))}

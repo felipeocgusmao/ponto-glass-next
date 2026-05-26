@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
+import { businessDate } from '@/lib/utils'
 import { SL } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
@@ -11,7 +12,7 @@ const PAGE_SIZE = 25
 
 export function RegistrosTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
-  const today = new Date().toISOString().split('T')[0]
+  const today = businessDate()
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
   const [empId, setEmpId] = useState('all')
@@ -75,7 +76,10 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
     setDeleting(id)
     try {
       const res = await fetch(`/api/records/${id}`, { method: 'DELETE' })
-      if (res.ok) setRecords(prev => prev.filter(r => r.id !== id))
+      if (res.ok) {
+        setRecords(prev => prev.filter(r => r.id !== id))
+        window.dispatchEvent(new Event('pg:records-changed'))
+      }
       else { const d = await res.json(); setError(d.error ?? t('error.connect')) }
     } catch { setError(t('error.connect')) }
     finally { setDeleting(null) }
@@ -94,6 +98,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
       if (res.ok) {
         setNewOk(t('reg.added')); setNewTs(''); setNewEmpId(''); setNewType('entrada')
         await load()
+        window.dispatchEvent(new Event('pg:records-changed'))
       } else { setNewErr(data.error ?? t('error.connect')) }
     } catch { setNewErr(t('error.connect')) }
     finally { setNewSaving(false); setTimeout(() => setNewOk(''), 2000) }
@@ -111,6 +116,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
         const updated = await res.json()
         setRecords(prev => prev.map(r => r.id === id ? { ...r, timestamp: updated.timestamp, date: updated.date } : r))
         setEditingId(null)
+        window.dispatchEvent(new Event('pg:records-changed'))
       } else { const d = await res.json(); setError(d.error ?? t('error.connect')) }
     } catch { setError(t('error.connect')) }
     finally { setEditSaving(false) }

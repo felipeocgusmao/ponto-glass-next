@@ -5,19 +5,52 @@ export const WORKDAY_MINUTES = 8 * 60
 const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 export const WORKING_TYPES  = ['entrada', 'fim_almoco', 'retorno_cafe']
 
-// Work date for a punch, honouring an employee's shift_start (UTC hour at which
-// a new workday begins). For night shifts (e.g. 22:00), punches before that UTC
-// time belong to the previous calendar day. Both the punch write path and the
-// "today" read filter MUST use this so they agree across the midnight UTC boundary.
+// The timezone the business operates in. A work "day" is the local calendar day
+// in THIS zone — never UTC — so punches near midnight are filed under the day the
+// employee actually worked. Override per-deployment with NEXT_PUBLIC_BUSINESS_TZ
+// (an IANA name like 'Europe/Madrid'); it must be NEXT_PUBLIC_ so the same value
+// is available on both the server (write path) and the client (report ranges).
+export const BUSINESS_TZ =
+  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_BUSINESS_TZ) || 'Europe/Madrid'
+
+// Calendar date + wall-clock time of an instant, as seen in the business timezone.
+function tzParts(date: Date, timeZone: string = BUSINESS_TZ): { date: string; minutes: number } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date)
+  let y = '', mo = '', d = '', h = '0', mi = '0'
+  for (const p of parts) {
+    if (p.type === 'year') y = p.value
+    else if (p.type === 'month') mo = p.value
+    else if (p.type === 'day') d = p.value
+    else if (p.type === 'hour') h = p.value
+    else if (p.type === 'minute') mi = p.value
+  }
+  return { date: `${y}-${mo}-${d}`, minutes: Number(h) * 60 + Number(mi) }
+}
+
+// Today's (or any instant's) calendar date in the business timezone, as YYYY-MM-DD.
+// Use this everywhere instead of `new Date().toISOString().split('T')[0]`, which
+// returns the UTC day and is wrong for the hours around local midnight.
+export function businessDate(date: Date = new Date()): string {
+  return tzParts(date).date
+}
+
+// Work date for a punch, honouring an employee's shift_start — the LOCAL
+// (business-timezone) time of day at which a new workday begins. For night shifts
+// (e.g. 22:00), punches before that local time belong to the previous calendar day.
+// Both the punch write path and the "today" read filter MUST use this so they agree
+// across midnight. shiftStart '00:00' = normal day shift (plain local calendar date).
 export function calcWorkDate(punchTime: Date, shiftStart = '00:00'): string {
-  const [sh] = shiftStart.split(':').map(Number)
-  if (sh === 0) return punchTime.toISOString().split('T')[0]
-  const nowUtcMin = punchTime.getUTCHours() * 60 + punchTime.getUTCMinutes()
-  const shiftStartMin = sh * 60 + Number(shiftStart.split(':')[1] ?? 0)
-  if (nowUtcMin >= shiftStartMin) return punchTime.toISOString().split('T')[0]
-  const d = new Date(punchTime)
-  d.setUTCDate(d.getUTCDate() - 1)
-  return d.toISOString().split('T')[0]
+  const { date, minutes } = tzParts(punchTime)
+  const [sh, sm] = shiftStart.split(':').map(Number)
+  const shiftStartMin = (sh || 0) * 60 + (sm || 0)
+  if (shiftStartMin <= 0 || minutes >= shiftStartMin) return date
+  // Before the shift's start time → this punch belongs to the previous local day.
+  const prev = new Date(`${date}T12:00:00Z`)
+  prev.setUTCDate(prev.getUTCDate() - 1)
+  return prev.toISOString().split('T')[0]
 }
 
 // ─── Legacy pair-based (entrada/saída only) ────────────────────────────────────
@@ -129,6 +162,21 @@ export function calcOvertimePeriod(
   return totalNet - workdayMinutes * byDay.size
 }
 
+// Day-aware total worked minutes over a period: each day's net is computed (and its
+// lunch deducted) separately, then summed — matching the CSV/PDF/payslip exports.
+// Use this for on-screen period totals instead of calcNetMinutes(allRecords, lunch),
+// which would subtract a single lunch for the whole range.
+export function calcWorkedMinutesPeriod(records: PunchRecord[], lunchBreakMinutes = 0): number {
+  const byDay = new Map<string, PunchRecord[]>()
+  records.forEach((r) => {
+    if (!byDay.has(r.date)) byDay.set(r.date, [])
+    byDay.get(r.date)!.push(r)
+  })
+  let total = 0
+  byDay.forEach((dayRecs) => { total += calcNetMinutes(dayRecs, lunchBreakMinutes) })
+  return total
+}
+
 export function calcEarnings(
   records: PunchRecord[],
   hourlyRate: number,
@@ -143,7 +191,7 @@ export function avatarInitials(name: string): string {
 }
 
 export function todayISO(): string {
-  return new Date().toISOString().split('T')[0]
+  return businessDate()
 }
 
 export function exportCSV(

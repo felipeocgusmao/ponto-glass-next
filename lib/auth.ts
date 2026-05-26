@@ -8,9 +8,13 @@ let _secret: Uint8Array | null = null
 function getSecret(): Uint8Array {
   if (_secret) return _secret
   const s = process.env.JWT_SECRET
-  if (!s && process.env.NODE_ENV === 'production')
-    throw new Error('JWT_SECRET must be set in production')
-  _secret = new TextEncoder().encode(s ?? 'dev-secret-change-in-production')
+  if (s) { _secret = new TextEncoder().encode(s); return _secret }
+  // No secret configured: tolerate a fixed dev secret ONLY in local development. Anywhere
+  // else (production, Vercel preview deploys, CI/tests) fail closed instead of signing and
+  // accepting tokens with a publicly-known constant, which would allow token forgery.
+  if (process.env.NODE_ENV !== 'development')
+    throw new Error('JWT_SECRET must be set')
+  _secret = new TextEncoder().encode('dev-secret-change-in-production')
   return _secret
 }
 

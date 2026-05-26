@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { calcWorkDate } from '@/lib/utils'
 import webpush from 'web-push'
 
 if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
   if (!timestamp || isNaN(parsed.getTime()))
     return NextResponse.json({ error: 'Timestamp inválido' }, { status: 400 })
 
-  const { data: emp } = await supabase.from('employees').select('name').eq('id', user.id).single()
+  const { data: emp } = await supabase.from('employees').select('name, shift_start').eq('id', user.id).single()
   if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
 
   const { data, error } = await supabase.from('correction_requests').insert({
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     employee_name: emp.name,
     req_type: type,
     req_timestamp: parsed.toISOString(),
-    req_date: parsed.toISOString().split('T')[0],
+    req_date: calcWorkDate(parsed, emp.shift_start ?? '00:00'),
     reason: reason || null,
     status: 'pending',
   }).select().single()

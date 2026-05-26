@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { businessDate } from '@/lib/utils'
 import webpush from 'web-push'
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL ?? 'mailto:admin@pontoglass.app',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '',
-  process.env.VAPID_PRIVATE_KEY ?? '',
-)
+// Guard so a deploy without VAPID keys doesn't crash this module at load
+// (web-push throws on an empty public key) — consistent with the other push routes.
+if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  )
+}
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization')
   if (auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const todayUtc = new Date().toISOString().split('T')[0]
+  const today = businessDate()
+
+  // Never flag absences on weekends.
+  const dow = new Date(`${today}T12:00:00Z`).getUTCDay()
+  if (dow === 0 || dow === 6) return NextResponse.json({ notified: 0, absent: 0, skipped: 'weekend' })
 
   const { data: employees } = await supabase
     .from('employees')
@@ -23,14 +32,23 @@ export async function GET(request: NextRequest) {
 
   if (!employees?.length) return NextResponse.json({ notified: 0 })
 
+  // Skip holidays (company-wide when employee_id is null) and per-employee days off.
+  const { data: exceptions } = await supabase
+    .from('day_exceptions')
+    .select('employee_id')
+    .eq('date', today)
+  if ((exceptions ?? []).some(e => !e.employee_id))
+    return NextResponse.json({ notified: 0, absent: 0, skipped: 'holiday' })
+  const offIds = new Set((exceptions ?? []).map(e => e.employee_id).filter(Boolean))
+
   const { data: entries } = await supabase
     .from('records')
     .select('employee_id')
-    .eq('date', todayUtc)
+    .eq('date', today)
     .eq('type', 'entrada')
 
   const presentIds = new Set((entries ?? []).map(r => r.employee_id))
-  const absent = employees.filter(e => !presentIds.has(e.id))
+  const absent = employees.filter(e => !presentIds.has(e.id) && !offIds.has(e.id))
 
   if (!absent.length) return NextResponse.json({ notified: 0, absent: 0 })
 
@@ -47,7 +65,7 @@ export async function GET(request: NextRequest) {
     body: absent.length === 1
       ? `${names} ainda não registou entrada hoje.`
       : `${absent.length} funcionários sem entrada: ${names}`,
-    tag: `absence-${todayUtc}`,
+    tag: `absence-${today}`,
     url: '/admin',
   })
 

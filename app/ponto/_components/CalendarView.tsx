@@ -1,7 +1,7 @@
 'use client'
 
 import type { PunchRecord, DayException } from '@/lib/types'
-import { calcNetMinutes, calcTimeBreakdown } from '@/lib/utils'
+import { calcNetMinutes, calcTimeBreakdown, businessDate } from '@/lib/utils'
 
 interface CalendarViewProps {
   records: PunchRecord[]
@@ -19,7 +19,7 @@ function fmtMin(min: number): string {
 }
 
 export function CalendarView({ records, exceptions, year, month, lunchBreakMinutes, onDayClick }: CalendarViewProps) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = businessDate()
   const exceptionDates = new Set(exceptions.map(e => e.date))
   const exceptionMap = new Map(exceptions.map(e => [e.date, e]))
 

@@ -44,13 +44,23 @@ export async function POST(request: NextRequest) {
 
   const { data: employee } = await supabase
     .from('employees')
-    .select('id')
+    .select('id, role')
     .eq('username', String(username).trim().toLowerCase())
     .eq('active', true)
     .single()
 
   if (!employee) {
     return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
+  }
+
+  // Admin accounts cannot be reset via the shared RECOVERY_SECRET (as documented in
+  // .env.example) — they must use the per-user e-mail reset link — so a leaked secret
+  // can never take over an administrator.
+  if (employee.role === 'admin') {
+    return NextResponse.json(
+      { error: 'Contas de administrador não podem ser recuperadas por esta via. Use a recuperação por e-mail.' },
+      { status: 403 }
+    )
   }
 
   const hash = await bcrypt.hash(new_password, 10)
