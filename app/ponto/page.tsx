@@ -249,7 +249,10 @@ export default function PontoPage() {
     if (!corrDate || !corrTime || !corrType) return
     setCorrSubmitting(true); setCorrMsg(null)
     try {
-      const timestamp = `${corrDate}T${corrTime}:00`
+      // Convert the chosen local wall-clock to a UTC instant, exactly like real punches
+      // (now.toISOString()) and manual records. Sending a naive string let the DB (timestamptz)
+      // treat it as UTC, shifting the corrected time by the user's timezone offset.
+      const timestamp = new Date(`${corrDate}T${corrTime}:00`).toISOString()
       const res = await fetch('/api/correction-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
