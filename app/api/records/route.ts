@@ -82,10 +82,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Funcionário obrigatório' }, { status: 400 })
 
   const { data: emp } = await supabase
-    .from('employees').select('name').eq('id', employeeId).single()
+    .from('employees').select('name, shift_start').eq('id', employeeId).single()
   if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
 
-  const date = parsed.toISOString().split('T')[0]
+  const date = calcWorkDate(parsed, emp.shift_start ?? '00:00')
 
   const { data, error } = await supabase
     .from('records')

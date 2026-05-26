@@ -20,16 +20,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Usuário e senha são obrigatórios' }, { status: 400 })
   }
 
-  // Auto-seed: create default admin if DB is empty
+  // First-run bootstrap: create the initial admin ONLY from an explicit env-provided
+  // password. Never seed a hardcoded default (e.g. "admin123") — on a public deploy that
+  // is a known credential anyone could use before the owner's first login. Set
+  // INITIAL_ADMIN_PASSWORD on first deploy, log in, then remove it from the environment.
   const { count } = await supabase
     .from('employees')
     .select('*', { count: 'exact', head: true })
 
   if (count === 0) {
-    const hash = await bcrypt.hash('admin123', 10)
+    const seedPwd = process.env.INITIAL_ADMIN_PASSWORD
+    if (!seedPwd || seedPwd.length < 8) {
+      return NextResponse.json(
+        { error: 'Sistema não inicializado. Defina INITIAL_ADMIN_PASSWORD (mín. 8 caracteres) no ambiente e faça login novamente.' },
+        { status: 503 }
+      )
+    }
+    const hash = await bcrypt.hash(seedPwd, 10)
     await supabase.from('employees').insert({
       name: 'Administrador',
-      username: 'admin',
+      username: (process.env.INITIAL_ADMIN_USERNAME ?? 'admin').trim().toLowerCase(),
       password_hash: hash,
       role: 'admin',
     })

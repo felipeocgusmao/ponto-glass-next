@@ -105,10 +105,13 @@ export default function KioskPage() {
   const openModal = (emp: Employee) => {
     const recs = todayRecs.filter(r => r.employee_id === emp.id)
     const state = getState(recs)
+    const last = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).at(-1)
     const defaults: Record<WorkState, PunchType> = {
       absent:  'entrada',
       working: 'saída',
-      pause:   recs.some(r => r.type === 'inicio_almoco') ? 'fim_almoco' : 'retorno_cafe',
+      // A "pause" is either lunch or coffee — resume the same kind based on the LAST
+      // punch, not merely whether lunch occurred earlier in the day.
+      pause:   last?.type === 'pausa_cafe' ? 'retorno_cafe' : 'fim_almoco',
       out:     'entrada',
     }
     setPunchType(defaults[state])

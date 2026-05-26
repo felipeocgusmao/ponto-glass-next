@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
-import { calcNetMinutes } from '@/lib/utils'
+import { calcNetMinutes, businessDate } from '@/lib/utils'
 import type { PunchRecord } from '@/lib/types'
 
 export async function GET(request: NextRequest) {
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
   if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = businessDate()
 
   const { data: records } = await supabase
     .from('records')
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       employee_id: employeeId,
       minutes: parsedMinutes,
       reason: String(reason).trim(),
-      date: date ?? new Date().toISOString().split('T')[0],
+      date: date ?? businessDate(),
       created_by: user.id,
     })
     .select()

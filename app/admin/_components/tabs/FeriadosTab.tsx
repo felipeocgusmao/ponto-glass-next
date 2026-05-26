@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { DayException } from '@/lib/types'
 import { SL } from '../../_lib/helpers'
+import { businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -10,7 +11,7 @@ export function FeriadosTab() {
   const { t } = useLang()
   const [exceptions, setExceptions] = useState<DayException[]>([])
   const [loading, setLoading] = useState(true)
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(() => businessDate())
   const [type, setType] = useState<'holiday' | 'day_off'>('holiday')
   const [description, setDescription] = useState('')
   const [err, setErr] = useState('')

@@ -25,6 +25,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
   const [rejectTarget, setRejectTarget] = useState<string | null>(null)
   const [bulkApproving, setBulkApproving] = useState(false)
   const [bulkMsg, setBulkMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [actErr, setActErr] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -39,6 +40,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
 
   const act = async (id: string, action: 'approve' | 'reject', note?: string) => {
     setActionId(id)
+    setActErr('')
     try {
       const res = await fetch(`/api/correction-requests/${id}`, {
         method: 'PATCH',
@@ -50,8 +52,13 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
         setRejectNote('')
         await load()
         onAction?.()
+        // Approving inserts a punch record — refresh the missing-exit banner.
+        if (action === 'approve') window.dispatchEvent(new Event('pg:records-changed'))
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setActErr(d.error ?? 'Falha ao processar o pedido. Tente novamente.')
       }
-    } catch { /* silent */ }
+    } catch { setActErr('Erro de conexão. Tente novamente.') }
     finally { setActionId(null) }
   }
 
@@ -72,6 +79,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
     }
     await load()
     onAction?.()
+    if (ok > 0) window.dispatchEvent(new Event('pg:records-changed'))
     setBulkApproving(false)
     setBulkMsg(fail === 0
       ? { ok: true, text: `${ok} correcção(ões) aprovada(s).` }
@@ -114,6 +122,10 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
 
           {bulkMsg && (
             <div className={`alert-inline ${bulkMsg.ok ? 'ok' : 'err'}`} style={{ marginBottom: 8 }}>{bulkMsg.text}</div>
+          )}
+
+          {actErr && (
+            <div className="alert-inline err" style={{ marginBottom: 8 }}>{actErr}</div>
           )}
 
           {pending.length === 0 && (

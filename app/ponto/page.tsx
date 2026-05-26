@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
 import { CalendarView } from './_components/CalendarView'
-import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, openPayslip } from '@/lib/utils'
+import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, openPayslip, businessDate } from '@/lib/utils'
 import { useLang, LANG_LABELS, type Lang } from '@/lib/LangContext'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
@@ -196,10 +196,9 @@ export default function PontoPage() {
     if (historyLoaded) return
     setHistoryLoading(true)
     try {
-      const now = new Date()
-      // UTC to match how records.date is stored (calcWorkDate dates by UTC day for the default shift).
-      const from = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
-      const to = now.toISOString().split('T')[0]
+      // Business-timezone day, matching how records.date is stored.
+      const to = businessDate()
+      const from = `${to.slice(0, 7)}-01`
       const [res, excRes] = await Promise.all([
         fetch(`/api/reports?from=${from}&to=${to}`),
         fetch(`/api/day-exceptions?from=${from}&to=${to}`),
@@ -275,7 +274,7 @@ export default function PontoPage() {
   useEffect(() => { if (user) setProfileEmail(user.email ?? '') }, [user])
   useEffect(() => {
     const n = new Date()
-    setCorrDate(n.toISOString().split('T')[0])
+    setCorrDate(businessDate(n))
     setCorrTime(`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`)
   }, [])
 
@@ -331,7 +330,7 @@ export default function PontoPage() {
     const remaining = targetMin - liveMin
     const overtime = liveMin - targetMin
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = businessDate()
     const key15 = `pg.notif.warn15.${today}.${user.id}`
     const keyOt = `pg.notif.overtime.${today}.${user.id}`
 
@@ -503,9 +502,8 @@ export default function PontoPage() {
   // working weekdays in the loaded month with no records = absent
   const absentDays: string[] = (() => {
     if (!historyLoaded || historyRecs.length === 0 && sortedDays.length === 0) return []
-    const now2 = new Date()
-    const firstOfMonth = `${now2.getUTCFullYear()}-${String(now2.getUTCMonth() + 1).padStart(2, '0')}-01`
-    const todayStr2 = now2.toISOString().split('T')[0]
+    const todayStr2 = businessDate()
+    const firstOfMonth = `${todayStr2.slice(0, 7)}-01`
     const cur = new Date(firstOfMonth + 'T12:00:00')
     const end = new Date(todayStr2 + 'T12:00:00')
     const absent: string[] = []
@@ -778,7 +776,7 @@ export default function PontoPage() {
                   const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
                   const dayMin = Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
                   const dt = new Date(date + 'T12:00:00')
-                  const isToday = date === new Date().toISOString().split('T')[0]
+                  const isToday = date === businessDate()
                   return (
                     <div key={date} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -852,7 +850,7 @@ export default function PontoPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
               <div className="field">
                 <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.date')}</label>
-                <input type="date" className="input" value={corrDate} onChange={e => setCorrDate(e.target.value)} max={new Date().toISOString().split('T')[0]} />
+                <input type="date" className="input" value={corrDate} onChange={e => setCorrDate(e.target.value)} max={businessDate()} />
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <div className="field" style={{ flex: 1 }}>

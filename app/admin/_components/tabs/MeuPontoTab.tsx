@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { EmployeeProfile, PunchRecord } from '@/lib/types'
 import { getWorkState, calcLiveMin, fmtMin, ProgressRing, getGeo } from '../../_lib/helpers'
+import { businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 
 function PlayIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}><polygon points="5 3 19 12 5 21 5 3"/></svg> }
@@ -68,7 +69,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
     const wMin = user.workday_hours * 60
     const rem = wMin - liveM
     const ot = liveM - wMin
-    const today = new Date().toISOString().split('T')[0]
+    const today = businessDate()
     const key15 = `pg.notif.warn15.${today}.${user.id}`
     const keyOt = `pg.notif.overtime.${today}.${user.id}`
     const notify = (title: string, body: string, tag: string) => {

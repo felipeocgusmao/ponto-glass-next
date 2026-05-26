@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { fmtMinutes, calcOvertimePeriod, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES, openPayslip } from '@/lib/utils'
+import { fmtMinutes, calcOvertimePeriod, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES, openPayslip, businessDate } from '@/lib/utils'
 import { SL, getWorkingDays } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
@@ -46,25 +46,27 @@ function empColor(id: string): number {
 export function DashboardTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
   const now = new Date()
-  // Use UTC for both endpoints so they match how records.date is stored (calcWorkDate
-  // dates by UTC day for the default shift). Mixing local month with UTC day produced an
-  // empty/inverted range near midnight on the 1st of the month in non-UTC timezones.
-  const firstOfMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
-  const todayStr = now.toISOString().split('T')[0]
+  // Range endpoints use the business-timezone day so they line up with how records.date
+  // is now stored (calcWorkDate → local business day), instead of the UTC day.
+  const todayStr = businessDate()
+  const firstOfMonth = `${todayStr.slice(0, 7)}-01`
   const [monthRecs, setMonthRecs] = useState<PunchRecord[]>([])
   const [todayRecs, setTodayRecs] = useState<PunchRecord[]>([])
+  const [holidays, setHolidays] = useState<string[]>([])
   const [bankBalances, setBankBalances] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [mRes, tRes] = await Promise.all([
+      const [mRes, tRes, eRes] = await Promise.all([
         fetch(`/api/reports?from=${firstOfMonth}&to=${todayStr}`),
         fetch('/api/records?today=true'),
+        fetch(`/api/day-exceptions?from=${firstOfMonth}&to=${todayStr}`),
       ])
       if (mRes.ok) setMonthRecs(await mRes.json())
       if (tRes.ok) setTodayRecs(await tRes.json())
+      if (eRes.ok) { const exc: { date: string }[] = await eRes.json(); setHolidays(exc.map(e => e.date)) }
     } catch { /* silent */ }
     finally { setLoading(false) }
   }, [firstOfMonth, todayStr])
@@ -107,6 +109,8 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
 
   // Monthly chart data
   const workingDays = getWorkingDays(firstOfMonth, todayStr)
+  // Exclude company holidays / days off from the monthly hours target.
+  const effectiveWorkingDays = workingDays.filter(d => !holidays.includes(d))
   const byDateEmp = new Map<string, Map<string, PunchRecord[]>>()
   monthRecs.forEach(r => {
     if (!byDateEmp.has(r.date)) byDateEmp.set(r.date, new Map())
@@ -273,7 +277,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
           {employees.map(emp => {
             const empRecs = byEmpMonth[emp.id] ?? []
             const monthMin = empRecs.length > 0 ? Math.max(0, calcOvertimePeriod(empRecs, 0, emp.lunch_break_minutes) ?? 0) : 0
-            const targetMin = emp.workday_hours * 60 * workingDays.length
+            const targetMin = emp.workday_hours * 60 * effectiveWorkingDays.length
             const pct = targetMin > 0 ? Math.min(100, (monthMin / targetMin) * 100) : 0
             const bank = bankBalances.get(emp.id)
             return (
