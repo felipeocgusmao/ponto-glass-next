@@ -165,6 +165,7 @@ export default function PontoPage() {
 
   const router = useRouter()
   const fetchSeq = useRef(0)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadUser = useCallback(async () => {
     setFetchError(false)
@@ -196,7 +197,8 @@ export default function PontoPage() {
     setHistoryLoading(true)
     try {
       const now = new Date()
-      const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      // UTC to match how records.date is stored (calcWorkDate dates by UTC day for the default shift).
+      const from = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
       const to = now.toISOString().split('T')[0]
       const [res, excRes] = await Promise.all([
         fetch(`/api/reports?from=${from}&to=${to}`),
@@ -379,7 +381,8 @@ export default function PontoPage() {
 
   const showToast = (msg: string) => {
     setToast(msg)
-    setTimeout(() => setToast(''), 2200)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(''), 2200)
   }
 
   const punch = async (type: PunchType) => {
@@ -498,7 +501,7 @@ export default function PontoPage() {
   const absentDays: string[] = (() => {
     if (!historyLoaded || historyRecs.length === 0 && sortedDays.length === 0) return []
     const now2 = new Date()
-    const firstOfMonth = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-01`
+    const firstOfMonth = `${now2.getUTCFullYear()}-${String(now2.getUTCMonth() + 1).padStart(2, '0')}-01`
     const todayStr2 = now2.toISOString().split('T')[0]
     const cur = new Date(firstOfMonth + 'T12:00:00')
     const end = new Date(todayStr2 + 'T12:00:00')
@@ -921,14 +924,18 @@ export default function PontoPage() {
               </div>
             </div>
 
-            <div className="field" style={{ marginBottom: 8 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('emp.email_optional')}</label>
-              <input type="email" className="input" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setProfileEmailMsg(null) }} placeholder="email@empresa.com" />
-            </div>
-            {profileEmailMsg && <div className={`alert-inline ${profileEmailMsg.ok ? 'ok' : 'err'}`} style={{ marginBottom: 8 }}>{profileEmailMsg.text}</div>}
-            <button className="btn-emp" style={{ width: '100%', justifyContent: 'center', marginBottom: 24 }} onClick={saveEmail} disabled={profileEmailSaving}>
-              {profileEmailSaving ? t('pwd.saving') : t('profile.save_email')}
-            </button>
+            {!user.lock_profile && (
+              <>
+                <div className="field" style={{ marginBottom: 8 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('emp.email_optional')}</label>
+                  <input type="email" className="input" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setProfileEmailMsg(null) }} placeholder="email@empresa.com" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+                </div>
+                {profileEmailMsg && <div className={`alert-inline ${profileEmailMsg.ok ? 'ok' : 'err'}`} style={{ marginBottom: 8 }}>{profileEmailMsg.text}</div>}
+                <button className="btn-emp" style={{ width: '100%', justifyContent: 'center', marginBottom: 24 }} onClick={saveEmail} disabled={profileEmailSaving}>
+                  {profileEmailSaving ? t('pwd.saving') : t('profile.save_email')}
+                </button>
+              </>
+            )}
 
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 8 }}>
               {t('profile.theme')}

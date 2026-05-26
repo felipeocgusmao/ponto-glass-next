@@ -64,6 +64,11 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
   }, [from, to, empId, t])
 
   useEffect(() => { load(); setPage(1) }, [load])
+  // Clamp the page when the record set shrinks (e.g. after deleting the last row on the last page).
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE))
+    setPage(p => Math.min(p, totalPages))
+  }, [records.length])
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('reg.del_confirm'))) return

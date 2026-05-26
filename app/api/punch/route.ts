@@ -4,6 +4,7 @@ import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcWorkDate } from '@/lib/utils'
+import { rateLimit } from '@/lib/rateLimit'
 
 export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
@@ -43,6 +44,20 @@ export async function POST(request: NextRequest) {
       .single()
     empShiftStart = empData?.shift_start ?? '00:00'
   }
+
+  if (!rateLimit(`punch:${empId}`, 10, 60_000))
+    return NextResponse.json({ error: 'Muitos registos seguidos. Aguarde um momento.' }, { status: 429 })
+
+  // Reject an accidental duplicate (same type repeated within a minute, e.g. double-click).
+  const { data: lastRec } = await supabase
+    .from('records')
+    .select('type, timestamp')
+    .eq('employee_id', empId)
+    .order('timestamp', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (lastRec && lastRec.type === type && Date.now() - new Date(lastRec.timestamp).getTime() < 60_000)
+    return NextResponse.json({ error: 'Registo duplicado. Aguarde um momento.' }, { status: 409 })
 
   const now = new Date()
   const workDate = calcWorkDate(now, empShiftStart)

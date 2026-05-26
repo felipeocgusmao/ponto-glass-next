@@ -9,7 +9,8 @@ import { useLang } from '@/lib/LangContext'
 export function RelatoriosTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
   const now = new Date()
-  const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  // UTC for both, matching how records.date is stored (see DashboardTab note).
+  const firstOfMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
   const todayStr = now.toISOString().split('T')[0]
   const [from, setFrom] = useState(firstOfMonth)
   const [to, setTo] = useState(todayStr)

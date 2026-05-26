@@ -388,10 +388,16 @@ export async function exportPDF(
   doc.save(filename)
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
+}
+
 export function openPayslip(
   empName: string, period: string, recs: PunchRecord[],
   workdayHours: number, lunchMin: number, hourlyRate: number | null,
 ) {
+  const safeName = escapeHtml(empName)
+  const safePeriod = escapeHtml(period)
   const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
   const byDate = new Map<string, PunchRecord[]>()
   recs.forEach(r => {
@@ -421,15 +427,15 @@ export function openPayslip(
   const earnHeader = hourlyRate != null ? '<th>Ganhos (€)</th>' : ''
   const rateTotal  = hourlyRate != null ? '<td></td>' : ''
   const earnTotal  = hourlyRate != null ? `<td>${totalEarnings.toFixed(2).replace('.', ',')} €</td>` : ''
-  const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><title>Holerite ${empName}</title>
+  const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><title>Holerite ${safeName}</title>
 <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#333;padding:24px;max-width:960px;margin:0 auto;font-size:13px}
 h1{font-size:20px;margin-bottom:4px}.sub{color:#666;margin-bottom:20px}
 table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#f0f0f0;border:1px solid #ddd;padding:7px 10px;text-align:left;font-size:12px}
 td{border:1px solid #ddd;padding:7px 10px;font-size:12px}.total-row{font-weight:bold;background:#f8f8f8}
 .btn{margin-top:20px;padding:10px 24px;background:#4f46e5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px}
 @media print{.btn{display:none}}</style></head><body>
-<h1>Holerite — ${empName}</h1>
-<div class="sub">Período: ${period} · Jornada: ${workdayHours}h · Almoço: ${lunchMin > 0 ? lunchMin + 'min' : 'sem desconto'}${hourlyRate != null ? ` · €${Number(hourlyRate).toFixed(2)}/h` : ''}</div>
+<h1>Holerite — ${safeName}</h1>
+<div class="sub">Período: ${safePeriod} · Jornada: ${workdayHours}h · Almoço: ${lunchMin > 0 ? lunchMin + 'min' : 'sem desconto'}${hourlyRate != null ? ` · €${Number(hourlyRate).toFixed(2)}/h` : ''}</div>
 <table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Almoço (min)</th><th>Café (min)</th><th>Total Horas</th>${rateHeader}${earnHeader}</tr></thead>
 <tbody>${rows}<tr class="total-row"><td colspan="5">TOTAL</td><td>${fmtMinutes(totalMin)}</td>${rateTotal}${earnTotal}</tr></tbody></table>
 <button class="btn" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>

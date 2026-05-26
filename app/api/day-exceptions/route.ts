@@ -16,7 +16,8 @@ async function requirePrivileged() {
 export async function GET(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  try { await verifyJWT(token) }
+  let user
+  try { user = await verifyJWT(token) }
   catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
 
   const { searchParams } = new URL(request.url)
@@ -28,6 +29,11 @@ export async function GET(request: NextRequest) {
     .select('*')
     .order('date', { ascending: false })
     .limit(200)
+
+  // Non-privileged users only see global exceptions (holidays) and their own personal days off,
+  // never colleagues' personal day_off entries.
+  if (!['admin', 'manager'].includes(user.role))
+    query = query.or(`employee_id.is.null,employee_id.eq.${user.id}`)
 
   if (from) query = query.gte('date', from)
   if (to)   query = query.lte('date', to)

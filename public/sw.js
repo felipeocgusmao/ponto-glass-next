@@ -1,4 +1,4 @@
-const CACHE = 'pontoglass-v2'
+const CACHE = 'pontoglass-v3'
 const STATIC = ['/login']
 
 self.addEventListener('install', e => {
@@ -42,8 +42,8 @@ self.addEventListener('push', e => {
   e.waitUntil(
     self.registration.showNotification(payload.title ?? 'PontoGlass', {
       body: payload.body ?? '',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      icon: '/icon-192.svg',
+      badge: '/icon-192.svg',
       tag: payload.tag ?? 'pontoglass',
       data: payload.url ?? '/ponto',
     })
@@ -55,8 +55,13 @@ self.addEventListener('notificationclick', e => {
   const url = e.notification.data ?? '/ponto'
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      const existing = list.find(c => c.url.includes('/ponto'))
-      if (existing) { existing.focus(); return existing.navigate(url) }
+      const target = list.find(c => c.url.includes(url)) || list[0]
+      if (target) {
+        target.focus()
+        // Only navigate if not already on the target and the browser supports it (iOS Safari may not).
+        if (!target.url.includes(url) && 'navigate' in target) return target.navigate(url).catch(() => {})
+        return
+      }
       return clients.openWindow(url)
     })
   )

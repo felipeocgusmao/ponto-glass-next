@@ -38,11 +38,13 @@ export async function POST(request: NextRequest) {
   const { data: employee } = await supabase
     .from('employees')
     .select('*')
-    .eq('username', username.trim())
+    .eq('username', String(username).trim().toLowerCase())
     .eq('active', true)
     .single()
 
   if (!employee) {
+    // Compare against a valid dummy hash so response timing doesn't reveal whether the user exists.
+    await bcrypt.compare(password, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy')
     return NextResponse.json({ error: 'Usuário ou senha incorretos' }, { status: 401 })
   }
 

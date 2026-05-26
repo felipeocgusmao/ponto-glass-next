@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { avatarInitials, fmtMinutes, calcNetMinutes, calcTimeBreakdown, calcOvertimePeriod, WORKING_TYPES } from '@/lib/utils'
 import { empColor, SL } from '../../_lib/helpers'
@@ -15,10 +15,16 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
   const [msg, setMsg] = useState<{ id: string; kind: 'success' | 'error'; text: string } | null>(null)
   const [weekRecords, setWeekRecords] = useState<PunchRecord[]>([])
 
+  const loadSeq = useRef(0)
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     try {
       const res = await fetch('/api/records?today=true')
-      if (res.ok) setRecords(await res.json())
+      if (res.ok) {
+        const data = await res.json()
+        // Ignore out-of-order responses so a slow interval fetch can't revert a fresh punch.
+        if (seq === loadSeq.current) setRecords(data)
+      }
     } catch { /* keep current */ }
   }, [])
 

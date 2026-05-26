@@ -211,7 +211,8 @@ export default function LoginPage() {
                   <div className="field">
                     <label>{t('auth.username')}</label>
                     <input className="input" placeholder="seu.usuario" value={forgotUsername}
-                      onChange={e => setForgotUsername(e.target.value)} autoFocus style={{ height: 38 }} required />
+                      onChange={e => setForgotUsername(e.target.value)} autoFocus
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ height: 38 }} required />
                   </div>
                   <button type="submit" disabled={forgotLoading} className="btn primary"
                     style={{ width: '100%', justifyContent: 'center', height: 40 }}>
@@ -231,7 +232,8 @@ export default function LoginPage() {
               <label>{t('auth.username')}</label>
               <input className="input" placeholder="seu.usuario" value={username}
                 onChange={e => setUsername(e.target.value)} disabled={loading}
-                autoFocus={!username} autoComplete="username" style={{ height: 38 }}/>
+                autoFocus={!username} autoComplete="username"
+                autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ height: 38 }}/>
             </div>
 
             <div className="field">
