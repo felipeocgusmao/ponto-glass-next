@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
+import { timingSafeEqual } from 'crypto'
 import { supabase } from '@/lib/supabase'
 import { rateLimit } from '@/lib/rateLimit'
+
+function secretsMatch(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
@@ -26,7 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Campos obrigatórios faltando' }, { status: 400 })
   }
 
-  if (recovery_secret !== secret) {
+  if (!secretsMatch(String(recovery_secret), secret)) {
     return NextResponse.json({ error: 'Chave de recuperação inválida' }, { status: 401 })
   }
 
@@ -37,7 +45,7 @@ export async function POST(request: NextRequest) {
   const { data: employee } = await supabase
     .from('employees')
     .select('id')
-    .eq('username', String(username).trim())
+    .eq('username', String(username).trim().toLowerCase())
     .eq('active', true)
     .single()
 

@@ -106,7 +106,7 @@ export default function AdminPage() {
         user={user} onLogout={handleLogout} onChangePwd={() => setShowPwd(true)}
         theme={theme} toggleTheme={toggleTheme}
         mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)}
-        badges={{ correcoes: tab === 'correcoes' ? 0 : pendingCorrections }}
+        badges={{ correcoes: pendingCorrections }}
       />
       <div className="main">
         <header className="topbar">

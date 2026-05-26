@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { supabase } from '@/lib/supabase'
 import { rateLimit } from '@/lib/rateLimit'
 import { createPasswordResetToken } from '@/lib/auth'
@@ -16,13 +17,14 @@ export async function POST(request: NextRequest) {
   // Always return success to prevent username enumeration
   const { data: emp } = await supabase
     .from('employees')
-    .select('id, name, email')
+    .select('id, name, email, password_hash')
     .eq('username', String(username).trim().toLowerCase())
     .eq('active', true)
     .maybeSingle()
 
   if (emp?.email) {
-    const token = await createPasswordResetToken(emp.id)
+    const fingerprint = createHash('sha256').update(emp.password_hash).digest('hex').slice(0, 16)
+    const token = await createPasswordResetToken(emp.id, fingerprint)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
     await sendPasswordResetEmail({
       to: emp.email,

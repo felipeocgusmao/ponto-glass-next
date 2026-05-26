@@ -46,7 +46,10 @@ function empColor(id: string): number {
 export function DashboardTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
   const now = new Date()
-  const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  // Use UTC for both endpoints so they match how records.date is stored (calcWorkDate
+  // dates by UTC day for the default shift). Mixing local month with UTC day produced an
+  // empty/inverted range near midnight on the 1st of the month in non-UTC timezones.
+  const firstOfMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
   const todayStr = now.toISOString().split('T')[0]
   const [monthRecs, setMonthRecs] = useState<PunchRecord[]>([])
   const [todayRecs, setTodayRecs] = useState<PunchRecord[]>([])

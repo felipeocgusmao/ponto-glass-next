@@ -17,8 +17,8 @@ export async function PUT(request: NextRequest) {
   if (!currentPassword || !newPassword)
     return NextResponse.json({ error: 'Campos obrigatórios' }, { status: 400 })
 
-  if (newPassword.length < 6)
-    return NextResponse.json({ error: 'Nova senha: mínimo 6 caracteres' }, { status: 400 })
+  if (newPassword.length < 6 || newPassword.length > 100)
+    return NextResponse.json({ error: 'Nova senha deve ter entre 6 e 100 caracteres' }, { status: 400 })
 
   const { data: emp } = await supabase
     .from('employees')

@@ -1,34 +1,48 @@
 import { SignJWT, jwtVerify } from 'jose'
 import type { JWTUser } from './types'
 
-const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? 'dev-secret-change-in-production'
-)
+// Resolve the signing secret lazily so a missing JWT_SECRET fails at first use (fail-closed)
+// rather than at module load — a module-load throw would break `next build`, which runs with
+// NODE_ENV=production but without the runtime env vars present.
+let _secret: Uint8Array | null = null
+function getSecret(): Uint8Array {
+  if (_secret) return _secret
+  const s = process.env.JWT_SECRET
+  if (!s && process.env.NODE_ENV === 'production')
+    throw new Error('JWT_SECRET must be set in production')
+  _secret = new TextEncoder().encode(s ?? 'dev-secret-change-in-production')
+  return _secret
+}
 
 export async function createJWT(payload: JWTUser): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('8h')
-    .sign(secret)
+    .sign(getSecret())
 }
 
 export async function verifyJWT(token: string): Promise<JWTUser> {
-  const { payload } = await jwtVerify(token, secret)
+  const { payload } = await jwtVerify(token, getSecret())
   return payload as unknown as JWTUser
 }
 
-export async function createPasswordResetToken(userId: string): Promise<string> {
-  return new SignJWT({ sub: userId, type: 'password_reset' })
+// `fingerprint` ties the token to the user's current password hash, making it single-use:
+// once the password changes (reset, self-change, or admin recovery) the fingerprint no
+// longer matches, so the link cannot be replayed within its remaining 1h window.
+export async function createPasswordResetToken(userId: string, fingerprint?: string): Promise<string> {
+  const claims: Record<string, unknown> = { sub: userId, type: 'password_reset' }
+  if (fingerprint) claims.pwh = fingerprint
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('1h')
-    .sign(secret)
+    .sign(getSecret())
 }
 
-export async function verifyPasswordResetToken(token: string): Promise<string> {
-  const { payload } = await jwtVerify(token, secret)
+export async function verifyPasswordResetToken(token: string): Promise<{ sub: string; pwh?: string }> {
+  const { payload } = await jwtVerify(token, getSecret())
   if (payload.type !== 'password_reset' || !payload.sub) throw new Error('Invalid token')
-  return payload.sub
+  return { sub: payload.sub as string, pwh: payload.pwh as string | undefined }
 }
 

@@ -32,8 +32,28 @@ export async function PATCH(request: NextRequest) {
 
   const { email, theme } = await request.json()
   const updates: Record<string, unknown> = {}
-  if (email !== undefined) updates.email = email?.trim() || null
+
   if (theme === 'dark' || theme === 'light') updates.theme = theme
+
+  if (email !== undefined) {
+    // Email changes are a profile edit and must respect the admin lock — otherwise a locked
+    // user could redirect their own password-reset emails (account-takeover vector).
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('lock_profile')
+      .eq('id', user.id)
+      .single()
+    if (emp?.lock_profile === true)
+      return NextResponse.json({ error: 'Edição de perfil bloqueada pelo administrador.' }, { status: 403 })
+
+    const trimmed = email ? String(email).trim().toLowerCase() : null
+    if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed))
+      return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
+    updates.email = trimmed
+  }
+
+  if (Object.keys(updates).length === 0) return NextResponse.json({ ok: true })
+
   const { error } = await supabase
     .from('employees')
     .update(updates)

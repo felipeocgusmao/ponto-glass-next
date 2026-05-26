@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const action = searchParams.get('action')
-  const limit = Math.min(Number(searchParams.get('limit') ?? '200'), 500)
+  const parsedLimit = Number(searchParams.get('limit') ?? '200')
+  const limit = Math.min(Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 200, 500)
 
   let query = supabase
     .from('audit_logs')

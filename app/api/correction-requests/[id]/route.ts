@@ -4,6 +4,7 @@ import { verifyJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import webpush from 'web-push'
 import { sendCorrectionEmail } from '@/lib/email'
+import { calcWorkDate } from '@/lib/utils'
 
 if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -36,15 +37,48 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (!cr) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 })
   if (cr.status !== 'pending') return NextResponse.json({ error: 'Pedido já resolvido' }, { status: 409 })
 
+  // Claim the request atomically (only if still pending) so a double-click or two concurrent
+  // admins can't both approve it and insert the correction record twice.
+  const { data, error } = await supabase
+    .from('correction_requests')
+    .update({
+      status: action === 'approve' ? 'approved' : 'rejected',
+      reviewer_id: user.id,
+      reviewer_name: user.name,
+      reviewer_note: note || null,
+      resolved_at: new Date().toISOString(),
+    })
+    .eq('id', params.id)
+    .eq('status', 'pending')
+    .select()
+    .single()
+
+  if (error || !data) return NextResponse.json({ error: 'Pedido já resolvido' }, { status: 409 })
+
   if (action === 'approve') {
+    // Date the inserted punch with the same shift-aware logic as the live punch path,
+    // so night-shift corrections land on the correct work date.
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('shift_start')
+      .eq('id', cr.employee_id)
+      .maybeSingle()
+    const workDate = calcWorkDate(new Date(cr.req_timestamp), emp?.shift_start ?? '00:00')
+
     const { error: recErr } = await supabase.from('records').insert({
       employee_id: cr.employee_id,
       employee_name: cr.employee_name,
       type: cr.req_type,
       timestamp: cr.req_timestamp,
-      date: cr.req_date,
+      date: workDate,
     })
-    if (recErr) return NextResponse.json({ error: recErr.message }, { status: 500 })
+    if (recErr) {
+      // Roll the claim back to pending so it can be retried, rather than left approved-without-record.
+      await supabase.from('correction_requests')
+        .update({ status: 'pending', reviewer_id: null, reviewer_name: null, reviewer_note: null, resolved_at: null })
+        .eq('id', params.id)
+      return NextResponse.json({ error: recErr.message }, { status: 500 })
+    }
 
     await supabase.from('audit_logs').insert({
       actor_id: user.id,
@@ -64,21 +98,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       details: { req_type: cr.req_type, req_timestamp: cr.req_timestamp, reason: cr.reason, note },
     })
   }
-
-  const { data, error } = await supabase
-    .from('correction_requests')
-    .update({
-      status: action === 'approve' ? 'approved' : 'rejected',
-      reviewer_id: user.id,
-      reviewer_name: user.name,
-      reviewer_note: note || null,
-      resolved_at: new Date().toISOString(),
-    })
-    .eq('id', params.id)
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Send push notification to the employee if they have a subscription
   if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {

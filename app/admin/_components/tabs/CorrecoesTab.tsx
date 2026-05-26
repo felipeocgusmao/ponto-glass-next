@@ -24,6 +24,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
   const [rejectNote, setRejectNote] = useState('')
   const [rejectTarget, setRejectTarget] = useState<string | null>(null)
   const [bulkApproving, setBulkApproving] = useState(false)
+  const [bulkMsg, setBulkMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -57,16 +58,24 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
   const approveAll = async () => {
     if (!confirm(`Aprovar todas as ${pending.length} correcções pendentes?`)) return
     setBulkApproving(true)
+    setBulkMsg(null)
+    let ok = 0, fail = 0
     for (const cr of pending) {
-      await fetch(`/api/correction-requests/${cr.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve' }),
-      }).catch(() => {})
+      try {
+        const res = await fetch(`/api/correction-requests/${cr.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'approve' }),
+        })
+        if (res.ok) ok++; else fail++
+      } catch { fail++ }
     }
     await load()
     onAction?.()
     setBulkApproving(false)
+    setBulkMsg(fail === 0
+      ? { ok: true, text: `${ok} correcção(ões) aprovada(s).` }
+      : { ok: false, text: `${ok} aprovada(s), ${fail} falharam. Tenta novamente.` })
   }
 
   const pending = items.filter(i => i.status === 'pending')
@@ -102,6 +111,10 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
               </button>
             )}
           </div>
+
+          {bulkMsg && (
+            <div className={`alert-inline ${bulkMsg.ok ? 'ok' : 'err'}`} style={{ marginBottom: 8 }}>{bulkMsg.text}</div>
+          )}
 
           {pending.length === 0 && (
             <div className="alert-inline ok" style={{ marginTop: 8 }}>{t('admin.corr.none_pending')}</div>
