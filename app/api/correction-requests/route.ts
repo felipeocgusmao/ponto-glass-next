@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
 
   if (!type || !VALID_TYPES.includes(type))
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
-  if (!timestamp || isNaN(new Date(timestamp).getTime()))
+  const parsed = new Date(timestamp)
+  if (!timestamp || isNaN(parsed.getTime()))
     return NextResponse.json({ error: 'Timestamp inválido' }, { status: 400 })
 
   const { data: emp } = await supabase.from('employees').select('name').eq('id', user.id).single()
@@ -60,8 +61,8 @@ export async function POST(request: NextRequest) {
     employee_id: user.id,
     employee_name: emp.name,
     req_type: type,
-    req_timestamp: timestamp,
-    req_date: timestamp.split('T')[0],
+    req_timestamp: parsed.toISOString(),
+    req_date: parsed.toISOString().split('T')[0],
     reason: reason || null,
     status: 'pending',
   }).select().single()
