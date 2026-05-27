@@ -129,6 +129,11 @@ export default function PontoPage() {
   const [historyExceptions, setHistoryExceptions] = useState<string[]>([])
   const [historyExceptionsFull, setHistoryExceptionsFull] = useState<DayException[]>([])
   const [calendarView, setCalendarView] = useState(false)
+  // Which month the history tab shows (month is 0-indexed). Defaults to the current business month.
+  const [histYM, setHistYM] = useState(() => {
+    const today = businessDate()
+    return { year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) - 1 }
+  })
 
   // bank tab state
   const [bankBalance, setBankBalance] = useState<number | null>(null)
@@ -193,12 +198,16 @@ export default function PontoPage() {
   }, [])
 
   const loadHistory = useCallback(async () => {
-    if (historyLoaded) return
     setHistoryLoading(true)
     try {
-      // Business-timezone day, matching how records.date is stored.
-      const to = businessDate()
-      const from = `${to.slice(0, 7)}-01`
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const { year, month } = histYM
+      const from = `${year}-${pad(month + 1)}-01`
+      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+      const monthEnd = `${year}-${pad(month + 1)}-${pad(lastDay)}`
+      // Don't query past today for the current month (records.date is the business-tz day).
+      const today = businessDate()
+      const to = monthEnd > today ? today : monthEnd
       const [res, excRes] = await Promise.all([
         fetch(`/api/reports?from=${from}&to=${to}`),
         fetch(`/api/day-exceptions?from=${from}&to=${to}`),
@@ -214,7 +223,7 @@ export default function PontoPage() {
       }
     } catch { /* keep */ }
     finally { setHistoryLoading(false) }
-  }, [historyLoaded])
+  }, [histYM])
 
   const loadBank = useCallback(async () => {
     if (bankLoaded) return
@@ -502,10 +511,14 @@ export default function PontoPage() {
   // working weekdays in the loaded month with no records = absent
   const absentDays: string[] = (() => {
     if (!historyLoaded || historyRecs.length === 0 && sortedDays.length === 0) return []
-    const todayStr2 = businessDate()
-    const firstOfMonth = `${todayStr2.slice(0, 7)}-01`
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const { year, month } = histYM
+    const firstOfMonth = `${year}-${pad(month + 1)}-01`
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+    const monthEnd = `${year}-${pad(month + 1)}-${pad(lastDay)}`
+    const today = businessDate()
     const cur = new Date(firstOfMonth + 'T12:00:00')
-    const end = new Date(todayStr2 + 'T12:00:00')
+    const end = new Date((monthEnd > today ? today : monthEnd) + 'T12:00:00')
     const absent: string[] = []
     while (cur <= end) {
       const d = cur.getDay()
@@ -515,6 +528,12 @@ export default function PontoPage() {
     }
     return absent
   })()
+
+  const _todayBiz = businessDate()
+  const isCurrentHistMonth = histYM.year === Number(_todayBiz.slice(0, 4)) && histYM.month === Number(_todayBiz.slice(5, 7)) - 1
+  const histMonthLabel = new Date(histYM.year, histYM.month, 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+  const goPrevMonth = () => setHistYM(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })
+  const goNextMonth = () => setHistYM(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })
 
   return (
     <div className="emp-shell">
@@ -694,8 +713,14 @@ export default function PontoPage() {
           <div className="emp-card">
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase' }}>
-                  {new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button onClick={goPrevMonth} aria-label="Mês anterior"
+                    style={{ background: 'var(--surface-2)', border: 'none', cursor: 'pointer', padding: '2px 9px', borderRadius: 4, fontSize: 13, color: 'var(--fg-muted)' }}>‹</button>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', minWidth: 104, textAlign: 'center' }}>
+                    {histMonthLabel}
+                  </div>
+                  <button onClick={goNextMonth} disabled={isCurrentHistMonth} aria-label="Próximo mês"
+                    style={{ background: 'var(--surface-2)', border: 'none', cursor: isCurrentHistMonth ? 'default' : 'pointer', padding: '2px 9px', borderRadius: 4, fontSize: 13, color: 'var(--fg-muted)', opacity: isCurrentHistMonth ? 0.4 : 1 }}>›</button>
                 </div>
                 <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 6, padding: '2px 3px', gap: 1 }}>
                   <button
@@ -732,8 +757,8 @@ export default function PontoPage() {
               <CalendarView
                 records={historyRecs}
                 exceptions={historyExceptionsFull}
-                year={new Date().getFullYear()}
-                month={new Date().getMonth()}
+                year={histYM.year}
+                month={histYM.month}
                 lunchBreakMinutes={user.lunch_break_minutes}
               />
             )}
@@ -749,8 +774,7 @@ export default function PontoPage() {
                     className="btn-emp"
                     style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
                     onClick={() => {
-                      const period = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
-                      openPayslip(user.name, period, historyRecs, user.workday_hours, user.lunch_break_minutes, user.hourly_rate)
+                      openPayslip(user.name, histMonthLabel, historyRecs, user.workday_hours, user.lunch_break_minutes, user.hourly_rate)
                     }}
                   >
                     {t('history.export_payslip')}
