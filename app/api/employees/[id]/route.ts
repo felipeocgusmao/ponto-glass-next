@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
-import { verifyJWT } from '@/lib/auth'
+import { verifyApiAuth } from '@/lib/apiAuth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 
@@ -13,7 +13,7 @@ export async function PATCH(
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let user
-  try { user = await verifyJWT(token) }
+  try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -130,6 +130,15 @@ export async function PATCH(
     fields: Object.keys(updates).filter(k => k !== 'password_hash'),
   })
 
+  // If an admin changed this user's password, revoke their existing sessions so any
+  // previously-issued token stops working (best-effort; no-op pre-migration).
+  if (updates.password_hash) {
+    await supabase
+      .from('employees')
+      .update({ sessions_valid_from: new Date().toISOString() })
+      .eq('id', params.id)
+  }
+
   return NextResponse.json(data)
 }
 
@@ -141,7 +150,7 @@ export async function DELETE(
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let user
-  try { user = await verifyJWT(token) }
+  try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
