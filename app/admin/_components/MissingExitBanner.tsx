@@ -31,10 +31,16 @@ export default function MissingExitBanner() {
       byEmpDate.forEach((dm, empId) => {
         const empName = records.find(r => r.employee_id === empId)?.employee_name ?? empId
         dm.forEach((dayRecs, date) => {
-          const last = [...dayRecs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).at(-1)
-          // Any day whose final punch isn't a "saída" is a missing exit — including days the
-          // employee forgot to clock out after starting lunch or a coffee break.
-          if (last && last.type !== 'saída') missing.push({ name: empName, date })
+          const saidas  = dayRecs.filter(r => r.type === 'saída')
+          const entradas = dayRecs.filter(r => r.type === 'entrada')
+          if (saidas.length === 0) { missing.push({ name: empName, date }); return }
+          // A day is complete when the last 'saída' is not followed by a later 'entrada'.
+          // Checking only saída↔entrada avoids false positives from retrospective admin
+          // corrections (e.g. an Entrada added for 09:30 after a 17:00 Saída already exists).
+          const ts = (r: PunchRecord) => new Date(r.timestamp).getTime()
+          const lastSaida   = saidas.reduce((a, b)  => ts(a) >= ts(b) ? a : b)
+          const lastEntrada = entradas.length ? entradas.reduce((a, b) => ts(a) >= ts(b) ? a : b) : null
+          if (lastEntrada && ts(lastEntrada) > ts(lastSaida)) missing.push({ name: empName, date })
         })
       })
       setAlerts(missing)
