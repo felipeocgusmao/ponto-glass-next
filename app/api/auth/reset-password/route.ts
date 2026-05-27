@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   // Single-use enforcement: reject if the password has already changed since the link was issued.
   if (payload.pwh) {
-    const current = createHash('sha256').update(emp.password_hash).digest('hex').slice(0, 16)
+    const current = createHash('sha256').update(emp.password_hash).digest('hex')
     if (current !== payload.pwh)
       return NextResponse.json({ error: 'Link inválido ou expirado' }, { status: 400 })
   }

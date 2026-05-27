@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     .maybeSingle()
 
   if (emp?.email) {
-    const fingerprint = createHash('sha256').update(emp.password_hash).digest('hex').slice(0, 16)
+    const fingerprint = createHash('sha256').update(emp.password_hash).digest('hex')
     const token = await createPasswordResetToken(emp.id, fingerprint)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
     await sendPasswordResetEmail({
