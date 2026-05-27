@@ -1,4 +1,4 @@
-const CACHE = 'pontoglass-v3'
+const CACHE = 'pontoglass-v4'
 const STATIC = ['/login']
 
 self.addEventListener('install', e => {
@@ -21,6 +21,13 @@ self.addEventListener('fetch', e => {
   const url = new URL(request.url)
   if (url.pathname.startsWith('/api/')) return
   if (url.pathname === '/ponto' || url.pathname === '/admin' || url.pathname === '/kiosk') return
+
+  // Only runtime-cache immutable, same-origin static assets (hashed Next.js chunks, fonts,
+  // icons). This keeps the offline fallback for the app shell without letting the cache grow
+  // unbounded with arbitrary responses, and avoids ever serving a stale HTML/data response.
+  const isStatic = url.origin === self.location.origin &&
+    (url.pathname.startsWith('/_next/static/') || /\.(?:js|css|woff2?|png|jpe?g|svg|ico|webp)$/.test(url.pathname))
+  if (!isStatic) return
 
   e.respondWith(
     fetch(request)
