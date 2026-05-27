@@ -172,11 +172,20 @@ export default function PontoPage() {
   const fetchSeq = useRef(0)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // A token can stay validly *signed* (so the edge middleware bounces /login back to a
+  // protected page) while the API rejects it — e.g. the session was revoked via
+  // sessions_valid_from. Clearing the cookie through logout makes /login reachable again,
+  // instead of looping forever on the loading splash.
+  const endDeadSession = useCallback(async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* clear cookie anyway */ }
+    router.replace('/login')
+  }, [router])
+
   const loadUser = useCallback(async () => {
     setFetchError(false)
     try {
       const res = await fetch('/api/me')
-      if (!res.ok) { router.push('/login'); return }
+      if (!res.ok) { await endDeadSession(); return }
       const profile = await res.json()
       setUser(profile)
       if (profile.theme) {
@@ -184,7 +193,7 @@ export default function PontoPage() {
         document.documentElement.setAttribute('data-theme', profile.theme)
       }
     } catch { setFetchError(true) }
-  }, [router])
+  }, [endDeadSession])
 
   const loadRecords = useCallback(async () => {
     const seq = ++fetchSeq.current

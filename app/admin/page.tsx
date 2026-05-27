@@ -40,15 +40,24 @@ export default function AdminPage() {
     localStorage.setItem('pg.theme', next)
   }
 
+  // A token can stay validly *signed* (so the edge middleware bounces /login back to a
+  // protected page) while the API rejects it — e.g. the session was revoked via
+  // sessions_valid_from. Clearing the cookie through logout makes /login reachable again,
+  // instead of looping forever on the loading splash.
+  const endDeadSession = useCallback(async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* clear cookie anyway */ }
+    router.replace('/login')
+  }, [router])
+
   const loadUser = useCallback(async () => {
     try {
       const res = await fetch('/api/me')
-      if (!res.ok) { router.push('/login'); return }
+      if (!res.ok) { await endDeadSession(); return }
       const data = await res.json()
       setUser(data)
       if (data.role === 'manager') setTab('meu_ponto')
     } catch { setFetchError(true) }
-  }, [router])
+  }, [endDeadSession])
 
   const loadEmployees = useCallback(async () => {
     try {

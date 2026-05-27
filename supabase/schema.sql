@@ -157,5 +157,9 @@ ALTER TABLE employees  ADD COLUMN IF NOT EXISTS shift_start    TIME NOT NULL DEF
 
 -- v9 → v10: revogação de sessão — logout e troca/reset de senha invalidam tokens
 -- emitidos antes deste instante (a API rejeita tokens com iat < sessions_valid_from).
+-- O default é a época (1970), NÃO now(): ao adicionar a coluna numa base já existente,
+-- now() marcaria todas as linhas com o instante da migração e revogaria de imediato TODAS
+-- as sessões abertas (todos caem para a tela de login). Com a época, nenhum token nasce
+-- revogado — só logout/troca de senha avançam o sessions_valid_from e revogam de facto.
 ALTER TABLE employees
-  ADD COLUMN IF NOT EXISTS sessions_valid_from TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  ADD COLUMN IF NOT EXISTS sessions_valid_from TIMESTAMPTZ NOT NULL DEFAULT to_timestamp(0);
