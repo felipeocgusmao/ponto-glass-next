@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { avatarInitials, fmtMinutes, calcNetMinutes, calcTimeBreakdown, calcOvertimePeriod, WORKING_TYPES } from '@/lib/utils'
+import { avatarInitials, fmtMinutes, calcNetMinutes, calcTimeBreakdown, calcOvertimePeriod, WORKING_TYPES, businessDate } from '@/lib/utils'
 import { empColor, SL } from '../../_lib/helpers'
 import { EXPLICIT_BREAK_TYPES } from '../../_lib/types'
 import { useLang } from '@/lib/LangContext'
@@ -29,13 +29,14 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
   }, [])
 
   const loadWeek = useCallback(async () => {
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-    const day = now.getDay()
-    const monday = new Date(now); monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1))
-    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1)
-    if (fmt(yesterday) < fmt(monday)) return
+    // Anchor on the business-timezone day at noon UTC (DST-safe) so Monday→yesterday
+    // shifts correctly even if the tab stays open across midnight.
+    const anchor = new Date(`${businessDate()}T12:00:00Z`)
+    const fmt = (d: Date) => d.toISOString().split('T')[0]
+    const dow = anchor.getUTCDay()
+    const monday = new Date(anchor); monday.setUTCDate(anchor.getUTCDate() - (dow === 0 ? 6 : dow - 1))
+    const yesterday = new Date(anchor); yesterday.setUTCDate(anchor.getUTCDate() - 1)
+    if (fmt(yesterday) < fmt(monday)) { setWeekRecords([]); return }
     try {
       const res = await fetch(`/api/reports?from=${fmt(monday)}&to=${fmt(yesterday)}`)
       if (res.ok) setWeekRecords(await res.json())
@@ -46,6 +47,8 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
   useEffect(() => { loadWeek() }, [loadWeek])
   useEffect(() => { const iv = setInterval(() => setLiveMs(Date.now()), 30_000); return () => clearInterval(iv) }, [])
   useEffect(() => { const iv = setInterval(load, 60_000); return () => clearInterval(iv) }, [load])
+  // Refresh the weekly window too, so it stays correct if the tab is left open past midnight.
+  useEffect(() => { const iv = setInterval(loadWeek, 60_000); return () => clearInterval(iv) }, [loadWeek])
 
   const handlePunch = async (emp: Employee, type: 'entrada' | 'saída') => {
     setPunching(emp.id); setMsg(null)

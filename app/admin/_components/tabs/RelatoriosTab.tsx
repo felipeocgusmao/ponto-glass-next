@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { exportCSV, exportPDF, fmtMinutes, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, calcTimeBreakdown, businessDate } from '@/lib/utils'
+import { exportCSV, exportPDF, fmtMinutes, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, calcTimeBreakdown, businessDate, isIncompleteDay } from '@/lib/utils'
 import { SL, getWorkingDays, openPayslip } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 
@@ -97,11 +97,22 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                         const lunch = emp?.lunch_break_minutes ?? 0
                         const workedMin = calcWorkedMinutesPeriod(recs, lunch)
                         const overtime = calcOvertimePeriod(recs, (emp?.workday_hours ?? 8) * 60, lunch)
+                        const incompleteDays = (() => {
+                          const byDate = new Map<string, PunchRecord[]>()
+                          recs.forEach(r => { if (!byDate.has(r.date)) byDate.set(r.date, []); byDate.get(r.date)!.push(r) })
+                          let n = 0; byDate.forEach(d => { if (isIncompleteDay(d)) n++ })
+                          return n
+                        })()
                         return (
                           <div key={empId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{name}</div>
                               <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{recs.length} {t('common.records')}</div>
+                              {incompleteDays > 0 && (
+                                <div style={{ fontSize: 11, color: 'var(--danger-fg)', marginTop: 2 }}>
+                                  ⚠ {incompleteDays} dia(s) sem saída — horas não contabilizadas
+                                </div>
+                              )}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{workedMin > 0 ? fmtMinutes(workedMin) : '—'}</div>
