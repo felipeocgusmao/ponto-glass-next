@@ -154,3 +154,8 @@ ALTER TABLE employees  ADD COLUMN IF NOT EXISTS shift_start    TIME NOT NULL DEF
 -- '00:00' = normal day shift (work date = the local calendar day).
 -- '22:00' = night shift starting at 22:00 local — punches before 22:00 local belong to the previous day.
 -- The business timezone is set via NEXT_PUBLIC_BUSINESS_TZ (default Europe/Madrid).
+
+-- v9 → v10: revogação de sessão — logout e troca/reset de senha invalidam tokens
+-- emitidos antes deste instante (a API rejeita tokens com iat < sessions_valid_from).
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS sessions_valid_from TIMESTAMPTZ NOT NULL DEFAULT NOW();

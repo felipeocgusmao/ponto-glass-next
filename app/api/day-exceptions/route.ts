@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { verifyJWT } from '@/lib/auth'
+import { verifyApiAuth } from '@/lib/apiAuth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 
@@ -8,7 +8,7 @@ async function requirePrivileged() {
   const token = cookies().get('ponto_token')?.value
   if (!token) return null
   try {
-    const user = await verifyJWT(token)
+    const user = await verifyApiAuth(token)
     return ['admin', 'manager'].includes(user.role) ? user : null
   } catch { return null }
 }
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   let user
-  try { user = await verifyJWT(token) }
+  try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
 
   const { searchParams } = new URL(request.url)

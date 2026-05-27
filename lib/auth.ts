@@ -31,6 +31,14 @@ export async function verifyJWT(token: string): Promise<JWTUser> {
   return payload as unknown as JWTUser
 }
 
+// Like verifyJWT but also returns the token's issued-at (seconds). Used by the API auth
+// layer to enforce session revocation (sessions_valid_from). Kept separate from verifyJWT
+// so the edge middleware keeps using the lightweight, DB-free verify.
+export async function verifyJWTWithMeta(token: string): Promise<{ user: JWTUser; iat: number }> {
+  const { payload } = await jwtVerify(token, getSecret())
+  return { user: payload as unknown as JWTUser, iat: (payload.iat as number) ?? 0 }
+}
+
 // `fingerprint` ties the token to the user's current password hash, making it single-use:
 // once the password changes (reset, self-change, or admin recovery) the fingerprint no
 // longer matches, so the link cannot be replayed within its remaining 1h window.

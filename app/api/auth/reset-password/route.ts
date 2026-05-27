@@ -48,5 +48,12 @@ export async function POST(request: NextRequest) {
     .eq('active', true)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Revoke any token issued before the reset (best-effort; no-op pre-migration).
+  await supabase
+    .from('employees')
+    .update({ sessions_valid_from: new Date().toISOString() })
+    .eq('id', payload.sub)
+
   return NextResponse.json({ ok: true })
 }
