@@ -25,6 +25,7 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErr('')
+    if (next.length < 6) { setErr(t('pwd.min_chars')); return }
     if (next !== confirm) { setErr(t('pwd.mismatch')); return }
     setLoading(true)
     const res = await fetch('/api/auth/password', {

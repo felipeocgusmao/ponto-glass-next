@@ -50,7 +50,9 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (!employee) {
-    return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
+    // Don't reveal whether the username exists (avoid enumeration by anyone holding the
+    // secret). A legitimate operator who mistyped will simply fail to log in afterwards.
+    return NextResponse.json({ success: true })
   }
 
   // Admin accounts cannot be reset via the shared RECOVERY_SECRET (as documented in

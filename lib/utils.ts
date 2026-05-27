@@ -177,6 +177,13 @@ export function calcWorkedMinutesPeriod(records: PunchRecord[], lunchBreakMinute
   return total
 }
 
+// A day is "incomplete" when there is an entrada but no saída — someone forgot to clock
+// out, so worked time can't be computed and the day would silently count as 0. Reports
+// surface this explicitly instead of showing a misleading 0/—.
+export function isIncompleteDay(records: PunchRecord[]): boolean {
+  return records.some(r => r.type === 'entrada') && !records.some(r => r.type === 'saída')
+}
+
 export function calcEarnings(
   records: PunchRecord[],
   hourlyRate: number,
@@ -257,6 +264,7 @@ export function exportCSV(
       const explicit = hasExplicitBreaks(day)
       const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
       const netMin     = explicit ? workedMin : Math.max(0, pairMinutes(day) - autoLunch)
+      const incomplete = isIncompleteDay(day)
       const dispLunch  = explicit ? lunchMin  : autoLunch
       const dispCoffee = explicit ? coffeeMin : 0
 
@@ -277,7 +285,7 @@ export function exportCSV(
         exits.join(' / ')   || '-',
         String(dispLunch),
         String(dispCoffee),
-        netMin > 0 ? fmtMinutes(netMin) : '-',
+        incomplete ? 'INCOMPLETO (sem saida)' : (netMin > 0 ? fmtMinutes(netMin) : '-'),
         rate != null ? rate.toFixed(2).replace('.', ',') : '-',
         rate != null ? fmtEur(dayEarnings) : '-',
       )
@@ -368,6 +376,7 @@ export async function exportPDF(
       const explicit = day.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
       const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
       const netMin = explicit ? workedMin : Math.max(0, calcNetMinutes(day, autoLunch))
+      const incomplete = isIncompleteDay(day)
       const dispLunch = explicit ? lunchMin : autoLunch
       const dispCoffee = explicit ? coffeeMin : 0
 
@@ -384,7 +393,7 @@ export async function exportPDF(
         exits.join(' / ') || '-',
         dispLunch > 0 ? String(dispLunch) : '-',
         dispCoffee > 0 ? String(dispCoffee) : '-',
-        netMin > 0 ? fmtMinutes(netMin) : '-',
+        incomplete ? 'Incompleto' : (netMin > 0 ? fmtMinutes(netMin) : '-'),
       ]
       if (hasRate) {
         row.push(rate!.toFixed(2))
@@ -458,6 +467,7 @@ export function openPayslip(
     const explicit = day.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
     const { workedMin, lunchMin: lMin, coffeeMin } = calcTimeBreakdown(day)
     const netMin = explicit ? workedMin : Math.max(0, day.filter(r => r.type === 'entrada').length > 0 ? workedMin - lunchMin : 0)
+    const incomplete = isIncompleteDay(day)
     const dispLunch = explicit ? lMin : lunchMin
     const dispCoffee = explicit ? coffeeMin : 0
     const [y, m, dNum] = date.split('-').map(Number)
@@ -469,7 +479,8 @@ export function openPayslip(
     totalMin += netMin; totalEarnings += earn
     const rateCell = hourlyRate != null ? `<td>${Number(hourlyRate).toFixed(2).replace('.', ',')} €</td>` : ''
     const earnCell = hourlyRate != null ? `<td>${earn.toFixed(2).replace('.', ',')} €</td>` : ''
-    return `<tr><td>${dateLabel}</td><td>${entries.join(' / ') || '-'}</td><td>${exits.join(' / ') || '-'}</td><td>${dispLunch}</td><td>${dispCoffee}</td><td>${netMin > 0 ? fmtMinutes(netMin) : '-'}</td>${rateCell}${earnCell}</tr>`
+    const totalCell = incomplete ? '<span style="color:#c00;font-weight:600">Incompleto</span>' : (netMin > 0 ? fmtMinutes(netMin) : '-')
+    return `<tr><td>${dateLabel}</td><td>${entries.join(' / ') || '-'}</td><td>${exits.join(' / ') || '-'}</td><td>${dispLunch}</td><td>${dispCoffee}</td><td>${totalCell}</td>${rateCell}${earnCell}</tr>`
   }).join('')
   const rateHeader = hourlyRate != null ? '<th>€/hora</th>' : ''
   const earnHeader = hourlyRate != null ? '<th>Ganhos (€)</th>' : ''
