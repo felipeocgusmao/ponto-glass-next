@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { supabase } from '@/lib/supabase'
-import { rateLimit } from '@/lib/rateLimit'
+import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { createPasswordResetToken } from '@/lib/auth'
 import { sendPasswordResetEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
-  if (!rateLimit(`forgot:${ip}`, 5, 15 * 60 * 1000))
+  const ip = clientIp(request)
+  if (!(await rateLimit(`forgot:${ip}`, 5, 15 * 60 * 1000)))
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em 15 minutos.' }, { status: 429 })
 
   const { username } = await request.json()
