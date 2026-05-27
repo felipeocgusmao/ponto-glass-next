@@ -5,7 +5,7 @@ import type { PunchRecord } from '@/lib/types'
 import { businessDate } from '@/lib/utils'
 
 export default function MissingExitBanner() {
-  const [alerts, setAlerts] = useState<{ name: string; date: string }[]>([])
+  const [alerts, setAlerts] = useState<{ name: string; date: string; reason: string }[]>([])
   const [dismissed, setDismissed] = useState(false)
 
   const check = useCallback(async () => {
@@ -27,20 +27,24 @@ export default function MissingExitBanner() {
         if (!dm.has(r.date)) dm.set(r.date, [])
         dm.get(r.date)!.push(r)
       })
-      const missing: { name: string; date: string }[] = []
+      const missing: { name: string; date: string; reason: string }[] = []
       byEmpDate.forEach((dm, empId) => {
         const empName = records.find(r => r.employee_id === empId)?.employee_name ?? empId
         dm.forEach((dayRecs, date) => {
-          const saidas  = dayRecs.filter(r => r.type === 'saída')
-          const entradas = dayRecs.filter(r => r.type === 'entrada')
-          if (saidas.length === 0) { missing.push({ name: empName, date }); return }
-          // A day is complete when the last 'saída' is not followed by a later 'entrada'.
-          // Checking only saída↔entrada avoids false positives from retrospective admin
-          // corrections (e.g. an Entrada added for 09:30 after a 17:00 Saída already exists).
           const ts = (r: PunchRecord) => new Date(r.timestamp).getTime()
+          const saidas   = dayRecs.filter(r => r.type === 'saída')
+          const entradas = dayRecs.filter(r => r.type === 'entrada')
+          const sorted   = [...dayRecs].sort((a, b) => ts(a) - ts(b))
+          const lastAny  = sorted.at(-1)
+          if (saidas.length === 0) {
+            missing.push({ name: empName, date, reason: `sem saída · último: ${lastAny?.type ?? '?'} ${lastAny ? new Date(lastAny.timestamp).toISOString() : ''}` })
+            return
+          }
           const lastSaida   = saidas.reduce((a, b)  => ts(a) >= ts(b) ? a : b)
           const lastEntrada = entradas.length ? entradas.reduce((a, b) => ts(a) >= ts(b) ? a : b) : null
-          if (lastEntrada && ts(lastEntrada) > ts(lastSaida)) missing.push({ name: empName, date })
+          if (lastEntrada && ts(lastEntrada) > ts(lastSaida)) {
+            missing.push({ name: empName, date, reason: `entrada após saída · entrada: ${new Date(lastEntrada.timestamp).toISOString()} · saída: ${new Date(lastSaida.timestamp).toISOString()}` })
+          }
         })
       })
       setAlerts(missing)
@@ -73,6 +77,7 @@ export default function MissingExitBanner() {
           {alerts.map((a) => (
             <div key={`${a.name}-${a.date}`} style={{ fontSize: 12 }}>
               {a.name} — {new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+              <span style={{ color: 'var(--fg-dim)', marginLeft: 6 }}>({a.reason})</span>
             </div>
           ))}
         </div>
