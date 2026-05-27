@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { createHash } from 'crypto'
 import { supabase } from '@/lib/supabase'
-import { rateLimit } from '@/lib/rateLimit'
+import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { verifyPasswordResetToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
-  if (!rateLimit(`reset:${ip}`, 10, 15 * 60 * 1000))
+  const ip = clientIp(request)
+  if (!(await rateLimit(`reset:${ip}`, 10, 15 * 60 * 1000)))
     return NextResponse.json({ error: 'Muitas tentativas.' }, { status: 429 })
 
   const { token, new_password } = await request.json()

@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     empShiftStart = empData?.shift_start ?? '00:00'
   }
 
-  if (!rateLimit(`punch:${empId}`, 10, 60_000))
+  if (!(await rateLimit(`punch:${empId}`, 10, 60_000)))
     return NextResponse.json({ error: 'Muitos registos seguidos. Aguarde um momento.' }, { status: 429 })
 
   // Reject an accidental duplicate (same type repeated within a minute, e.g. double-click).

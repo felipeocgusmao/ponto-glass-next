@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { timingSafeEqual } from 'crypto'
 import { supabase } from '@/lib/supabase'
-import { rateLimit } from '@/lib/rateLimit'
+import { rateLimit, clientIp } from '@/lib/rateLimit'
 
 function secretsMatch(a: string, b: string): boolean {
   const bufA = Buffer.from(a)
@@ -12,8 +12,8 @@ function secretsMatch(a: string, b: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
-  if (!rateLimit(`recover:${ip}`, 5, 15 * 60 * 1000)) {
+  const ip = clientIp(request)
+  if (!(await rateLimit(`recover:${ip}`, 5, 15 * 60 * 1000))) {
     return NextResponse.json(
       { error: 'Muitas tentativas. Tente novamente em 15 minutos.' },
       { status: 429 }
