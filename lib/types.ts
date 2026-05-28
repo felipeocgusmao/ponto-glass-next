@@ -15,6 +15,9 @@ export interface Employee {
   expected_start?: string | null
   expected_end?: string | null
   shift_start?: string
+  workplace_lat?: number | null
+  workplace_lng?: number | null
+  max_distance_meters?: number | null
 }
 
 export interface PunchRecord {
