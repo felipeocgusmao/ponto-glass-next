@@ -374,7 +374,7 @@ employees (
   theme               TEXT,           ← 'dark' | 'light' (persiste no banco)
   expected_start      TIME,           ← hora de entrada esperada (horas flexíveis)
   expected_end        TIME,           ← hora de saída esperada (horas flexíveis)
-  shift_start         TIME,           ← início do turno UTC (00:00 = normal; 22:00 = noturno)
+  shift_start         TIME,           ← início do turno (hora local) — 00:00 = diurno; 22:00 = noturno
   created_at          TIMESTAMPTZ
 )
 
@@ -518,9 +518,10 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Exportação PDF (relatório A4 com cabeçalho, tabelas por funcionário e totais)
   ✓  Notificação push de ausência (cron 09:00 UTC dias úteis, protegido por CRON_SECRET)
   ✓  Vista calendário mensal no histórico do funcionário (cores por estado do dia)
-  ✓  Turno noturno (shift_start UTC — entrada 22h creditada no dia anterior)
+  ✓  Turno noturno (shift_start hora local — entrada 22h creditada no dia anterior)
   ✓  Horas flexíveis (expected_start / expected_end por funcionário)
   ✓  Comentário em registo (nota livre do admin/gerente, ≤ 500 chars)
+  ✓  Aviso de shift_start incomum (alerta amarelo ao configurar turno diurno com horário > 00:00)
   ☐  Domínio personalizado por empresa                     → issue #5
   ☐  Multi-empresa (tenancy)                               → issue #6
   ☐  Relatório mensal automático por e-mail                → issue #9
