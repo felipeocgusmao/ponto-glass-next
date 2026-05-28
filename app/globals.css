@@ -352,10 +352,10 @@ ul, ol { list-style: none; }
 .table tbody tr.selected td { background: var(--accent-soft); }
 .table .right { text-align: right; }
 .table .muted { color: var(--fg-muted); }
-.cell-emp { display: flex; align-items: center; gap: 10px; }
-.cell-emp-info { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.cell-emp-name { font-weight: 500; color: var(--fg); }
-.cell-emp-sub { font-size: 11.5px; color: var(--fg-subtle); }
+.cell-emp { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.cell-emp-info { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; flex: 1; }
+.cell-emp-name { font-weight: 500; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-emp-sub { font-size: 11.5px; color: var(--fg-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ─── Chips ─── */
 .chip {
@@ -464,6 +464,16 @@ select.input { padding-right: 24px; appearance: none; background-image: url("dat
     box-shadow: var(--shadow-lg);
   }
   .sidebar.mobile-open { transform: translateX(0); }
+  /* In mobile drawer mode, ignore the desktop collapsed state so labels always show. */
+  .app[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
+  .app[data-collapsed="true"] .sidebar.mobile-open .sb-item-label,
+  .app[data-collapsed="true"] .sidebar.mobile-open .sb-item-badge,
+  .app[data-collapsed="true"] .sidebar.mobile-open .sb-section-label,
+  .app[data-collapsed="true"] .sidebar.mobile-open .sb-user-meta { display: block; }
+  .app[data-collapsed="true"] .sidebar.mobile-open .sb-item { justify-content: flex-start; padding: 6px 10px; }
+  .app[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
+  .app[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
+  .app[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
   .sidebar-overlay {
     position: fixed; inset: 0; z-index: 99;
     background: rgba(0,0,0,0.4); animation: pg-fadeIn 0.2s ease;
@@ -475,11 +485,18 @@ select.input { padding-right: 24px; appearance: none; background-image: url("dat
   .page { padding: 14px; gap: 12px; }
   .form-grid-2 { grid-template-columns: 1fr; }
   .form-grid-3 { grid-template-columns: 1fr 1fr; }
+  /* Activity rows: drop the earnings column and shrink the others to fit. */
+  .status-row { gap: 10px; padding: 10px 12px; }
+  .status-row > [data-col="earnings"] { display: none; }
+  .status-row > [data-col="time"]  { width: 70px !important; font-size: 11.5px; }
+  .status-row > [data-col="bar"]   { width: 56px !important; }
+  .status-row > [data-col="chip"]  { width: auto !important; }
 }
 
 @media (max-width: 480px) {
   .form-grid-3 { grid-template-columns: 1fr; }
   .page { padding: 12px; gap: 10px; }
+  .status-row > [data-col="bar"] { display: none; }
 }
 
 /* ─── Toast ─── */

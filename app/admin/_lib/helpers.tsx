@@ -48,8 +48,9 @@ export function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
 }
 
 export function fmtMin(min: number): string {
-  const h = Math.floor(Math.abs(min) / 60)
-  const m = Math.abs(min) % 60
+  const abs = Math.round(Math.abs(min))
+  const h = Math.floor(abs / 60)
+  const m = abs % 60
   return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`
 }
 

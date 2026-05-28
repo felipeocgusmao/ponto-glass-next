@@ -220,13 +220,13 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                   <div style={{ fontSize: 12, marginTop: 4, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
                 )}
               </div>
-              <div style={{ width: 80 }}>
+              <div data-col="bar" style={{ width: 80, flexShrink: 0 }}>
                 <div className="bar"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
                 <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 3, textAlign: 'right' }} className="tnum">
                   {fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h
                 </div>
               </div>
-              <div style={{ width: 90 }}>
+              <div data-col="chip" style={{ width: 90, flexShrink: 0 }}>
                 {isWorking    && <span className="chip success">Trabalhando</span>}
                 {isOnLunch    && <span className="chip warn">Almoço</span>}
                 {isOnCafe     && <span className="chip warn">Pausa</span>}
