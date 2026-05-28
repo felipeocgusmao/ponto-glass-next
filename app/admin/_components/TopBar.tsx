@@ -2,10 +2,12 @@
 
 import { useLang } from '@/lib/LangContext'
 import type { Tab } from '../_lib/types'
+import type { Notif } from '../_lib/useNotifications'
 import {
   IconHamburger, SunIcon, MoonIcon,
   IconChevronRight, IconSearch, IconBell,
 } from './icons'
+import NotificationsDropdown from './NotificationsDropdown'
 
 const PAGE_TITLES: Record<Tab, string> = {
   meu_ponto:    'tab.meu_ponto',
@@ -26,15 +28,24 @@ export default function TopBar({
   onToggleTheme,
   onOpenMobileNav,
   onOpenCmdK,
+  notificationsOpen,
+  onToggleNotifications,
+  onNavigate,
+  notifItems,
 }: {
   tab: Tab
   theme: string
   onToggleTheme: () => void
   onOpenMobileNav: () => void
   onOpenCmdK: () => void
+  notificationsOpen: boolean
+  onToggleNotifications: () => void
+  onNavigate: (tab: Tab) => void
+  notifItems: Notif[]
 }) {
   const { t } = useLang()
   const title = t(PAGE_TITLES[tab] as Parameters<typeof t>[0])
+  const count = notifItems.length
 
   return (
     <div className="topbar">
@@ -43,7 +54,7 @@ export default function TopBar({
         className="topbar-hamburger"
         aria-label="Abrir menu"
       >
-        <IconHamburger />
+        <IconHamburger size={16} />
       </button>
 
       <div className="breadcrumbs">
@@ -66,10 +77,28 @@ export default function TopBar({
         {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
       </button>
 
-      <button className="topbar-action" title="Notificações">
-        <IconBell size={14} />
-        <span className="dot" />
-      </button>
+      <div style={{ position: 'relative' }}>
+        <button
+          className="topbar-action"
+          onClick={onToggleNotifications}
+          title="Notificações"
+          aria-label="Notificações"
+          aria-expanded={notificationsOpen}
+        >
+          <IconBell size={14} />
+          {count > 0 && (
+            <span className="topbar-badge" aria-hidden="true">
+              {count > 9 ? '9+' : count}
+            </span>
+          )}
+        </button>
+        <NotificationsDropdown
+          open={notificationsOpen}
+          onClose={() => { if (notificationsOpen) onToggleNotifications() }}
+          onNavigate={onNavigate}
+          items={notifItems}
+        />
+      </div>
     </div>
   )
 }

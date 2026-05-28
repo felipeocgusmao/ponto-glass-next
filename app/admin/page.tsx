@@ -20,6 +20,7 @@ import { FeriadosTab } from './_components/tabs/FeriadosTab'
 import { RelatoriosTab } from './_components/tabs/RelatoriosTab'
 import { AuditoriaTab } from './_components/tabs/AuditoriaTab'
 import { CorrecoesTab } from './_components/tabs/CorrecoesTab'
+import { useNotifications } from './_lib/useNotifications'
 
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
@@ -33,7 +34,10 @@ export default function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [pendingCorrections, setPendingCorrections] = useState(0)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const router = useRouter()
+
+  const { items: notifItems } = useNotifications({ pendingCorrections, employees })
 
   const isManager = user?.role === 'manager'
   const visibleTabs = isManager ? MANAGER_TABS : ALL_TABS
@@ -185,6 +189,10 @@ export default function AdminPage() {
           onToggleTheme={toggleTheme}
           onOpenMobileNav={() => setSidebarOpen(true)}
           onOpenCmdK={() => setShowCmdK(true)}
+          notificationsOpen={notificationsOpen}
+          onToggleNotifications={() => setNotificationsOpen(v => !v)}
+          onNavigate={t => { setTab(t); if (t === 'correcoes') refreshPendingCount() }}
+          notifItems={notifItems}
         />
         <div className="page">
           <MissingExitBanner />
