@@ -5,6 +5,7 @@ import type { CorrectionRequest } from '@/lib/types'
 import { SL } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
+import { IconRefresh } from '../icons'
 
 function fmtTs(ts: string) {
   const d = new Date(ts)
@@ -89,25 +90,47 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
   const pending = items.filter(i => i.status === 'pending')
   const resolved = items.filter(i => i.status !== 'pending')
 
-  if (loading) return (
-    <div className="card">
-      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {[0,1,2].map(i => (
-          <div key={i} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="skeleton skeleton-title" style={{ width: '40%' }} />
-            <div className="skeleton skeleton-text" style={{ width: '60%' }} />
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <div className="skeleton" style={{ height: 28, flex: 1, borderRadius: 'var(--r-sm)' }} />
-              <div className="skeleton" style={{ height: 28, flex: 1, borderRadius: 'var(--r-sm)' }} />
-            </div>
-          </div>
-        ))}
+  const pageHead = (
+    <div className="page-head">
+      <div>
+        <div className="page-title">{t('tab.correcoes')}</div>
+        <div className="page-sub">
+          {loading
+            ? t('common.loading')
+            : pending.length > 0
+              ? `${pending.length} ${pending.length === 1 ? 'pedido pendente' : 'pedidos pendentes'}`
+              : 'Sem pedidos pendentes'}
+        </div>
+      </div>
+      <div className="page-actions">
+        <button className="btn" onClick={load}><IconRefresh size={13}/> Atualizar</button>
       </div>
     </div>
   )
 
+  if (loading) return (
+    <>
+      {pageHead}
+      <div className="card">
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="skeleton skeleton-title" style={{ width: '40%' }} />
+              <div className="skeleton skeleton-text" style={{ width: '60%' }} />
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <div className="skeleton" style={{ height: 28, flex: 1, borderRadius: 'var(--r-sm)' }} />
+                <div className="skeleton" style={{ height: 28, flex: 1, borderRadius: 'var(--r-sm)' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+
   return (
     <>
+      {pageHead}
       {/* ── PENDING ─────────────────────────────────────────────────────── */}
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
