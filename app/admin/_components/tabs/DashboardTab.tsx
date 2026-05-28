@@ -291,22 +291,22 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                         </div>
                       </div>
                     </div>
-                    <div style={{ width: 110, textAlign: 'right', fontSize: 12 }} className="tnum muted">
+                    <div data-col="time" style={{ width: 110, textAlign: 'right', fontSize: 12, flexShrink: 0 }} className="tnum muted">
                       {fmtMin(liveMin)} / {emp.workday_hours}h
                     </div>
-                    <div style={{ width: 80 }}>
+                    <div data-col="bar" style={{ width: 80, flexShrink: 0 }}>
                       <div className="bar">
                         <div className={`bar-fill${isOver ? ' over' : ''}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
-                    <div style={{ width: 90 }}>
+                    <div data-col="chip" style={{ width: 90, flexShrink: 0 }}>
                       {state === 'working' && <span className="chip success">Ativo</span>}
                       {state === 'lunch'   && <span className="chip warn">Almoço</span>}
                       {state === 'coffee'  && <span className="chip warn">Pausa</span>}
                       {state === 'off' && recs.length > 0 && <span className="chip outline">Saiu</span>}
                       {recs.length === 0 && <span className="chip outline">—</span>}
                     </div>
-                    <div style={{ width: 80, textAlign: 'right' }} className="tnum muted">
+                    <div data-col="earnings" style={{ width: 80, textAlign: 'right', flexShrink: 0 }} className="tnum muted">
                       {earnings !== null ? fmtCost(earnings) : '—'}
                     </div>
                   </div>
