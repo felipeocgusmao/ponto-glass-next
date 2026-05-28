@@ -120,6 +120,12 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
           <label>{t('emp.shift_start')}</label>
           <input type="time" value={shiftStart} onChange={e => setShiftStart(e.target.value)} className="input" />
           <div style={{ fontSize: 10, color: 'var(--fg-subtle)', marginTop: 3 }}>{t('emp.shift_start.hint')}</div>
+          {(() => {
+            const [h] = shiftStart.split(':').map(Number)
+            return h > 0 && h < 20
+              ? <div className="alert-inline warn" style={{ fontSize: 11, marginTop: 6, padding: '6px 10px' }}>{t('emp.shift_start.warn')}</div>
+              : null
+          })()}
         </div>
       </div>
       <div className="field">
