@@ -5,6 +5,7 @@ import type { Employee } from '@/lib/types'
 import { avatarInitials } from '@/lib/utils'
 import { empColor, SL } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
+import { IconUserPlus } from '../icons'
 
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
   const { t } = useLang()
@@ -203,6 +204,19 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
 
   return (
     <>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-title">{t('tab.funcionarios')}</div>
+          <div className="page-sub">{employees.length} {t('emp.active')}</div>
+        </div>
+        <div className="page-actions">
+          <button className="btn primary" onClick={() => document.getElementById('emp-add-form')?.scrollIntoView({ behavior: 'smooth' })}>
+            <IconUserPlus size={13}/> {t('emp.add_btn')}
+          </button>
+        </div>
+      </div>
+
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
           <SL>{employees.length} {t('emp.active')}</SL>
@@ -251,7 +265,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" id="emp-add-form">
         <div style={{ padding: '16px 20px' }}>
           <SL>{t('emp.add_new')}</SL>
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>

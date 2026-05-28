@@ -5,6 +5,7 @@ import type { Employee, HourBankAdjustment } from '@/lib/types'
 import { fmtMinutes, businessDate } from '@/lib/utils'
 import { SL } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
+import { IconRefresh } from '../icons'
 
 export function BancoHorasTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
@@ -57,6 +58,17 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
 
   return (
     <>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-title">{t('tab.banco')}</div>
+          <div className="page-sub">{employees.length} {t('emp.active')}</div>
+        </div>
+        <div className="page-actions">
+          <button className="btn" onClick={loadAll}><IconRefresh size={13}/> Atualizar</button>
+        </div>
+      </div>
+
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
           <SL>{t('hbank.balances')}</SL>

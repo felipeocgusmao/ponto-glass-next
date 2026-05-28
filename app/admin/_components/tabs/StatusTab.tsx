@@ -3,9 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { avatarInitials, fmtMinutes, calcNetMinutes, calcTimeBreakdown, calcOvertimePeriod, WORKING_TYPES, businessDate } from '@/lib/utils'
-import { empColor, SL } from '../../_lib/helpers'
+import { empColor } from '../../_lib/helpers'
 import { EXPLICIT_BREAK_TYPES } from '../../_lib/types'
 import { useLang } from '@/lib/LangContext'
+import { IconRefresh } from '../icons'
+
+type StatusFilter = 'all' | 'working' | 'break' | 'out' | 'absent'
 
 export function StatusTab({ employees, currentUserId }: { employees: Employee[]; currentUserId: string }) {
   const { t } = useLang()
@@ -14,6 +17,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
   const [punching, setPunching] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ id: string; kind: 'success' | 'error'; text: string } | null>(null)
   const [weekRecords, setWeekRecords] = useState<PunchRecord[]>([])
+  const [filter, setFilter] = useState<StatusFilter>('all')
 
   const loadSeq = useRef(0)
   const load = useCallback(async () => {
@@ -115,68 +119,130 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
   })
 
   const onlineCount   = statuses.filter(s => s.isIn).length
+  const breakCount    = statuses.filter(s => s.isOnLunch || s.isOnCafe).length
+  const outCount      = statuses.filter(s => !s.isIn && recordsByEmp.has(s.emp.id)).length
+  const absentCount   = statuses.filter(s => !recordsByEmp.has(s.emp.id)).length
   const totalMinToday = statuses.reduce((sum, s) => sum + s.liveNetMin, 0)
+
+  const filteredStatuses = statuses.filter(s => {
+    if (filter === 'working') return s.isWorking
+    if (filter === 'break')   return s.isOnLunch || s.isOnCafe
+    if (filter === 'out')     return !s.isIn && recordsByEmp.has(s.emp.id)
+    if (filter === 'absent')  return !recordsByEmp.has(s.emp.id)
+    return true
+  })
+
+  const FilterPill = ({ id, label, count, tone }: { id: StatusFilter; label: string; count: number; tone?: string }) => (
+    <button
+      className={`filter-pill${filter === id ? ' active' : ''}`}
+      onClick={() => setFilter(id)}
+    >
+      {tone && <span className="dot" style={{ background: tone === 'success' ? 'var(--success)' : tone === 'warn' ? 'var(--warning)' : 'var(--fg-dim)', width: 6, height: 6, borderRadius: '50%', display: 'inline-block' }} />}
+      <span className="val">{label}</span>
+      <span className="key tnum">{count}</span>
+    </button>
+  )
 
   return (
     <>
-      <div className="card">
-        <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div className="kpi">
-            <div className="kpi-label">{t('status.on_duty_now')}</div>
-            <div className="kpi-value" style={{ color: 'var(--success-fg)' }}>{onlineCount}</div>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-title">
+            {t('tab.status')}
+            <span className="live-dot pulse" style={{ marginLeft: 10, display: 'inline-block', verticalAlign: 'middle' }} />
           </div>
-          <div className="kpi">
-            <div className="kpi-label">{t('status.hours_today')}</div>
-            <div className="kpi-value">{totalMinToday > 0 ? fmtMinutes(Math.round(totalMinToday)) : '—'}</div>
-          </div>
+          <div className="page-sub">{onlineCount} trabalhando · {breakCount} em pausa · atualizado agora</div>
+        </div>
+        <div className="page-actions">
+          <button className="btn" onClick={load}><IconRefresh size={13}/> Atualizar</button>
         </div>
       </div>
 
-      <div className="card">
-        <div style={{ padding: '16px 20px 8px' }}>
-          <SL>{workers.length} {t('status.employees')}</SL>
-        </div>
-        {workers.length === 0 && (
-          <div style={{ padding: '0 20px 16px' }}><div className="alert-inline info">{t('status.none_emp')}</div></div>
-        )}
-        {statuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal }) => (
-          <div key={emp.id} className="status-row">
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <div className={`avatar size-28 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
-              <span style={{
-                position: 'absolute', bottom: 0, right: 0,
-                width: 8, height: 8, borderRadius: '50%',
-                background: isWorking ? 'var(--success-fg)' : (isOnLunch || isOnCafe) ? 'var(--warning-fg)' : 'var(--fg-dim)',
-                border: '2px solid var(--bg)',
-              }} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{emp.name}</div>
-              <div style={{ fontSize: 12, marginTop: 2, color: 'var(--fg-muted)' }}>
-                {isWorking
-                  ? <span style={{ color: 'var(--success-fg)' }}>{t('status.on_duty')} · {liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}</span>
-                  : isOnLunch
-                  ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.at_lunch')}</span>
-                  : isOnCafe
-                  ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.coffee_break')}</span>
-                  : <span>{liveNetMin > 0 ? `${fmtMinutes(Math.round(liveNetMin))} ${t('common.today')}` : t('status.no_records')}</span>
-                }
-              </div>
-              {liveEarnings && <div style={{ fontSize: 11, color: 'var(--success-fg)', marginTop: 2, opacity: 0.75 }}>{liveEarnings} {t('common.today')}</div>}
-              {weekTotal > 0 && <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 1 }}>{fmtMinutes(weekTotal)} {t('status.this_week')}</div>}
-              {msg?.id === emp.id && (
-                <div style={{ fontSize: 12, marginTop: 4, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
-              )}
-            </div>
-            <button
-              onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
-              disabled={punching === emp.id}
-              className={isIn ? 'btn danger sm' : 'btn primary sm'}
-            >
-              {punching === emp.id ? '…' : isIn ? t('status.clock_out') : t('status.clock_in')}
-            </button>
+      {/* KPI row */}
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+        <div className="kpi">
+          <div className="kpi-label">{t('status.on_duty_now')}</div>
+          <div className="kpi-value tnum" style={{ color: 'var(--success-fg)' }}>
+            {onlineCount}<span style={{ fontSize: 14, color: 'var(--fg-subtle)', fontWeight: 500 }}> / {workers.length}</span>
           </div>
-        ))}
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">{t('status.hours_today')}</div>
+          <div className="kpi-value tnum">{totalMinToday > 0 ? fmtMinutes(Math.round(totalMinToday)) : '—'}</div>
+        </div>
+      </div>
+
+      {/* Filter pills */}
+      <div className="filter-bar">
+        <FilterPill id="all"     label="Todos"        count={statuses.length} />
+        <FilterPill id="working" label="Trabalhando"  count={onlineCount - breakCount} tone="success" />
+        <FilterPill id="break"   label="Em pausa"     count={breakCount}   tone="warn" />
+        <FilterPill id="out"     label="Encerraram"   count={outCount} />
+        <FilterPill id="absent"  label="Sem registro" count={absentCount} />
+      </div>
+
+      {/* Employee list */}
+      <div className="card">
+        {workers.length === 0 && (
+          <div style={{ padding: '16px 20px' }}><div className="alert-inline info">{t('status.none_emp')}</div></div>
+        )}
+        {filteredStatuses.length === 0 && workers.length > 0 && (
+          <div className="empty"><div className="desc">Nenhum funcionário neste estado.</div></div>
+        )}
+        {filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal }) => {
+          const targetMin = emp.workday_hours * 60
+          const pct = Math.min(100, targetMin > 0 ? (liveNetMin / targetMin) * 100 : 0)
+          return (
+            <div key={emp.id} className="status-row">
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <div className={`avatar size-28 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
+                <span style={{
+                  position: 'absolute', bottom: 0, right: 0,
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: isWorking ? 'var(--success-fg)' : (isOnLunch || isOnCafe) ? 'var(--warning-fg)' : 'var(--fg-dim)',
+                  border: '2px solid var(--bg)',
+                }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{emp.name}</div>
+                <div style={{ fontSize: 12, marginTop: 2, color: 'var(--fg-muted)' }}>
+                  {isWorking
+                    ? <span style={{ color: 'var(--success-fg)' }}>{t('status.on_duty')} · {liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}</span>
+                    : isOnLunch ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.at_lunch')}</span>
+                    : isOnCafe  ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.coffee_break')}</span>
+                    : <span>{liveNetMin > 0 ? `${fmtMinutes(Math.round(liveNetMin))} ${t('common.today')}` : t('status.no_records')}</span>
+                  }
+                </div>
+                {liveEarnings && <div style={{ fontSize: 11, color: 'var(--success-fg)', marginTop: 2, opacity: 0.75 }}>{liveEarnings} {t('common.today')}</div>}
+                {weekTotal > 0 && <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 1 }}>{fmtMinutes(weekTotal)} {t('status.this_week')}</div>}
+                {msg?.id === emp.id && (
+                  <div style={{ fontSize: 12, marginTop: 4, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
+                )}
+              </div>
+              <div style={{ width: 80 }}>
+                <div className="bar"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
+                <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 3, textAlign: 'right' }} className="tnum">
+                  {fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h
+                </div>
+              </div>
+              <div style={{ width: 90 }}>
+                {isWorking    && <span className="chip success">Trabalhando</span>}
+                {isOnLunch    && <span className="chip warn">Almoço</span>}
+                {isOnCafe     && <span className="chip warn">Pausa</span>}
+                {!isIn && recordsByEmp.has(emp.id) && <span className="chip outline">Saiu</span>}
+                {!recordsByEmp.has(emp.id) && <span className="chip outline">—</span>}
+              </div>
+              <button
+                onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
+                disabled={punching === emp.id}
+                className={isIn ? 'btn danger sm' : 'btn primary sm'}
+              >
+                {punching === emp.id ? '…' : isIn ? t('status.clock_out') : t('status.clock_in')}
+              </button>
+            </div>
+          )
+        })}
       </div>
     </>
   )

@@ -4,11 +4,11 @@ import { avatarInitials } from '@/lib/utils'
 import type { EmployeeProfile } from '@/lib/types'
 import type { Tab } from '../_lib/types'
 import { empColor } from '../_lib/helpers'
-import { useLang, LANG_LABELS, type Lang } from '@/lib/LangContext'
+import { useLang, type Lang } from '@/lib/LangContext'
 import {
   IconClock, IconDashboard, IconStatus, IconList, IconUsers,
   IconBank, IconCalendar, IconBar, IconAudit, IconEdit,
-  SunIcon, MoonIcon, LockSmIcon,
+  IconChevronsLeft, IconSettings,
 } from './icons'
 
 const TAB_ICONS: Record<Tab, React.ReactNode> = {
@@ -24,84 +24,115 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   auditoria:    <IconAudit />,
 }
 
-const LANGS: Lang[] = ['pt-PT', 'pt-BR', 'en', 'es']
+const NAV_GROUPS: { key: string; labels: Record<Lang, string>; tabs: Tab[] }[] = [
+  {
+    key: 'operacao',
+    labels: { 'pt-PT': 'Operação', 'pt-BR': 'Operação', 'en': 'Operations', 'es': 'Operación' },
+    tabs: ['dashboard', 'status', 'registros', 'correcoes', 'meu_ponto'],
+  },
+  {
+    key: 'pessoas',
+    labels: { 'pt-PT': 'Pessoas', 'pt-BR': 'Pessoas', 'en': 'People', 'es': 'Personas' },
+    tabs: ['funcionarios', 'banco', 'feriados'],
+  },
+  {
+    key: 'analise',
+    labels: { 'pt-PT': 'Análise', 'pt-BR': 'Análise', 'en': 'Analysis', 'es': 'Análisis' },
+    tabs: ['relatorios', 'auditoria'],
+  },
+]
 
-export default function Sidebar({ tab, setTab, tabs, user, onLogout, onChangePwd, theme, toggleTheme, mobileOpen, onMobileClose, badges = {} }: {
-  tab: Tab; setTab: (t: Tab) => void
+export default function Sidebar({
+  tab, setTab, tabs, user, onOpenSettings,
+  mobileOpen, onMobileClose, collapsed, onToggleCollapse, badges = {},
+}: {
+  tab: Tab
+  setTab: (t: Tab) => void
   tabs: { id: Tab; label: string }[]
-  user: EmployeeProfile; onLogout: () => void; onChangePwd: () => void
-  theme: string; toggleTheme: () => void
-  mobileOpen: boolean; onMobileClose: () => void
+  user: EmployeeProfile
+  onOpenSettings: () => void
+  mobileOpen: boolean
+  onMobileClose: () => void
+  collapsed: boolean
+  onToggleCollapse: () => void
   badges?: Partial<Record<Tab, number>>
 }) {
-  const { lang, setLang, t } = useLang()
+  const { lang, t } = useLang()
   const ci = empColor(user.id)
-  const handleTabClick = (tabId: Tab) => { setTab(tabId); onMobileClose() }
+  const tabSet = new Set(tabs.map(it => it.id))
+
+  const handleTabClick = (tabId: Tab) => {
+    setTab(tabId)
+    onMobileClose()
+  }
 
   return (
     <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
       <div className="sb-head">
-        <img src="/icon-192.svg" width="28" height="28" alt="" style={{ borderRadius: 8, flexShrink: 0 }} />
+        <div className="sb-logo">P</div>
         <span className="sb-brand">PontoGlass</span>
+        <button
+          className="sb-collapse"
+          onClick={onToggleCollapse}
+          title={collapsed ? 'Expandir' : 'Recolher'}
+        >
+          <span style={{ display: 'flex', transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+            <IconChevronsLeft size={14} />
+          </span>
+        </button>
       </div>
-      <nav className="sb-nav" style={{ padding: '8px' }}>
-        {tabs.map(tabItem => {
-          const count = badges[tabItem.id] ?? 0
+
+      <div className="sb-nav" style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+        {NAV_GROUPS.map(group => {
+          const groupTabs = group.tabs.filter(id => tabSet.has(id))
+          if (groupTabs.length === 0) return null
           return (
-            <button key={tabItem.id} onClick={() => handleTabClick(tabItem.id)} className={`sb-item${tab === tabItem.id ? ' active' : ''}`}>
-              <span className="sb-item-icon">{TAB_ICONS[tabItem.id]}</span>
-              <span className="sb-item-label">{t(`tab.${tabItem.id}` as Parameters<typeof t>[0])}</span>
-              {count > 0 && (
-                <span style={{
-                  marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999,
-                  background: 'var(--danger-fg)', color: '#fff',
-                  fontSize: 10, fontWeight: 700, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', padding: '0 5px',
-                }}>
-                  {count > 99 ? '99+' : count}
-                </span>
-              )}
-            </button>
+            <div key={group.key} className="sb-section">
+              <div className="sb-section-label">{group.labels[lang]}</div>
+              {groupTabs.map(tabId => {
+                const count = badges[tabId] ?? 0
+                return (
+                  <button
+                    key={tabId}
+                    onClick={() => handleTabClick(tabId)}
+                    className={`sb-item${tab === tabId ? ' active' : ''}`}
+                    title={collapsed ? t(`tab.${tabId}` as Parameters<typeof t>[0]) : undefined}
+                  >
+                    <span className="sb-item-icon">{TAB_ICONS[tabId]}</span>
+                    <span className="sb-item-label">
+                      {t(`tab.${tabId}` as Parameters<typeof t>[0])}
+                    </span>
+                    {count > 0 && (
+                      <span className="sb-item-badge" style={{
+                        marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999,
+                        background: 'var(--danger-fg)', color: '#fff',
+                        fontSize: 10, fontWeight: 700, display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', padding: '0 5px',
+                      }}>
+                        {count > 99 ? '99+' : count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           )
         })}
-      </nav>
+      </div>
+
       <div className="sb-footer">
-        <div className="sb-user">
+        <button className="sb-user" onClick={onOpenSettings} style={{ width: '100%', textAlign: 'left' }}>
           <div className={`avatar size-28 av-c${ci}`}>{avatarInitials(user.name)}</div>
           <div className="sb-user-meta">
             <div className="sb-user-name">{user.name}</div>
-            <div className="sb-user-role">{user.role === 'manager' ? t('auth.role.manager') : 'Admin'}</div>
+            <div className="sb-user-role">
+              {user.role === 'manager' ? t('auth.role.manager') : t('auth.role.admin')}
+            </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 4, marginTop: 8, padding: '0 2px', flexWrap: 'wrap' }}>
-          <button onClick={toggleTheme} className="btn ghost sm icon" title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}>
-            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-          </button>
-          <button onClick={onChangePwd} className="btn ghost sm icon" title={t('auth.change_password')}>
-            <LockSmIcon />
-          </button>
-          <button onClick={onLogout} className="btn ghost sm" style={{ flex: 1, justifyContent: 'center' }}>
-            {t('common.logout')}
-          </button>
-        </div>
-        <div style={{ display: 'flex', gap: 4, marginTop: 6, padding: '0 2px' }}>
-          {LANGS.map(l => (
-            <button
-              key={l}
-              onClick={() => setLang(l)}
-              className="btn ghost sm"
-              style={{
-                flex: 1, justifyContent: 'center', padding: '3px 0',
-                fontSize: 10, fontWeight: lang === l ? 700 : 400,
-                color: lang === l ? 'var(--accent)' : 'var(--fg-muted)',
-                borderBottom: lang === l ? '2px solid var(--accent)' : '2px solid transparent',
-                borderRadius: 0,
-              }}
-            >
-              {LANG_LABELS[l]}
-            </button>
-          ))}
-        </div>
+          <span style={{ color: 'var(--fg-subtle)', flexShrink: 0 }}>
+            <IconSettings size={14} />
+          </span>
+        </button>
       </div>
     </aside>
   )

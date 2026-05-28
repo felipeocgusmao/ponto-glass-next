@@ -7,6 +7,7 @@ import { SL } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
 import * as XLSX from 'xlsx'
+import { IconDownload, IconRefresh } from '../icons'
 
 const PAGE_SIZE = 25
 
@@ -167,43 +168,48 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
 
   return (
     <>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-title">{t('tab.registros')}</div>
+          <div className="page-sub">
+            {loading ? t('common.loading') : records.length > 0 ? `${records.length} ${t('common.records')}` : t('reg.none')}
+          </div>
+        </div>
+        <div className="page-actions">
+          {records.length > 0 && (
+            <button onClick={exportExcel} className="btn"><IconDownload size={13}/> Excel</button>
+          )}
+          <button className="btn" onClick={load}><IconRefresh size={13}/> Atualizar</button>
+        </div>
+      </div>
+
+      {/* Filters */}
       <div className="card">
-        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <SL style={{ margin: 0 }}>{t('reg.filters')}</SL>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                className={`btn ghost sm${from === today && to === today ? ' active' : ''}`}
-                onClick={setQuickToday}
-                style={{ fontSize: 11 }}
-              >{t('reg.today')}</button>
-              <button
-                className="btn ghost sm"
-                onClick={setQuickWeek}
-                style={{ fontSize: 11 }}
-              >{t('reg.this_week')}</button>
-            </div>
+        <div style={{ padding: '12px 20px', display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
+          <div className="field" style={{ marginBottom: 0, flex: '0 0 auto' }}>
+            <label>{t('reg.from')}</label>
+            <input type="date" value={from} onChange={e => handleFromChange(e.target.value)} className="input" />
           </div>
-          <div className="form-grid-2">
-            <div className="field">
-              <label>{t('reg.from')}</label>
-              <input type="date" value={from} onChange={e => handleFromChange(e.target.value)} className="input" />
-            </div>
-            <div className="field">
-              <label>{t('reg.to')}</label>
-              <input type="date" value={to} onChange={e => handleToChange(e.target.value)} className="input" />
-            </div>
+          <div className="field" style={{ marginBottom: 0, flex: '0 0 auto' }}>
+            <label>{t('reg.to')}</label>
+            <input type="date" value={to} onChange={e => handleToChange(e.target.value)} className="input" />
           </div>
-          <div className="field">
+          <div className="field" style={{ marginBottom: 0, flex: '1 1 160px' }}>
             <label>{t('reg.employee')}</label>
             <select value={empId} onChange={e => setEmpId(e.target.value)} className="input">
               <option value="all">{t('reg.all')}</option>
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
+          <div style={{ display: 'flex', gap: 6, paddingBottom: 1 }}>
+            <button className={`filter-pill${from === today && to === today ? ' active' : ''}`} onClick={setQuickToday}>{t('reg.today')}</button>
+            <button className="filter-pill" onClick={setQuickWeek}>{t('reg.this_week')}</button>
+          </div>
         </div>
       </div>
 
+      {/* Records list */}
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
           {error && <div className="alert-inline err" style={{ marginBottom: 12 }}>{error}</div>}
@@ -228,12 +234,6 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                 const paged = records.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
                 return (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <SL style={{ margin: 0 }}>{records.length} {t('common.records')}</SL>
-                    <button onClick={exportExcel} className="btn ghost sm" title="Exportar Excel">
-                      ⬇ Excel
-                    </button>
-                  </div>
                   {paged.map(r => {
                     const isEditing = editingId === r.id
                     const isCommenting = commentingId === r.id
@@ -304,6 +304,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
         </div>
       </div>
 
+      {/* Add new record */}
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SL>{t('reg.new_record')}</SL>
