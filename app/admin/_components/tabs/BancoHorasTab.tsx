@@ -1,15 +1,21 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Employee, HourBankAdjustment } from '@/lib/types'
-import { fmtMinutes, businessDate } from '@/lib/utils'
-import { SL } from '../../_lib/helpers'
+import { fmtMinutes, businessDate, avatarInitials } from '@/lib/utils'
+import { empColor } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
-import { IconRefresh } from '../icons'
+import { IconRefresh, IconArrowUp, IconArrowDown } from '../icons'
+
+type Balance = { balanceMin: number; adjustments: HourBankAdjustment[] }
+
+function fmtSigned(min: number) {
+  return (min >= 0 ? '+' : '') + fmtMinutes(Math.abs(min))
+}
 
 export function BancoHorasTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
-  const [balances, setBalances] = useState<Map<string, { balanceMin: number; adjustments: HourBankAdjustment[] }>>(new Map())
+  const [balances, setBalances] = useState<Map<string, Balance>>(new Map())
   const [selectedEmp, setSelectedEmp] = useState('')
   const [minutes, setMinutes] = useState('')
   const [reason, setReason] = useState('')
@@ -17,9 +23,11 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
   const [saving, setSaving] = useState(false)
+  const [loadingBalances, setLoadingBalances] = useState(false)
 
   const loadAll = useCallback(async () => {
-    const map = new Map<string, { balanceMin: number; adjustments: HourBankAdjustment[] }>()
+    setLoadingBalances(true)
+    const map = new Map<string, Balance>()
     await Promise.all(employees.map(async emp => {
       try {
         const res = await fetch(`/api/hour-bank?employeeId=${emp.id}`)
@@ -27,6 +35,7 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
       } catch { /* silent */ }
     }))
     setBalances(new Map(map))
+    setLoadingBalances(false)
   }, [employees])
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -56,50 +65,143 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
     await loadAll()
   }
 
+  const rows = useMemo(() => {
+    return employees
+      .filter(e => e.role !== 'admin' && e.active !== false)
+      .map(emp => {
+        const info = balances.get(emp.id)
+        const bal = info?.balanceMin ?? 0
+        const last = info?.adjustments?.[0]
+        return { emp, bal, hasData: info !== undefined, last }
+      })
+      .sort((a, b) => b.bal - a.bal)
+  }, [employees, balances])
+
+  const totalBalance = rows.reduce((acc, r) => acc + r.bal, 0)
+  const positive = rows.filter(r => r.bal > 0).length
+  const negative = rows.filter(r => r.bal < 0).length
+  const zero = rows.filter(r => r.bal === 0).length
+
   return (
     <>
       {/* Page header */}
       <div className="page-head">
         <div>
           <div className="page-title">{t('tab.banco')}</div>
-          <div className="page-sub">{employees.length} {t('emp.active')}</div>
+          <div className="page-sub">Saldo coletivo · ajustes manuais</div>
         </div>
         <div className="page-actions">
-          <button className="btn" onClick={loadAll}><IconRefresh size={13}/> Atualizar</button>
+          <button className="btn" onClick={loadAll} disabled={loadingBalances}>
+            <IconRefresh size={13}/> Atualizar
+          </button>
         </div>
       </div>
 
-      <div className="card">
-        <div style={{ padding: '16px 20px' }}>
-          <SL>{t('hbank.balances')}</SL>
-          {employees.length === 0 && <div className="alert-inline info">{t('hbank.none_emp')}</div>}
-          {employees.map(emp => {
-            const info = balances.get(emp.id)
-            const bal = info?.balanceMin
-            return (
-              <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontSize: 13, color: 'var(--fg)' }}>{emp.name}</span>
-                {bal !== undefined
-                  ? <span style={{ fontSize: 13, fontWeight: 600, color: bal >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
-                      {bal >= 0 ? '+' : '-'}{Math.floor(Math.abs(bal) / 60)}h{String(Math.abs(bal) % 60).padStart(2, '0')}m
-                    </span>
-                  : <span style={{ fontSize: 12, color: 'var(--fg-subtle)' }}>—</span>
-                }
-              </div>
-            )
-          })}
+      {/* KPI grid */}
+      <div className="kpi-grid">
+        <div className="kpi">
+          <div className="kpi-label">Saldo total</div>
+          <div className="kpi-value tnum" style={{ color: totalBalance >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
+            {fmtSigned(totalBalance)}
+          </div>
+          <div className="kpi-delta">{rows.length} funcionário(s)</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">Positivos</div>
+          <div className="kpi-value tnum">{positive}</div>
+          <div className="kpi-delta up"><IconArrowUp size={11}/> a favor do funcionário</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">Negativos</div>
+          <div className="kpi-value tnum">{negative}</div>
+          <div className="kpi-delta down"><IconArrowDown size={11}/> a compensar</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">Zerados</div>
+          <div className="kpi-value tnum">{zero}</div>
+          <div className="kpi-delta">sem saldo pendente</div>
         </div>
       </div>
 
+      {/* Saldos por funcionário */}
       <div className="card">
-        <div style={{ padding: '16px 20px' }}>
-          <SL>{t('hbank.new_adj')}</SL>
-          <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+        <div className="card-head">
+          <div className="card-title">Saldos por funcionário</div>
+        </div>
+        {rows.length === 0 ? (
+          <div className="empty"><div className="title">{t('hbank.none_emp')}</div></div>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Funcionário</th>
+                <th className="right">Saldo</th>
+                <th>Tendência</th>
+                <th className="right">Última alteração</th>
+                <th style={{ width: 90 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ emp, bal, hasData, last }) => {
+                const maxRef = 360 // 6h reference for full bar
+                const balPct = Math.min(100, Math.abs(bal) / maxRef * 100)
+                return (
+                  <tr key={emp.id}>
+                    <td>
+                      <div className="cell-emp">
+                        <div className={`avatar size-22 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
+                        <div className="cell-emp-info">
+                          <div className="cell-emp-name">{emp.name}</div>
+                          <div className="cell-emp-sub">@{emp.username}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="right tnum" style={{ fontWeight: 600, color: bal > 0 ? 'var(--success-fg)' : bal < 0 ? 'var(--danger-fg)' : 'var(--fg-muted)' }}>
+                      {hasData ? fmtSigned(bal) : <span className="muted">—</span>}
+                    </td>
+                    <td style={{ width: 160 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 4, background: 'var(--surface-2)', borderRadius: 2, position: 'relative' }}>
+                          <div style={{
+                            position: 'absolute', top: 0, left: '50%',
+                            width: `${balPct / 2}%`,
+                            transform: bal < 0 ? 'translateX(-100%)' : 'none',
+                            height: '100%',
+                            background: bal > 0 ? 'var(--success-fg)' : bal < 0 ? 'var(--danger-fg)' : 'var(--fg-dim)',
+                            borderRadius: 2,
+                          }}/>
+                          <div style={{ position: 'absolute', top: -2, left: 'calc(50% - 0.5px)', width: 1, height: 8, background: 'var(--fg-dim)' }}/>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="right muted" style={{ fontSize: 12 }}>
+                      {last
+                        ? <span>{last.date} <span style={{ color: last.minutes > 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>({last.minutes > 0 ? '+' : ''}{last.minutes}min)</span></span>
+                        : <span className="muted">—</span>}
+                    </td>
+                    <td className="right">
+                      <button className="btn ghost sm" onClick={() => setSelectedEmp(emp.id)}>Ajustar</button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Lançar ajuste */}
+      <div className="card">
+        <div className="card-head">
+          <div className="card-title">{t('hbank.new_adj')}</div>
+        </div>
+        <div className="card-body">
+          <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div className="field">
               <label>{t('reg.employee')}</label>
               <select value={selectedEmp} onChange={e => setSelectedEmp(e.target.value)} className="input">
                 <option value="">{t('hbank.select')}</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                {employees.filter(e => e.role !== 'admin' && e.active !== false).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
             <div className="form-grid-2">
@@ -118,34 +220,48 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
             </div>
             {err && <div className="alert-inline err">{err}</div>}
             {ok  && <div className="alert-inline ok">{ok}</div>}
-            <button type="submit" disabled={saving} className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>
+            <button type="submit" disabled={saving} className="btn primary" style={{ alignSelf: 'flex-start' }}>
               {saving ? t('hbank.saving') : t('hbank.add_btn')}
             </button>
+            <div className="muted" style={{ fontSize: 11.5 }}>Ajustes ficam registrados na auditoria.</div>
           </form>
         </div>
       </div>
 
+      {/* Histórico do funcionário seleccionado */}
       {selectedEmp && (() => {
         const adjs = balances.get(selectedEmp)?.adjustments ?? []
         if (adjs.length === 0) return null
         const empName = employees.find(e => e.id === selectedEmp)?.name ?? ''
         return (
           <div className="card">
-            <div style={{ padding: '16px 20px' }}>
-              <SL>{t('hbank.adj_of')} {empName}</SL>
-              {adjs.map(a => (
-                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, color: 'var(--fg)' }}>{a.reason}</div>
-                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{a.date}</div>
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: a.minutes >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)', flexShrink: 0 }}>
-                    {a.minutes >= 0 ? '+' : ''}{a.minutes}min
-                  </span>
-                  <button onClick={() => handleDelete(a.id)} className="btn danger sm icon">✕</button>
-                </div>
-              ))}
+            <div className="card-head">
+              <div className="card-title">{t('hbank.adj_of')} {empName}</div>
             </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th style={{ width: 110 }}>Data</th>
+                  <th>Motivo</th>
+                  <th className="right">Minutos</th>
+                  <th style={{ width: 60 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {adjs.map(a => (
+                  <tr key={a.id}>
+                    <td className="tnum muted" style={{ fontSize: 12 }}>{a.date}</td>
+                    <td>{a.reason}</td>
+                    <td className="right tnum" style={{ fontWeight: 600, color: a.minutes >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
+                      {a.minutes >= 0 ? '+' : ''}{a.minutes}min
+                    </td>
+                    <td>
+                      <button onClick={() => handleDelete(a.id)} className="btn ghost sm icon" title="Remover">✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )
       })()}
