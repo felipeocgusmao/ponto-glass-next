@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     .eq('date', today).eq('type', 'entrada')
   if (!entries?.length) return NextResponse.json({ notified: 0, missing: 0 })
 
-  const enteredIds = [...new Set(entries.map(r => r.employee_id))]
+  const enteredIds = Array.from(new Set(entries.map(r => r.employee_id)))
   const { data: exits } = await supabase
     .from('records').select('employee_id')
     .eq('date', today).eq('type', 'saída').in('employee_id', enteredIds)
