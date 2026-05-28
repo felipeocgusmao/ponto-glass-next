@@ -1,58 +1,47 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { Employee, PunchRecord } from '@/lib/types'
-import { fmtMinutes, calcOvertimePeriod, calcNetMinutes, calcTimeBreakdown, WORKING_TYPES, openPayslip, businessDate } from '@/lib/utils'
-import { SL, getWorkingDays } from '../../_lib/helpers'
+import type { Employee, PunchRecord, DayException } from '@/lib/types'
+import { fmtMinutes, businessDate } from '@/lib/utils'
+import { empColor, getWorkState, calcLiveMin, fmtMin, getWorkingDays } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
-import type { TranslationKey } from '@/lib/i18n'
+import { avatarInitials } from '@/lib/utils'
+import {
+  IconRefresh, IconArrowUp, IconArrowDown,
+  IconPulse, IconEuro, IconClock, IconBank, IconCalendar,
+  IconAlertTriangle, IconArrowRight,
+} from '../icons'
 
-type EmpStatus = 'working' | 'pause' | 'out' | 'absent'
-
-function getEmpStatus(recs: PunchRecord[]): EmpStatus {
-  if (!recs.length) return 'absent'
-  const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-  const last = sorted.at(-1)!
-  if (WORKING_TYPES.includes(last.type)) return 'working'
-  if (last.type === 'inicio_almoco' || last.type === 'pausa_cafe') return 'pause'
-  if (last.type === 'saída') return 'out'
-  return 'absent'
+function fmtCost(n: number): string {
+  return n.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 })
 }
 
-const STATUS_COLOR: Record<EmpStatus, string> = {
-  working: 'var(--success-fg)',
-  pause: 'var(--warning)',
-  out: 'var(--fg-muted)',
-  absent: 'var(--danger-fg)',
-}
-
-const STATUS_CHIP: Record<EmpStatus, string> = {
-  working: 'success',
-  pause: 'warn',
-  out: '',
-  absent: 'danger',
-}
-
-const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-
-function initials(name: string) {
-  return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
-}
-
-function empColor(id: string): number {
-  return (id.charCodeAt(0) % 8) + 1
+function Sparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return null
+  const max = Math.max(...values, 1)
+  const w = 64, h = 28
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w
+    const y = h - (v / max) * h * 0.9
+    return `${x},${y}`
+  }).join(' ')
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: 'visible' }}>
+      <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.7"/>
+    </svg>
+  )
 }
 
 export function DashboardTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
   const now = new Date()
-  // Range endpoints use the business-timezone day so they line up with how records.date
-  // is now stored (calcWorkDate → local business day), instead of the UTC day.
   const todayStr = businessDate()
   const firstOfMonth = `${todayStr.slice(0, 7)}-01`
+  const next30Str = new Date(now.getTime() + 30 * 86400000).toISOString().split('T')[0]
+
   const [monthRecs, setMonthRecs] = useState<PunchRecord[]>([])
   const [todayRecs, setTodayRecs] = useState<PunchRecord[]>([])
-  const [holidays, setHolidays] = useState<string[]>([])
+  const [exceptions, setExceptions] = useState<DayException[]>([])
   const [bankBalances, setBankBalances] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
 
@@ -62,14 +51,14 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
       const [mRes, tRes, eRes] = await Promise.all([
         fetch(`/api/reports?from=${firstOfMonth}&to=${todayStr}`),
         fetch('/api/records?today=true'),
-        fetch(`/api/day-exceptions?from=${firstOfMonth}&to=${todayStr}`),
+        fetch(`/api/day-exceptions?from=${todayStr}&to=${next30Str}`),
       ])
       if (mRes.ok) setMonthRecs(await mRes.json())
       if (tRes.ok) setTodayRecs(await tRes.json())
-      if (eRes.ok) { const exc: { date: string }[] = await eRes.json(); setHolidays(exc.map(e => e.date)) }
+      if (eRes.ok) setExceptions(await eRes.json())
     } catch { /* silent */ }
     finally { setLoading(false) }
-  }, [firstOfMonth, todayStr])
+  }, [firstOfMonth, todayStr, next30Str])
 
   useEffect(() => { load() }, [load])
 
@@ -88,29 +77,36 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     fetchAll()
   }, [employees])
 
-  // Today's status per employee
+  // Per-employee today data
   const todayByEmp = new Map<string, PunchRecord[]>()
   todayRecs.forEach(r => {
     if (!todayByEmp.has(r.employee_id)) todayByEmp.set(r.employee_id, [])
     todayByEmp.get(r.employee_id)!.push(r)
   })
 
-  const empStatuses = employees.map(emp => ({
-    emp,
-    status: getEmpStatus(todayByEmp.get(emp.id) ?? []),
-  }))
+  const empData = employees.map(emp => {
+    const recs = todayByEmp.get(emp.id) ?? []
+    const { state, since } = getWorkState(recs)
+    const liveMin = calcLiveMin(recs, emp.lunch_break_minutes ?? 60)
+    const targetMin = emp.workday_hours * 60
+    const earnings = emp.hourly_rate ? (liveMin / 60) * emp.hourly_rate : null
+    return { emp, recs, state, since, liveMin, targetMin, earnings }
+  })
 
-  const statusCounts = {
-    working: empStatuses.filter(e => e.status === 'working').length,
-    pause:   empStatuses.filter(e => e.status === 'pause').length,
-    out:     empStatuses.filter(e => e.status === 'out').length,
-    absent:  empStatuses.filter(e => e.status === 'absent').length,
-  }
+  // KPI values
+  const working = empData.filter(e => e.state === 'working').length
+  const onBreak = empData.filter(e => e.state === 'lunch' || e.state === 'coffee').length
+  const absent  = empData.filter(e => e.recs.length === 0).length
+  const totalMinToday = empData.reduce((acc, e) => acc + e.liveMin, 0)
+  const totalEarnings = empData.reduce((acc, e) => acc + (e.earnings ?? 0), 0)
+  const bankValues = Array.from(bankBalances.values())
+  const totalBank  = bankValues.reduce((a, b) => a + b, 0)
+  const positiveBank = bankValues.filter(v => v > 0).length
+  const negativeBank = bankValues.filter(v => v < 0).length
 
-  // Monthly chart data
+  // Chart: last 14 working days of month
   const workingDays = getWorkingDays(firstOfMonth, todayStr)
-  // Exclude company holidays / days off from the monthly hours target.
-  const effectiveWorkingDays = workingDays.filter(d => !holidays.includes(d))
+  const chartDays = workingDays.slice(-14)
   const byDateEmp = new Map<string, Map<string, PunchRecord[]>>()
   monthRecs.forEach(r => {
     if (!byDateEmp.has(r.date)) byDateEmp.set(r.date, new Map())
@@ -118,52 +114,68 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     if (!em.has(r.employee_id)) em.set(r.employee_id, [])
     em.get(r.employee_id)!.push(r)
   })
-
-  // Last 14 working days for chart (or all if fewer)
-  const chartDays = workingDays.slice(-14)
   const chartData = chartDays.map(date => {
     const empMap = byDateEmp.get(date)
     if (!empMap) return { date, min: 0 }
-    let totalMin = 0
-    empMap.forEach((dayRecs, eId) => {
-      const e = employees.find(emp => emp.id === eId)
-      const lMin = e?.lunch_break_minutes ?? 60
-      const hasBreaks = dayRecs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
-      totalMin += hasBreaks ? calcTimeBreakdown(dayRecs).workedMin : Math.max(0, calcNetMinutes(dayRecs, lMin))
+    let tot = 0
+    empMap.forEach((recs, eid) => {
+      const e = employees.find(x => x.id === eid)
+      tot += calcLiveMin(recs, e?.lunch_break_minutes ?? 60)
     })
-    return { date, min: totalMin }
+    return { date, min: tot }
   })
-  const maxChartMin = Math.max(...chartData.map(d => d.min), 1)
+  const chartMax = Math.max(...chartData.map(d => d.min), 1)
+  const chartValues = chartData.map(d => d.min)
+  const avgMin = chartValues.length ? Math.round(chartValues.reduce((a, b) => a + b, 0) / chartValues.length) : 0
+  const todayVsAvg = totalMinToday - avgMin
 
-  // Monthly totals per employee
-  const byEmpMonth: Record<string, PunchRecord[]> = {}
-  monthRecs.forEach(r => {
-    if (!byEmpMonth[r.employee_id]) byEmpMonth[r.employee_id] = []
-    byEmpMonth[r.employee_id].push(r)
-  })
+  // Upcoming exceptions (future, not today)
+  const upcoming = exceptions
+    .filter(e => e.date > todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 4)
+
+  // Alerts: absent employees
+  const absentEmps = empData.filter(e => e.recs.length === 0).slice(0, 4)
+
+  // Recent punches feed
+  const recentPunches = [...todayRecs]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 8)
+
+  const PUNCH_LABEL: Record<string, string> = {
+    entrada: 'Entrada', 'saída': 'Saída',
+    inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço',
+    pausa_cafe: 'Pausa café', retorno_cafe: 'Retorno café',
+  }
+  const PUNCH_TONE: Record<string, string> = {
+    entrada: 'success', 'saída': '', inicio_almoco: 'warn',
+    fim_almoco: 'warn', pausa_cafe: 'accent', retorno_cafe: 'accent',
+  }
+
+  const fmtDate = (dateStr: string) => {
+    const d = new Date(dateStr + 'T12:00:00')
+    return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
+  }
 
   if (loading) return (
     <>
-      <div className="card">
-        <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          {[0,1,2,3].map(i => (
-            <div key={i} style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div className="skeleton" style={{ height: 22, width: '40%' }} />
-              <div className="skeleton skeleton-text" style={{ width: '70%' }} />
-            </div>
-          ))}
-        </div>
+      <div className="kpi-grid">
+        {[0,1,2,3].map(i => (
+          <div key={i} className="kpi">
+            <div className="skeleton skeleton-text" style={{ width: '55%' }} />
+            <div className="skeleton" style={{ height: 32, width: '40%', marginTop: 4 }} />
+            <div className="skeleton skeleton-text" style={{ width: '60%' }} />
+          </div>
+        ))}
       </div>
       <div className="card">
-        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[0,1,2,3].map(i => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
-              <div className="skeleton skeleton-avatar" style={{ width: 32, height: 32 }} />
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div className="skeleton skeleton-title" style={{ width: '45%' }} />
-                <div className="skeleton skeleton-text" style={{ width: '30%' }} />
-              </div>
-              <div className="skeleton" style={{ width: 48, height: 20, borderRadius: 99 }} />
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div className="skeleton skeleton-avatar" style={{ width: 28, height: 28 }} />
+              <div style={{ flex: 1 }}><div className="skeleton skeleton-text" style={{ width: '45%' }} /></div>
+              <div className="skeleton" style={{ width: 56, height: 6 }} />
             </div>
           ))}
         </div>
@@ -173,147 +185,268 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
 
   return (
     <>
-      {/* ── STATUS TODAY ─────────────────────────────────────────────────── */}
-      <div className="card">
-        <div style={{ padding: '16px 20px' }}>
-          <SL>{t('dash.presence_today')} · {now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' })}</SL>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 10 }}>
-            {((['working', 'pause', 'out', 'absent'] as EmpStatus[])).map(s => (
-              <div key={s} style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-md)', padding: '10px 12px', textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: STATUS_COLOR[s], fontFamily: 'var(--font-mono)' }}>
-                  {statusCounts[s]}
-                </div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-muted)', marginTop: 2, letterSpacing: '0.04em' }}>
-                  {t(('dash.status.' + s) as TranslationKey).toUpperCase()}
-                </div>
-              </div>
-            ))}
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-title">Dashboard</div>
+          <div className="page-sub">
+            {now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' })}
+          </div>
+        </div>
+        <div className="page-actions">
+          <button className="btn" onClick={load}>
+            <IconRefresh size={13} /> {t('common.retry').replace('Tentar novamente', 'Atualizar')}
+          </button>
+        </div>
+      </div>
+
+      {/* KPI grid */}
+      <div className="kpi-grid">
+        {/* 1 - Working now */}
+        <div className="kpi">
+          <div className="kpi-label"><IconPulse size={12} /> Trabalhando agora</div>
+          <div className="kpi-value tnum">
+            {working}
+            <span style={{ fontSize: 14, color: 'var(--fg-subtle)', fontWeight: 500 }}> / {employees.length}</span>
+          </div>
+          <div className="kpi-delta" style={{ gap: 6 }}>
+            {onBreak > 0 && <span className="chip warn dot">{onBreak} em pausa</span>}
+            {absent > 0 && <span className="chip outline">{absent} sem registro</span>}
+          </div>
+        </div>
+
+        {/* 2 - Hours today */}
+        <div className="kpi">
+          <div className="kpi-label"><IconClock size={12} /> Horas registadas hoje</div>
+          <div className="kpi-value tnum">{fmtMin(totalMinToday)}</div>
+          <div className={`kpi-delta${todayVsAvg >= 0 ? ' up' : ' down'}`}>
+            {todayVsAvg >= 0 ? <IconArrowUp size={11}/> : <IconArrowDown size={11}/>}
+            {fmtMin(Math.abs(todayVsAvg))} vs. média
+          </div>
+          <div className="kpi-spark">
+            <Sparkline values={chartValues} />
+          </div>
+        </div>
+
+        {/* 3 - Cost today */}
+        <div className="kpi">
+          <div className="kpi-label"><IconEuro size={12} /> Custos do dia</div>
+          <div className="kpi-value tnum">{fmtCost(totalEarnings)}</div>
+          <div className="kpi-delta">
+            Estimativa · {employees.filter(e => e.hourly_rate).length} c/ valor/h
+          </div>
+        </div>
+
+        {/* 4 - Hour bank */}
+        <div className="kpi">
+          <div className="kpi-label"><IconBank size={12} /> Banco de horas</div>
+          <div className="kpi-value tnum" style={{ color: totalBank >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
+            {totalBank >= 0 ? '+' : ''}{fmtMin(totalBank)}
+          </div>
+          <div className="kpi-delta" style={{ gap: 6 }}>
+            {positiveBank > 0 && <span className="chip success">{positiveBank} positivos</span>}
+            {negativeBank > 0 && <span className="chip danger">{negativeBank} negativos</span>}
           </div>
         </div>
       </div>
 
-      {/* ── EMPLOYEE STATUS LIST ─────────────────────────────────────────── */}
-      <div className="card">
-        <div style={{ padding: '16px 20px' }}>
-          <SL>{t('dash.team_now')}</SL>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {empStatuses
+      {/* Activity live + right column */}
+      <div className="grid-3">
+        {/* Activity table */}
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <div className="card-title">Atividade ao vivo</div>
+              <div className="card-sub">Atualiza ao recarregar</div>
+            </div>
+          </div>
+          <div className="card-body flush">
+            {empData
               .sort((a, b) => {
-                const order: EmpStatus[] = ['working', 'pause', 'out', 'absent']
-                return order.indexOf(a.status) - order.indexOf(b.status)
+                const order: Record<string, number> = { working: 0, lunch: 1, coffee: 1, off: 2 }
+                const ao = order[a.state] ?? 3
+                const bo = order[b.state] ?? 3
+                if (ao !== bo) return ao - bo
+                if (a.recs.length === 0 && b.recs.length > 0) return 1
+                if (b.recs.length === 0 && a.recs.length > 0) return -1
+                return 0
               })
-              .map(({ emp, status }) => {
-                const recs = todayByEmp.get(emp.id) ?? []
-                const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                const lastRec = sorted.at(-1)
-                const since = lastRec ? new Date(lastRec.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }) : null
+              .slice(0, 8)
+              .map(({ emp, recs, state, since, liveMin, targetMin, earnings }) => {
+                const pct = Math.min(100, targetMin > 0 ? (liveMin / targetMin) * 100 : 0)
+                const isOver = liveMin > targetMin
+                const ci = empColor(emp.id)
                 return (
-                  <div key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div className={`avatar size-32 av-c${empColor(emp.id)}`} style={{ flexShrink: 0, fontSize: 11 }}>{initials(emp.name)}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp.name}</div>
-                      {since && (
-                        <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
-                          {status === 'working' ? t('dash.since') : status === 'pause' ? t('dash.pause_since') : t('dash.left_at')} {since}
+                  <div key={emp.id} className="status-row">
+                    <div className="cell-emp" style={{ minWidth: 0 }}>
+                      <div className={`avatar size-28 av-c${ci}`}>{avatarInitials(emp.name)}</div>
+                      <div className="cell-emp-info">
+                        <div className="cell-emp-name">{emp.name}</div>
+                        <div className="cell-emp-sub">
+                          {state === 'working' && since && <>desde {since}</>}
+                          {state === 'lunch'   && since && <>almoço desde {since}</>}
+                          {state === 'coffee'  && since && <>pausa café desde {since}</>}
+                          {state === 'off' && since && <>saiu às {since}</>}
+                          {recs.length === 0 && <>sem registro hoje</>}
                         </div>
-                      )}
+                      </div>
                     </div>
-                    <span className={`chip ${STATUS_CHIP[status]}`} style={{ fontSize: 10, flexShrink: 0 }}>
-                      {t(('dash.status.' + status) as TranslationKey)}
-                    </span>
+                    <div style={{ width: 110, textAlign: 'right', fontSize: 12 }} className="tnum muted">
+                      {fmtMin(liveMin)} / {emp.workday_hours}h
+                    </div>
+                    <div style={{ width: 80 }}>
+                      <div className="bar">
+                        <div className={`bar-fill${isOver ? ' over' : ''}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                    <div style={{ width: 90 }}>
+                      {state === 'working' && <span className="chip success">Ativo</span>}
+                      {state === 'lunch'   && <span className="chip warn">Almoço</span>}
+                      {state === 'coffee'  && <span className="chip warn">Pausa</span>}
+                      {state === 'off' && recs.length > 0 && <span className="chip outline">Saiu</span>}
+                      {recs.length === 0 && <span className="chip outline">—</span>}
+                    </div>
+                    <div style={{ width: 80, textAlign: 'right' }} className="tnum muted">
+                      {earnings !== null ? fmtCost(earnings) : '—'}
+                    </div>
                   </div>
                 )
               })}
           </div>
         </div>
+
+        {/* Right column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Upcoming events */}
+          <div className="card">
+            <div className="card-head">
+              <div className="card-title">Próximos eventos</div>
+            </div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {upcoming.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: 'var(--fg-muted)' }}>
+                  Nenhum feriado ou folga nos próximos 30 dias.
+                </div>
+              ) : (
+                upcoming.map(exc => {
+                  const [day, mon] = fmtDate(exc.date).split(' ')
+                  return (
+                    <div key={exc.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 44, padding: '6px 0', flexShrink: 0,
+                        background: 'var(--surface-2)', borderRadius: 'var(--r-sm)',
+                        textAlign: 'center', border: '1px solid var(--border)',
+                      }}>
+                        <div style={{ fontWeight: 600, fontSize: 11 }} className="tnum">{day}</div>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--fg-muted)' }}>{mon}</div>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{exc.description}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
+                          {exc.type === 'holiday' ? 'Feriado' : exc.employee_id ? 'Folga individual' : 'Folga empresa'}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Alerts */}
+          {absentEmps.length > 0 && (
+            <div className="card">
+              <div className="card-head">
+                <div className="card-title">Atenção</div>
+                <span className="chip warn">{absentEmps.length}</span>
+              </div>
+              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {absentEmps.map(({ emp }) => (
+                  <div key={emp.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: '50%', marginTop: 5, flexShrink: 0,
+                      background: 'var(--warning)',
+                    }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{emp.name} sem registro hoje</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
+                        Nenhuma batida registada
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── HOURS CHART ─────────────────────────────────────────────────── */}
-      {chartDays.length >= 2 && (
+      {/* Chart + Recent punches */}
+      <div className="grid-3">
+        {/* Bar chart */}
         <div className="card">
-          <div style={{ padding: '16px 20px' }}>
-            <SL>{t('dash.hours_per_day')} — {now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</SL>
-            <div style={{ marginTop: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 80 }}>
-                {chartData.map(({ date, min }) => {
-                  const pct = Math.min(100, (min / maxChartMin) * 100)
-                  const d = new Date(date + 'T12:00:00')
-                  const isToday = date === todayStr
-                  const label = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}: ${min > 0 ? fmtMinutes(min) : t('dash.no_records_bar')}`
-                  return (
-                    <div key={date} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} title={label}>
-                      <div style={{
-                        width: '100%', borderRadius: '3px 3px 0 0',
-                        height: pct > 0 ? `${pct}%` : 3,
-                        background: min === 0 ? 'var(--border)' : isToday ? 'var(--accent)' : 'var(--accent)',
-                        opacity: min === 0 ? 1 : isToday ? 1 : 0.55,
-                        transition: 'height 0.3s',
-                      }} />
+          <div className="card-head">
+            <div className="card-title">Horas trabalhadas · últimos {chartDays.length} dias</div>
+          </div>
+          <div className="card-body">
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 160, paddingBottom: 4 }}>
+              {chartData.map(({ date, min }) => {
+                const pct = (min / chartMax) * 100
+                const d = new Date(date + 'T12:00:00')
+                const isToday = date === todayStr
+                return (
+                  <div
+                    key={date}
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}
+                    title={`${fmtDate(date)}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`}
+                  >
+                    <div style={{
+                      width: '100%', maxWidth: 40,
+                      height: Math.max(pct, 4) + '%',
+                      background: isToday ? 'var(--accent)' : 'var(--accent-soft)',
+                      borderRadius: 'var(--r-xs) var(--r-xs) 0 0',
+                      transition: 'height 0.4s ease',
+                    }} />
+                    <div style={{ fontSize: 10, color: isToday ? 'var(--accent)' : 'var(--fg-subtle)', fontWeight: isToday ? 700 : 400 }} className="tnum">
+                      {d.getDate()}
                     </div>
-                  )
-                })}
-              </div>
-              {/* Day labels */}
-              <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
-                {chartData.map(({ date }) => {
-                  const d = new Date(date + 'T12:00:00')
-                  const isToday = date === todayStr
-                  return (
-                    <div key={date} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: isToday ? 'var(--accent)' : 'var(--fg-muted)', fontWeight: isToday ? 700 : 400 }}>
-                      {DAYS_SHORT[d.getDay()]}
-                    </div>
-                  )
-                })}
-              </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
-      )}
 
-      {/* ── MONTHLY PROGRESS PER EMPLOYEE ───────────────────────────────── */}
-      <div className="card">
-        <div style={{ padding: '16px 20px' }}>
-          <SL>{t('dash.month_progress')}</SL>
-          {employees.map(emp => {
-            const empRecs = byEmpMonth[emp.id] ?? []
-            const monthMin = empRecs.length > 0 ? Math.max(0, calcOvertimePeriod(empRecs, 0, emp.lunch_break_minutes) ?? 0) : 0
-            const targetMin = emp.workday_hours * 60 * effectiveWorkingDays.length
-            const pct = targetMin > 0 ? Math.min(100, (monthMin / targetMin) * 100) : 0
-            const bank = bankBalances.get(emp.id)
-            return (
-              <div key={emp.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{emp.name}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
-                      {monthMin > 0 ? fmtMinutes(Math.round(monthMin)) : '—'}
-                    </span>
-                    {bank !== undefined && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: bank >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
-                        {bank >= 0 ? '+' : '-'}{fmtMinutes(Math.abs(bank))}
-                      </span>
-                    )}
-                    <button
-                      className="btn ghost sm"
-                      style={{ fontSize: 10, padding: '2px 7px' }}
-                      title={t('dash.month_progress') + ' PDF'}
-                      onClick={() => {
-                        const period = now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
-                        openPayslip(emp.name, period, empRecs, emp.workday_hours, emp.lunch_break_minutes ?? 60, emp.hourly_rate ?? null)
-                      }}
-                    >PDF</button>
-                  </div>
-                </div>
-                <div style={{ width: '100%', background: 'var(--border)', borderRadius: 999, height: 4 }}>
-                  <div style={{
-                    height: 4, borderRadius: 999, width: `${pct}%`,
-                    background: pct >= 100 ? 'var(--success-fg)' : pct >= 75 ? 'var(--accent)' : 'var(--fg-subtle)',
-                    transition: 'width 0.3s',
-                  }} />
-                </div>
+        {/* Recent punches */}
+        <div className="card">
+          <div className="card-head">
+            <div className="card-title">Últimas batidas</div>
+          </div>
+          <div className="card-body flush">
+            {recentPunches.length === 0 ? (
+              <div className="empty">
+                <div className="desc">Nenhuma batida hoje.</div>
               </div>
-            )
-          })}
+            ) : recentPunches.map(r => {
+              const emp = employees.find(e => e.id === r.employee_id)
+              const ci = emp ? empColor(emp.id) : 1
+              const time = new Date(r.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+              return (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
+                  <div className={`avatar av-c${ci}`}>{avatarInitials(r.employee_name)}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{r.employee_name}</div>
+                    <div style={{ marginTop: 2 }}>
+                      <span className={`chip ${PUNCH_TONE[r.type] || 'outline'}`} style={{ fontSize: 11 }}>
+                        {PUNCH_LABEL[r.type] ?? r.type}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="tnum muted" style={{ fontSize: 11.5 }}>{time}</div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </>
