@@ -6,6 +6,7 @@ import { SL } from '../../_lib/helpers'
 import { AUDIT_LABELS } from '../../_lib/types'
 import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
+import { IconRefresh } from '../icons'
 
 export function AuditoriaTab() {
   const { t } = useLang()
@@ -31,6 +32,17 @@ export function AuditoriaTab() {
 
   return (
     <>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-title">{t('tab.auditoria')}</div>
+          <div className="page-sub">{!loading && logs.length > 0 ? `${logs.length} ${t('common.records')}` : t('audit.none')}</div>
+        </div>
+        <div className="page-actions">
+          <button className="btn" onClick={load}><IconRefresh size={13}/> Atualizar</button>
+        </div>
+      </div>
+
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
           <SL>{t('audit.filter')}</SL>

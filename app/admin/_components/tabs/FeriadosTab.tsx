@@ -55,6 +55,14 @@ export function FeriadosTab() {
 
   return (
     <>
+      {/* Page header */}
+      <div className="page-head">
+        <div>
+          <div className="page-title">{t('tab.feriados')}</div>
+          <div className="page-sub">{exceptions.length > 0 ? `${exceptions.length} ${t('common.records')}` : t('fer.none')}</div>
+        </div>
+      </div>
+
       <div className="card">
         <div style={{ padding: '16px 20px' }}>
           <SL>{t('fer.add_title')}</SL>
