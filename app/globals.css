@@ -310,15 +310,24 @@ ul, ol { list-style: none; }
 .notif-icon.warn   { background: var(--warning-soft); color: var(--warning-fg); }
 .notif-icon.muted  { background: var(--surface-2); color: var(--fg-muted); }
 .notif-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.notif-title { font-size: 13px; font-weight: 500; color: var(--fg); line-height: 1.25; }
-.notif-desc  { font-size: 11.5px; color: var(--fg-muted); line-height: 1.3; }
+.notif-title { font-size: 13px; font-weight: 500; color: var(--fg); line-height: 1.25; word-break: break-word; }
+.notif-desc  { font-size: 11.5px; color: var(--fg-muted); line-height: 1.3; word-break: break-word; }
 .notif-arrow { color: var(--fg-subtle); display: inline-flex; align-items: center; align-self: center; flex-shrink: 0; }
 .notif-empty { padding: 28px 16px; text-align: center; }
 .notif-empty-emoji { font-size: 26px; color: var(--success-fg); margin-bottom: 4px; }
 .notif-empty-title { font-size: 13px; font-weight: 600; color: var(--fg); }
 .notif-empty-sub { font-size: 11.5px; color: var(--fg-muted); margin-top: 2px; }
-@media (max-width: 480px) {
-  .notif-pop { width: calc(100vw - 16px); right: -4px; }
+
+/* On narrow screens, anchor to the viewport (not the bell wrapper) so the popover
+   always fits even when the bell sits very close to the right edge of the screen. */
+@media (max-width: 560px) {
+  .notif-pop {
+    position: fixed;
+    top: 56px;          /* topbar height (49px) + 6px gap + 1px border */
+    left: 8px; right: 8px;
+    width: auto; max-width: none;
+  }
+  .notif-list { max-height: calc(100vh - 96px); }
 }
 
 /* ─── Page ─── */
