@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
 import type { Employee, EmployeeProfile } from '@/lib/types'
 import { Tab, ALL_TABS, MANAGER_TABS } from './_lib/types'
-import { IconHamburger } from './_components/icons'
 import Sidebar from './_components/Sidebar'
+import TopBar from './_components/TopBar'
+import CommandPalette from './_components/CommandPalette'
+import SettingsModal from './_components/SettingsModal'
 import MissingExitBanner from './_components/MissingExitBanner'
 import { MeuPontoTab } from './_components/tabs/MeuPontoTab'
 import { DashboardTab } from './_components/tabs/DashboardTab'
@@ -24,9 +26,12 @@ export default function AdminPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [tab, setTab] = useState<Tab>('dashboard')
   const [showPwd, setShowPwd] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showCmdK, setShowCmdK] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const [theme, setTheme] = useState('dark')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [pendingCorrections, setPendingCorrections] = useState(0)
   const router = useRouter()
 
@@ -40,10 +45,13 @@ export default function AdminPage() {
     localStorage.setItem('pg.theme', next)
   }
 
-  // A token can stay validly *signed* (so the edge middleware bounces /login back to a
-  // protected page) while the API rejects it — e.g. the session was revoked via
-  // sessions_valid_from. Clearing the cookie through logout makes /login reachable again,
-  // instead of looping forever on the loading splash.
+  const toggleCollapse = () => {
+    const next = !sidebarCollapsed
+    setSidebarCollapsed(next)
+    document.documentElement.querySelector('.app')?.setAttribute('data-collapsed', String(next))
+    localStorage.setItem('pg.sidebar-collapsed', String(next))
+  }
+
   const endDeadSession = useCallback(async () => {
     try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* clear cookie anyway */ }
     router.replace('/login')
@@ -63,7 +71,7 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/employees')
       if (res.ok) setEmployees(await res.json())
-    } catch { /* employees ficam como estão */ }
+    } catch { /* silent */ }
   }, [])
 
   const refreshPendingCount = useCallback(async () => {
@@ -74,8 +82,15 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    const saved = localStorage.getItem('pg.theme')
-    if (saved) setTheme(saved)
+    const savedTheme = localStorage.getItem('pg.theme')
+    if (savedTheme) {
+      setTheme(savedTheme)
+      document.documentElement.setAttribute('data-theme', savedTheme)
+    }
+    const savedCollapsed = localStorage.getItem('pg.sidebar-collapsed') === 'true'
+    if (savedCollapsed) {
+      setSidebarCollapsed(true)
+    }
     setFetchError(false)
     loadUser()
     loadEmployees()
@@ -84,9 +99,33 @@ export default function AdminPage() {
     return () => clearInterval(interval)
   }, [loadUser, loadEmployees, refreshPendingCount])
 
+  // Sync data-collapsed attribute on app element
+  useEffect(() => {
+    const app = document.querySelector('.app')
+    app?.setAttribute('data-collapsed', String(sidebarCollapsed))
+  }, [sidebarCollapsed])
+
+  // ⌘K / Ctrl+K global shortcut
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowCmdK(v => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
+  }
+
+  const handleCmdAction = (id: string) => {
+    if (id === 'toggle_theme') toggleTheme()
+    if (id === 'new_employee') setTab('funcionarios')
+    if (id === 'export_csv') setTab('relatorios')
   }
 
   if (fetchError) return (
@@ -107,25 +146,46 @@ export default function AdminPage() {
   )
 
   return (
-    <div className="app">
+    <div className="app" data-collapsed={sidebarCollapsed}>
       {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
+      {showSettings && (
+        <SettingsModal
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onChangePwd={() => { setShowSettings(false); setShowPwd(true) }}
+          onLogout={handleLogout}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+      <CommandPalette
+        open={showCmdK}
+        onClose={() => setShowCmdK(false)}
+        tabs={visibleTabs}
+        onNavigate={t => { setTab(t); setShowCmdK(false) }}
+        onAction={handleCmdAction}
+        theme={theme}
+      />
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
-        tab={tab} setTab={t => { setTab(t); if (t === 'correcoes') refreshPendingCount() }} tabs={visibleTabs}
-        user={user} onLogout={handleLogout} onChangePwd={() => setShowPwd(true)}
-        theme={theme} toggleTheme={toggleTheme}
-        mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)}
+        tab={tab}
+        setTab={t => { setTab(t); if (t === 'correcoes') refreshPendingCount() }}
+        tabs={visibleTabs}
+        user={user}
+        onOpenSettings={() => setShowSettings(true)}
+        mobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleCollapse}
         badges={{ correcoes: pendingCorrections }}
       />
       <div className="main">
-        <header className="topbar">
-          <button onClick={() => setSidebarOpen(true)} className="topbar-hamburger" aria-label="Abrir menu">
-            <IconHamburger />
-          </button>
-          <div className="breadcrumbs">
-            <span className="crumb current">{visibleTabs.find(t => t.id === tab)?.label ?? ''}</span>
-          </div>
-        </header>
+        <TopBar
+          tab={tab}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onOpenMobileNav={() => setSidebarOpen(true)}
+          onOpenCmdK={() => setShowCmdK(true)}
+        />
         <div className="page">
           <MissingExitBanner />
           {tab === 'meu_ponto'    && <MeuPontoTab user={user} />}
