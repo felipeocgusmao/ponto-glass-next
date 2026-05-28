@@ -90,9 +90,12 @@ Existe **um URL** e **uma senha**.
 │   Banco       →   Supabase  (PostgreSQL gerenciado)     │
 │   Senhas      →   bcryptjs  (hash + salt)               │
 │   Push        →   Web Push API  (VAPID)                 │
-│   Email       →   Nodemailer  (SMTP — opcional)         │
+│   E-mail      →   Microsoft Graph API  (+ SMTP fallback)│
 │   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
-│   Cron        →   Vercel Cron Jobs  (ausências)         │
+│   Cron        →   Vercel Cron Jobs  (ausências, saída)  │
+│   Testes      →   Vitest  (utils, auth, rateLimit)      │
+│   Monitor     →   Sentry  (erros cliente + servidor)    │
+│   Geofencing  →   Haversine  (raio por funcionário)     │
 │   Deploy      →   Vercel  (Edge Network global)         │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
@@ -108,9 +111,12 @@ Cada peça foi escolhida com intenção:
 | **bcryptjs** | Senhas nunca saem do servidor em texto plano |
 | **CSS Variables** | Design system próprio — tema claro/escuro, sem dependências de UI |
 | **Web Push / VAPID** | Notificações nativas no celular sem app store |
-| **Nodemailer** | Alertas de correção por e-mail, configuração opcional |
+| **Microsoft Graph + SMTP** | Graph API como transporte principal (OAuth Client Credentials), SMTP como fallback automático |
 | **jsPDF + AutoTable** | Geração de PDF no cliente, sem dependências de servidor |
-| **Vercel Cron Jobs** | Tarefa agendada diária para alertas de ausência |
+| **Vercel Cron Jobs** | Tarefas agendadas: alerta de ausência (manhã) e alerta de saída não registada (17h) |
+| **Vitest** | Testes unitários rápidos para a lógica de cálculo de horas, auth e rate limit |
+| **Sentry** | Captura de erros e source maps automáticos via `withSentryConfig` |
+| **Haversine** | Cálculo de distância para validação opcional de geofencing por funcionário |
 
 <br/>
 
@@ -155,7 +161,7 @@ Nenhuma configuração manual de banco necessária.
 ## ◈ design
 
 O visual foi construído do zero em CSS puro — sem bibliotecas de UI, sem componentes prontos.  
-Inspirado no minimalismo do Linear e Notion: estrutura clara, hierarquia legível, zero ruído.
+Inspirado no minimalismo do Linear, Notion e VSCode: estrutura clara, hierarquia legível, zero ruído.
 
 ```css
 /* o sistema de cores — claro e escuro via atributo */
@@ -163,13 +169,19 @@ Inspirado no minimalismo do Linear e Notion: estrutura clara, hierarquia legíve
 [data-theme="dark"]  { --bg: #08090b; --accent: #7c8cf8; --fg: #fafafa; }
 
 /* sidebar + conteúdo — 100dvh para iOS Safari (barra de endereço dinâmica) */
-.app   { display: grid; grid-template-columns: 240px 1fr; height: 100vh; height: 100dvh; }
-.page  { flex: 1; overflow: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
+.app   { display: grid; grid-template-columns: var(--sidebar-w, 240px) 1fr; height: 100dvh; }
+.app[data-collapsed="true"] { --sidebar-w: 56px; }
 ```
+
+**Admin shell** — sidebar agrupada (OPERAÇÃO / PESSOAS / ANÁLISE), botão de colapsar com persistência em `localStorage`, topbar com breadcrumbs, busca **⌘K** que abre uma **Command Palette** (navegação + ações), **Notifications Dropdown** no sino (correções pendentes, saídas em falta, ausências) e um **Settings Modal** centralizado para tema, idioma, palavra-passe e logout.
+
+**Page-head** consistente em todos os tabs: título, subtítulo dinâmico (contagem ou estado) e botões de ação (Atualizar, Exportar, etc.).
+
+**Employee shell** — ecrã `/ponto` em layout fullscreen com relógio ao vivo, anel de progresso, ações contextuais (entrada / almoço / pausa / saída) e navegação inferior por 5 tabs (Ponto, Histórico, Banco, Correções, Perfil).
 
 Tema claro/escuro com um clique — persiste via `localStorage` e no banco por funcionário.  
 Cores de avatar (`av-c1` → `av-c8`) atribuídas por hash do ID, sem campo extra no banco.  
-Interface totalmente responsiva: sidebar retrátil em mobile, layout adaptado a 768px.
+Interface totalmente responsiva: sidebar em drawer mobile (≤768px), colunas ocultas/encolhidas em ecrãs estreitos, layout específico ≤480px.
 
 <br/>
 
@@ -205,18 +217,26 @@ ponto_glass_next/
 │   │   └── _components/
 │   │       └── CalendarView      ← grelha de mês com dias coloridos (trabalhado/ausente/feriado)
 │   ├── kiosk/page.tsx            ← modo quiosque (tablet compartilhado, sem login individual)
-│   ├── admin/page.tsx            ← painel admin/gerente (sidebar, 10 abas por role)
-│   │   └── _components/tabs/
-│   │       ├── MeuPontoTab       ← ponto do admin/gerente logado
-│   │       ├── DashboardTab      ← gráficos de horas por dia e mês
-│   │       ├── StatusTab         ← status ao vivo de todos os funcionários
-│   │       ├── RegistrosTab      ← histórico de registros com filtros
-│   │       ├── FuncionariosTab   ← CRUD completo de funcionários
-│   │       ├── BancoHorasTab     ← saldo e ajustes manuais do banco de horas
-│   │       ├── FeriadosTab       ← gerir feriados e dias de folga
-│   │       ├── RelatoriosTab     ← relatórios por período + exportação CSV e PDF
-│   │       ├── CorrecoesTab      ← aprovar/rejeitar solicitações de correção
-│   │       └── AuditoriaTab      ← audit log de ações administrativas
+│   ├── admin/page.tsx            ← painel admin/gerente (sidebar agrupada, 10 abas por role)
+│   │   ├── _lib/
+│   │   │   └── useNotifications  ← hook que agrega correções pendentes, saídas em falta, ausências
+│   │   └── _components/
+│   │       ├── Sidebar           ← grupos OPERAÇÃO / PESSOAS / ANÁLISE, colapsável, drawer mobile
+│   │       ├── TopBar            ← breadcrumbs + ⌘K + tema + sino com badge
+│   │       ├── CommandPalette    ← navegação por teclado e ações rápidas (⌘K / Ctrl+K)
+│   │       ├── NotificationsDropdown  ← popover do sino: correções, saídas em falta, ausências
+│   │       ├── SettingsModal     ← tema, idioma, palavra-passe, sair
+│   │       └── tabs/
+│   │           ├── MeuPontoTab       ← ponto do admin/gerente logado
+│   │           ├── DashboardTab      ← KPIs, sparkline, gráfico, feed de batidas, próximos eventos
+│   │           ├── StatusTab         ← status ao vivo com KPIs e filter pills
+│   │           ├── RegistrosTab      ← histórico de registros com filtros e exportação Excel
+│   │           ├── FuncionariosTab   ← CRUD completo de funcionários
+│   │           ├── BancoHorasTab     ← saldo e ajustes manuais do banco de horas
+│   │           ├── FeriadosTab       ← gerir feriados e dias de folga
+│   │           ├── RelatoriosTab     ← relatórios por período + exportação CSV e PDF
+│   │           ├── CorrecoesTab      ← aprovar/rejeitar solicitações de correção
+│   │           └── AuditoriaTab      ← audit log de ações administrativas
 │   │
 │   └── api/
 │       ├── auth/
@@ -233,7 +253,8 @@ ponto_glass_next/
 │       ├── employees/            ← CRUD funcionários + horário esperado + turno noturno
 │       │   └── [id]/
 │       ├── cron/
-│       │   └── absence-check/    ← push de ausência (protegido por CRON_SECRET)
+│       │   ├── absence-check/    ← push de ausência (protegido por CRON_SECRET)
+│       │   └── missing-exit/     ← alerta de saída não registada às 17h (protegido por CRON_SECRET)
 │       ├── hour-bank/            ← saldo do banco de horas + ajustes manuais
 │       │   └── [id]/
 │       ├── correction-requests/  ← criar / listar / aprovar / rejeitar correções
@@ -252,7 +273,7 @@ ponto_glass_next/
 │   ├── supabase.ts           ← cliente Supabase (service_role)
 │   ├── rateLimit.ts          ← rate limiter em memória (login / recover)
 │   ├── audit.ts              ← helper de audit log
-│   ├── email.ts              ← Nodemailer (envio de e-mails)
+│   ├── email.ts              ← Microsoft Graph (preferido) + SMTP fallback
 │   ├── i18n.ts               ← traduções PT-PT / PT-BR / EN / ES
 │   ├── LangContext.tsx        ← contexto React de idioma
 │   ├── types.ts              ← Employee, EmployeeProfile, PunchRecord, CorrectionRequest…
@@ -260,8 +281,14 @@ ponto_glass_next/
 │
 ├── middleware.ts              ← RBAC: protege rotas por role (admin/manager/employee)
 ├── public/sw.js               ← Service Worker (cache + push notifications)
-├── vercel.json                ← Vercel Cron Jobs (absence-check às 09:00 UTC dias úteis)
-└── supabase/schema.sql        ← schema do banco com RLS + migrações comentadas (v1→v9)
+├── vercel.json                ← Vercel Cron Jobs (absence-check 09:00 + missing-exit 17:00 UTC)
+├── sentry.client.config.ts    ← inicialização Sentry no cliente
+├── sentry.server.config.ts    ← inicialização Sentry no servidor
+├── vitest.config.ts           ← configuração Vitest (jsdom)
+├── __tests__/                 ← testes unitários (utils, auth, rateLimit)
+└── supabase/
+    ├── schema.sql             ← schema do banco com RLS + migrações comentadas
+    └── migrations/            ← migrações datadas (geofencing, RLS policies, backfill)
 ```
 
 <br/>
@@ -308,13 +335,26 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_EMAIL=mailto:admin@empresa.com
 
-# E-mail (opcional — desativa alertas por e-mail se omitido)
+# E-mail via Microsoft Graph (preferido — OAuth Client Credentials)
+# Crie uma app no Azure AD com permissão Mail.Send (Application).
+MS_TENANT_ID=
+MS_CLIENT_ID=
+MS_CLIENT_SECRET=
+MS_SENDER_EMAIL=noreply@empresa.com
+
+# E-mail via SMTP (fallback automático se Graph não estiver configurado ou falhar)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
 SMTP_FROM=PontoGlass <noreply@empresa.com>
 NEXT_PUBLIC_APP_URL=https://ponto-glass-next.vercel.app
+
+# Sentry (opcional — desativa monitorização se omitido)
+NEXT_PUBLIC_SENTRY_DSN=
+SENTRY_ORG=
+SENTRY_PROJECT=
+SENTRY_AUTH_TOKEN=
 ```
 
 **4. Crie o banco**
@@ -480,6 +520,9 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Lock de perfil — admin pode impedir que o funcionário altere os próprios dados
   ✓  Push notifications via VAPID (chave privada nunca sai do servidor)
   ✓  Reset de senha por e-mail com token de uso único e expiração
+  ✓  Geofencing por funcionário (Haversine, validação no servidor — não confia no cliente)
+  ✓  Sessões revogáveis via sessions_valid_from no JWT payload
+  ✓  Monitorização Sentry — erros capturados sem expor segredos
 ```
 
 <br/>
@@ -505,11 +548,17 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Alerta de funcionários sem saída registrada
   ✓  Dashboard com gráficos de horas por dia e mês
   ✓  Audit log de alterações administrativas
-  ✓  Redesign Linear/Notion — tema claro/escuro, sidebar, design system próprio
+  ✓  Redesign admin Linear/Notion/VSCode — sidebar agrupada colapsável, topbar com breadcrumbs
+  ✓  Command Palette ⌘K — navegação por teclado + ações rápidas (novo func., exportar, tema)
+  ✓  Settings Modal centralizado (tema, idioma, palavra-passe, sair)
+  ✓  Notifications Dropdown no sino — correções pendentes, saídas em falta, ausências
+  ✓  Dashboard redesenhado — KPIs, sparkline, gráfico 14 dias, feed de batidas, próximos eventos
+  ✓  Page-head consistente em todos os 10 tabs (título, contagem, ações)
   ✓  Banco de horas com ajustes manuais
   ✓  Solicitações de correção de registo (funcionário solicita, admin aprova)
   ✓  Feriados e dias de folga (global e por funcionário)
   ✓  Geolocalização por registo (configurável por funcionário)
+  ✓  Geofencing por funcionário (raio em metros, validação Haversine no servidor)
   ✓  Modo quiosque (tablet partilhado, sem login individual)
   ✓  i18n — PT-PT / PT-BR / EN / ES
   ✓  Reset de senha por e-mail
@@ -517,11 +566,15 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Lock de perfil por funcionário
   ✓  Exportação PDF (relatório A4 com cabeçalho, tabelas por funcionário e totais)
   ✓  Notificação push de ausência (cron 09:00 UTC dias úteis, protegido por CRON_SECRET)
+  ✓  Alerta de saída não registada (cron 17:00 UTC, push aos admins)
   ✓  Vista calendário mensal no histórico do funcionário (cores por estado do dia)
   ✓  Turno noturno (shift_start hora local — entrada 22h creditada no dia anterior)
   ✓  Horas flexíveis (expected_start / expected_end por funcionário)
   ✓  Comentário em registo (nota livre do admin/gerente, ≤ 500 chars)
   ✓  Aviso de shift_start incomum (alerta amarelo ao configurar turno diurno com horário > 00:00)
+  ✓  E-mail via Microsoft Graph API (OAuth Client Credentials) com fallback SMTP automático
+  ✓  Testes Vitest (utils, auth, rateLimit)
+  ✓  Monitorização Sentry (cliente + servidor, source maps)
   ☐  Domínio personalizado por empresa                     → issue #5
   ☐  Multi-empresa (tenancy)                               → issue #6
   ☐  Relatório mensal automático por e-mail                → issue #9
