@@ -9,6 +9,7 @@ import { useLang } from '@/lib/LangContext'
 import { IconRefresh } from '../icons'
 
 type StatusFilter = 'all' | 'working' | 'break' | 'out' | 'absent'
+type ViewMode = 'list' | 'grid'
 
 export function StatusTab({ employees, currentUserId }: { employees: Employee[]; currentUserId: string }) {
   const { t } = useLang()
@@ -18,6 +19,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
   const [msg, setMsg] = useState<{ id: string; kind: 'success' | 'error'; text: string } | null>(null)
   const [weekRecords, setWeekRecords] = useState<PunchRecord[]>([])
   const [filter, setFilter] = useState<StatusFilter>('all')
+  const [view, setView] = useState<ViewMode>('list')
 
   const loadSeq = useRef(0)
   const load = useCallback(async () => {
@@ -155,6 +157,10 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
           <div className="page-sub">{onlineCount} trabalhando · {breakCount} em pausa · atualizado agora</div>
         </div>
         <div className="page-actions">
+          <div className="seg">
+            <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>Lista</button>
+            <button className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}>Cards</button>
+          </div>
           <button className="btn" onClick={load}><IconRefresh size={13}/> Atualizar</button>
         </div>
       </div>
@@ -182,7 +188,81 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
         <FilterPill id="absent"  label="Sem registro" count={absentCount} />
       </div>
 
-      {/* Employee list */}
+      {/* Employee grid (Cards view) */}
+      {view === 'grid' && workers.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+          {filteredStatuses.length === 0 ? (
+            <div className="card" style={{ gridColumn: '1 / -1' }}>
+              <div className="empty">
+                <div className="title">Nenhum funcionário neste estado</div>
+                <div className="desc">Ajuste o filtro acima.</div>
+              </div>
+            </div>
+          ) : filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings }) => {
+            const targetMin = emp.workday_hours * 60
+            const pct = Math.min(100, targetMin > 0 ? (liveNetMin / targetMin) * 100 : 0)
+            return (
+              <div key={emp.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ position: 'relative' }}>
+                      <div className={`avatar size-36 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
+                      <span style={{
+                        position: 'absolute', bottom: 0, right: 0,
+                        width: 10, height: 10, borderRadius: '50%',
+                        background: isWorking ? 'var(--success-fg)' : (isOnLunch || isOnCafe) ? 'var(--warning-fg)' : 'var(--fg-dim)',
+                        border: '2px solid var(--surface)',
+                      }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 550, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.name}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
+                        {emp.role === 'manager' ? t('auth.role.manager') : t('auth.role.employee')} · {emp.workday_hours}h/dia
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    {isWorking && <span className="chip success"><span className="dot"/>{t('status.on_duty')}</span>}
+                    {isOnLunch && <span className="chip warn"><span className="dot"/>{t('status.at_lunch')}</span>}
+                    {isOnCafe  && <span className="chip warn"><span className="dot"/>{t('status.coffee_break')}</span>}
+                    {!isIn && recordsByEmp.has(emp.id) && <span className="chip outline">{t('status.no_records')}</span>}
+                    {!recordsByEmp.has(emp.id) && <span className="chip outline">—</span>}
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--fg-muted)', marginBottom: 6 }}>
+                      <span>Jornada</span>
+                      <span className="tnum">{fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h</span>
+                    </div>
+                    <div className="bar"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
+                  </div>
+                  {liveEarnings && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--fg-muted)' }}>
+                      <span>Ganhos hoje</span>
+                      <span className="tnum" style={{ color: 'var(--success-fg)', fontWeight: 550 }}>{liveEarnings}</span>
+                    </div>
+                  )}
+                  {msg?.id === emp.id && (
+                    <div style={{ fontSize: 12, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                  <button
+                    onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
+                    disabled={punching === emp.id}
+                    className={isIn ? 'btn danger sm' : 'btn primary sm'}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                  >
+                    {punching === emp.id ? '…' : isIn ? t('status.clock_out') : t('status.clock_in')}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Employee list (List view) */}
+      {view === 'list' && (
       <div className="card">
         {workers.length === 0 && (
           <div style={{ padding: '16px 20px' }}><div className="alert-inline info">{t('status.none_emp')}</div></div>
@@ -244,6 +324,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
           )
         })}
       </div>
+      )}
     </>
   )
 }
