@@ -228,15 +228,15 @@ ponto_glass_next/
 │   │       ├── SettingsModal     ← tema, idioma, palavra-passe, sair
 │   │       └── tabs/
 │   │           ├── MeuPontoTab       ← ponto do admin/gerente logado
-│   │           ├── DashboardTab      ← KPIs, sparkline, gráfico, feed de batidas, próximos eventos
-│   │           ├── StatusTab         ← status ao vivo com KPIs e filter pills
-│   │           ├── RegistrosTab      ← histórico de registros com filtros e exportação Excel
-│   │           ├── FuncionariosTab   ← CRUD completo de funcionários
-│   │           ├── BancoHorasTab     ← saldo e ajustes manuais do banco de horas
-│   │           ├── FeriadosTab       ← gerir feriados e dias de folga
-│   │           ├── RelatoriosTab     ← relatórios por período + exportação CSV e PDF
+│   │           ├── DashboardTab      ← KPIs, sparkline, gráfico 14 dias, feed de batidas, atrasos
+│   │           ├── StatusTab         ← status ao vivo, toggle Lista/Cards, detecta sessões abertas de ontem
+│   │           ├── RegistrosTab      ← search + tipo + range pills (Hoje/7d/14d/30d), agrupado por data
+│   │           ├── FuncionariosTab   ← filter bar + tabela densa + drawer de configurações
+│   │           ├── BancoHorasTab     ← KPI grid, tabela com trend bars centradas em zero
+│   │           ├── FeriadosTab       ← toggle Lista/Calendário (grelha mensal navegável)
+│   │           ├── RelatoriosTab     ← KPI summary, quick range pills, tabela por funcionário (Resumo/Detalhado)
 │   │           ├── CorrecoesTab      ← aprovar/rejeitar solicitações de correção
-│   │           └── AuditoriaTab      ← audit log de ações administrativas
+│   │           └── AuditoriaTab      ← search + filtro de ator + exportar JSON
 │   │
 │   └── api/
 │       ├── auth/
@@ -553,6 +553,15 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Settings Modal centralizado (tema, idioma, palavra-passe, sair)
   ✓  Notifications Dropdown no sino — correções pendentes, saídas em falta, ausências
   ✓  Dashboard redesenhado — KPIs, sparkline, gráfico 14 dias, feed de batidas, próximos eventos
+  ✓  Dashboard "Atenção" — funcionários atrasados (vs expected_start) + ausentes do dia
+  ✓  Status detecta sessões abertas de dias anteriores (entrada de ontem sem saída → "Trabalhando")
+  ✓  Status com toggle Lista/Cards (vista grid responsiva)
+  ✓  Registros com search por nome, filtro por tipo, range pills (7d/14d/30d) e agrupamento por data
+  ✓  Funcionários com filter bar (search/cargo/ativos) e tabela densa com drawer de edição
+  ✓  Banco de horas com KPI grid (Total/Positivos/Negativos/Zerados) + tabela com trend bars
+  ✓  Relatórios com KPI summary (Total/Extras/Custo/Médio), quick range pills (Mês atual/passado/30d/Tri) e tabela por funcionário (Resumo/Detalhado + Holerite)
+  ✓  Feriados com vista Calendário (grelha mensal navegável com células coloridas)
+  ✓  Auditoria com search, filtro de ator e exportar JSON
   ✓  Page-head consistente em todos os 10 tabs (título, contagem, ações)
   ✓  Banco de horas com ajustes manuais
   ✓  Solicitações de correção de registo (funcionário solicita, admin aprova)
