@@ -248,7 +248,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                     {isOnLunch && <span className="chip warn"><span className="dot"/>{t('status.at_lunch')}</span>}
                     {isOnCafe  && <span className="chip warn"><span className="dot"/>{t('status.coffee_break')}</span>}
                     {!isIn && recordsTodayByEmp.has(emp.id) && <span className="chip outline">{t('status.no_records')}</span>}
-                    {!recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
+                    {!isIn && !recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
                   </div>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--fg-muted)', marginBottom: 6 }}>
@@ -321,7 +321,11 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                   }
                 </div>
                 {liveEarnings && <div style={{ fontSize: 11, color: 'var(--success-fg)', marginTop: 2, opacity: 0.75 }}>{liveEarnings} {t('common.today')}</div>}
-                {weekTotal > 0 && <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 1 }}>{fmtMinutes(weekTotal)} {t('status.this_week')}</div>}
+                <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <span className="tnum">{fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h hoje</span>
+                  {weekTotal > 0 && <span>· <span className="tnum">{fmtMinutes(weekTotal)}</span> {t('status.this_week')}</span>}
+                  {emp.hourly_rate != null && <span>· {Number(emp.hourly_rate).toFixed(2).replace('.', ',')} €/h</span>}
+                </div>
                 {msg?.id === emp.id && (
                   <div style={{ fontSize: 12, marginTop: 4, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
                 )}
@@ -337,7 +341,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                 {isOnLunch    && <span className="chip warn">Almoço</span>}
                 {isOnCafe     && <span className="chip warn">Pausa</span>}
                 {!isIn && recordsTodayByEmp.has(emp.id) && <span className="chip outline">Saiu</span>}
-                {!recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
+                {!isIn && !recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
               </div>
               <button
                 onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
