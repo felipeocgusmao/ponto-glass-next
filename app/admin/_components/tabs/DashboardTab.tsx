@@ -444,30 +444,45 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
             <div className="card-title">Horas trabalhadas · últimos {chartDays.length} dias</div>
           </div>
           <div className="card-body">
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 160, paddingBottom: 4 }}>
-              {chartData.map(({ date, min }) => {
-                const pct = (min / chartMax) * 100
-                const d = new Date(date + 'T12:00:00')
-                const isToday = date === todayStr
-                return (
-                  <div
-                    key={date}
-                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}
-                    title={`${fmtDate(date)}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`}
-                  >
-                    <div style={{
-                      width: '100%', maxWidth: 40,
-                      height: Math.max(pct, 4) + '%',
-                      background: isToday ? 'var(--accent)' : 'var(--accent-soft)',
-                      borderRadius: 'var(--r-xs) var(--r-xs) 0 0',
-                      transition: 'height 0.4s ease',
-                    }} />
-                    <div style={{ fontSize: 10, color: isToday ? 'var(--accent)' : 'var(--fg-subtle)', fontWeight: isToday ? 700 : 400 }} className="tnum">
+            {/* Split the chart into a bars row (flex:1 → has a resolvable height for the % bars)
+                and a labels row, so the bars actually render. Previously each column was
+                flex-direction: column with the bar using height: X% inside an auto-height
+                parent — the percentage didn't resolve and the bars never appeared. */}
+            <div style={{ height: 160, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 3, minHeight: 0 }}>
+                {chartData.map(({ date, min }) => {
+                  const pct = (min / chartMax) * 100
+                  const isToday = date === todayStr
+                  return (
+                    <div
+                      key={`bar-${date}`}
+                      style={{
+                        flex: 1, maxWidth: 40,
+                        height: `${Math.max(pct, 3)}%`,
+                        background: isToday ? 'var(--accent)' : 'var(--accent-soft)',
+                        borderRadius: 'var(--r-xs) var(--r-xs) 0 0',
+                        transition: 'height 0.4s ease',
+                      }}
+                      title={`${fmtDate(date)}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`}
+                    />
+                  )
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 3, marginTop: 6 }}>
+                {chartData.map(({ date }) => {
+                  const d = new Date(date + 'T12:00:00')
+                  const isToday = date === todayStr
+                  return (
+                    <div
+                      key={`lbl-${date}`}
+                      style={{ flex: 1, maxWidth: 40, textAlign: 'center', fontSize: 10, color: isToday ? 'var(--accent)' : 'var(--fg-subtle)', fontWeight: isToday ? 700 : 400 }}
+                      className="tnum"
+                    >
                       {d.getDate()}
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>
