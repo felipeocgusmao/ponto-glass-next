@@ -44,7 +44,13 @@ export function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
   const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   const lastEntry = state === 'working' ? sorted.slice().reverse().find(r => r.type === 'entrada') : undefined
   const ongoing = lastEntry ? (Date.now() - new Date(lastEntry.timestamp).getTime()) / 60000 : 0
-  return Math.max(0, totalWorked + ongoing - lunchAuto)
+  const gross = totalWorked + ongoing
+  // While the worker is still IN (no saída yet), show gross elapsed time — deducting
+  // the assumed lunch upfront would mislead someone who just punched in to see 0
+  // minutes worked. The assumed lunch is only subtracted once the day is closed
+  // (state !== 'working'), matching how reports/payslips compute net work.
+  const lunchToDeduct = state === 'working' ? 0 : lunchAuto
+  return Math.max(0, gross - lunchToDeduct)
 }
 
 export function fmtMin(min: number): string {
