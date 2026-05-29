@@ -11,15 +11,23 @@ export async function GET() {
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
-  const { data, error } = await supabase
+  // Try the extended profile first; if a newer column is missing from the DB
+  // (migration not applied), fall back to the basic set so the user can still
+  // sign in instead of being kicked into a logout loop on every refresh.
+  const ext = await supabase
     .from('employees')
-    .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, lock_profile, theme')
+    .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, lock_profile, theme, expected_start, expected_end, shift_start')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
+  if (ext.data) return NextResponse.json(ext.data)
 
-  if (error || !data) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
-
-  return NextResponse.json(data)
+  const basic = await supabase
+    .from('employees')
+    .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (!basic.data) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
+  return NextResponse.json(basic.data)
 }
 
 export async function PATCH(request: NextRequest) {
