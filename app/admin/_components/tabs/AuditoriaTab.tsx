@@ -50,17 +50,16 @@ export function AuditoriaTab() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const labelOf = (action: string) => t(('audit.action.' + action) as TranslationKey) || action
     return logs.filter(l => {
       if (actorFilter !== 'all' && l.actor_id !== actorFilter) return false
       if (q) {
-        const hay = `${l.actor_name} ${l.action} ${l.target_name ?? ''} ${auditLabel(l.action)}`.toLowerCase()
+        const hay = `${l.actor_name} ${l.action} ${l.target_name ?? ''} ${labelOf(l.action)}`.toLowerCase()
         if (!hay.includes(q)) return false
       }
       return true
     })
-    // auditLabel uses t() which is stable in the closure for this render — safe to omit
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logs, actorFilter, search])
+  }, [logs, actorFilter, search, t])
 
   const exportJSON = () => {
     const data = filtered.map(l => ({
@@ -168,7 +167,7 @@ export function AuditoriaTab() {
                     <div className="mono muted" style={{ fontSize: 11 }}>{log.action}</div>
                   </td>
                   <td style={{ fontSize: 13 }}>{log.target_name || <span className="muted">—</span>}</td>
-                  <td className="muted mono" style={{ fontSize: 11.5, wordBreak: 'break-all' }}>
+                  <td className="muted mono" style={{ fontSize: 11.5, wordBreak: 'break-all', maxWidth: 320 }}>
                     {fmtDetails(log.details) || '—'}
                   </td>
                 </tr>
