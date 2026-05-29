@@ -25,47 +25,67 @@ export async function POST(request: NextRequest) {
   let empShiftStart = '00:00'
   const onBehalf = targetId && targetId !== user.id
 
+  // Try to read the geofencing columns; if the migration hasn't been applied (v11
+  // missing in older DBs), fall back to a basic select and skip geofencing checks.
+  async function readEmployee(id: string, requireActive: boolean) {
+    let q = supabase.from('employees')
+      .select('id, name, shift_start, geo_mode, workplace_lat, workplace_lng, max_distance_meters')
+      .eq('id', id)
+    if (requireActive) q = q.eq('active', true)
+    const ext = await q.maybeSingle()
+    if (ext.data) return { data: ext.data, geofenceAvailable: true }
+    if (ext.error) {
+      // schema-cache miss or column does not exist → retry without geofencing columns
+      let q2 = supabase.from('employees')
+        .select('id, name, shift_start, geo_mode')
+        .eq('id', id)
+      if (requireActive) q2 = q2.eq('active', true)
+      const basic = await q2.maybeSingle()
+      return { data: basic.data, geofenceAvailable: false }
+    }
+    return { data: null, geofenceAvailable: true }
+  }
+
   if (onBehalf) {
     if (!['admin', 'manager'].includes(user.role))
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    const { data: emp } = await supabase
-      .from('employees')
-      .select('id, name, shift_start, geo_mode, workplace_lat, workplace_lng, max_distance_meters')
-      .eq('id', targetId).eq('active', true).single()
+    const { data: emp } = await readEmployee(targetId, true)
     if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
     empId = emp.id
     empName = emp.name
     empShiftStart = emp.shift_start ?? '00:00'
   } else {
-    const { data: empData } = await supabase
-      .from('employees')
-      .select('shift_start, geo_mode, workplace_lat, workplace_lng, max_distance_meters')
-      .eq('id', empId).single()
+    const { data: empData, geofenceAvailable } = await readEmployee(empId, false)
 
     if (empData) {
       empShiftStart = empData.shift_start ?? '00:00'
 
-      // Geofencing: validate coordinates against workplace when geo_mode requires it
-      // and the employee has a workplace location configured.
-      const { geo_mode, workplace_lat, workplace_lng, max_distance_meters } = empData
-      if (
-        geo_mode !== 'disabled' &&
-        workplace_lat != null && workplace_lng != null && max_distance_meters != null
-      ) {
-        if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-          return NextResponse.json(
-            { error: 'Localização obrigatória para este funcionário.' },
-            { status: 400 }
-          )
+      // Geofencing only when the migration is in place and the columns exist.
+      if (geofenceAvailable) {
+        const e = empData as { geo_mode?: string | null; workplace_lat?: number | null; workplace_lng?: number | null; max_distance_meters?: number | null }
+        const { geo_mode, workplace_lat, workplace_lng, max_distance_meters } = e
+        if (
+          geo_mode !== 'disabled' &&
+          workplace_lat != null && workplace_lng != null && max_distance_meters != null
+        ) {
+          if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+            return NextResponse.json(
+              { error: 'Localização obrigatória para este funcionário.' },
+              { status: 400 }
+            )
+          }
+          const dist = haversineMeters(latitude, longitude, workplace_lat, workplace_lng)
+          if (dist > max_distance_meters) {
+            return NextResponse.json(
+              { error: `Fora do local de trabalho (${Math.round(dist)}m de distância, máximo ${max_distance_meters}m).` },
+              { status: 400 }
+            )
+          }
+        } else if (geo_mode === 'required') {
+          if (typeof latitude !== 'number' || typeof longitude !== 'number')
+            return NextResponse.json({ error: 'Localização obrigatória.' }, { status: 400 })
         }
-        const dist = haversineMeters(latitude, longitude, workplace_lat, workplace_lng)
-        if (dist > max_distance_meters) {
-          return NextResponse.json(
-            { error: `Fora do local de trabalho (${Math.round(dist)}m de distância, máximo ${max_distance_meters}m).` },
-            { status: 400 }
-          )
-        }
-      } else if (geo_mode === 'required') {
+      } else if (empData.geo_mode === 'required') {
         if (typeof latitude !== 'number' || typeof longitude !== 'number')
           return NextResponse.json({ error: 'Localização obrigatória.' }, { status: 400 })
       }
