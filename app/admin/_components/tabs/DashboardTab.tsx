@@ -77,20 +77,35 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     fetchAll()
   }, [employees])
 
-  // Per-employee today data
+  // Per-employee data — split into "today" (for live worked minutes / progress) and
+  // "all recent" (month window, for state determination so an unclosed entrada from
+  // yesterday still shows the employee as working today).
   const todayByEmp = new Map<string, PunchRecord[]>()
   todayRecs.forEach(r => {
     if (!todayByEmp.has(r.employee_id)) todayByEmp.set(r.employee_id, [])
     todayByEmp.get(r.employee_id)!.push(r)
   })
+  const recentByEmp = new Map<string, PunchRecord[]>()
+  monthRecs.forEach(r => {
+    if (!recentByEmp.has(r.employee_id)) recentByEmp.set(r.employee_id, [])
+    recentByEmp.get(r.employee_id)!.push(r)
+  })
 
   const empData = employees.map(emp => {
-    const recs = todayByEmp.get(emp.id) ?? []
-    const { state, since } = getWorkState(recs)
-    const liveMin = calcLiveMin(recs, emp.lunch_break_minutes ?? 60)
+    const todayRecsEmp = todayByEmp.get(emp.id) ?? []
+    const recentRecsEmp = recentByEmp.get(emp.id) ?? []
+    // state from the broader window so unclosed prior-day entries register as working
+    const stateSource = recentRecsEmp.length > 0 ? recentRecsEmp : todayRecsEmp
+    const { state, since } = getWorkState(stateSource)
+    const latestSorted = [...stateSource].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    const latestRec = latestSorted.at(-1)
+    const stateFromPriorDay = state !== 'off' && latestRec != null && latestRec.date !== todayStr
+    // ...but only today's records contribute to today's worked minutes
+    const liveMin = calcLiveMin(todayRecsEmp, emp.lunch_break_minutes ?? 60)
     const targetMin = emp.workday_hours * 60
     const earnings = emp.hourly_rate ? (liveMin / 60) * emp.hourly_rate : null
-    return { emp, recs, state, since, liveMin, targetMin, earnings }
+    // Use todayRecsEmp for `recs` so downstream displays (count, history) still reflect today.
+    return { emp, recs: todayRecsEmp, state, since, liveMin, targetMin, earnings, stateFromPriorDay, latestRec }
   })
 
   // KPI values
@@ -136,7 +151,9 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     .slice(0, 4)
 
   // Alerts: absent employees + late arrivals
-  const absentEmps = empData.filter(e => e.recs.length === 0).slice(0, 4)
+  // "Truly absent" = no records today AND no open session from a prior day
+  // (MissingExitBanner already flags the unclosed prior-day sessions separately).
+  const absentEmps = empData.filter(e => e.recs.length === 0 && !e.stateFromPriorDay).slice(0, 4)
   const lateArrivals = empData
     .map(({ emp, recs }) => {
       if (!emp.expected_start || recs.length === 0) return null
@@ -292,7 +309,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                 return 0
               })
               .slice(0, 8)
-              .map(({ emp, recs, state, since, liveMin, targetMin, earnings }) => {
+              .map(({ emp, recs, state, since, liveMin, targetMin, earnings, stateFromPriorDay }) => {
                 const pct = Math.min(100, targetMin > 0 ? (liveMin / targetMin) * 100 : 0)
                 const isOver = liveMin > targetMin
                 const ci = empColor(emp.id)
@@ -303,9 +320,9 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                       <div className="cell-emp-info">
                         <div className="cell-emp-name">{emp.name}</div>
                         <div className="cell-emp-sub">
-                          {state === 'working' && since && <>desde {since}</>}
-                          {state === 'lunch'   && since && <>almoço desde {since}</>}
-                          {state === 'coffee'  && since && <>pausa café desde {since}</>}
+                          {state === 'working' && since && <>desde {since}{stateFromPriorDay && <span style={{ color: 'var(--warning-fg)' }}> · sem saída anterior</span>}</>}
+                          {state === 'lunch'   && since && <>almoço desde {since}{stateFromPriorDay && ' (ontem)'}</>}
+                          {state === 'coffee'  && since && <>pausa café desde {since}{stateFromPriorDay && ' (ontem)'}</>}
                           {state === 'off' && since && <>saiu às {since}</>}
                           {recs.length === 0 && <>sem registro hoje</>}
                         </div>

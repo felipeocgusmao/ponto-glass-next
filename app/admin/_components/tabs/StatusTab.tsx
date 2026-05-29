@@ -22,17 +22,23 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
   const [view, setView] = useState<ViewMode>('list')
 
   const loadSeq = useRef(0)
+  const today = businessDate()
   const load = useCallback(async () => {
     const seq = ++loadSeq.current
     try {
-      const res = await fetch('/api/records?today=true')
+      // Load yesterday + today so unclosed entradas from the previous business day still
+      // count as "working" today — admin can then close the missing saída straight from here.
+      const anchor = new Date(`${today}T12:00:00Z`)
+      const yest = new Date(anchor); yest.setUTCDate(anchor.getUTCDate() - 1)
+      const from = yest.toISOString().split('T')[0]
+      const res = await fetch(`/api/reports?from=${from}&to=${today}`)
       if (res.ok) {
         const data = await res.json()
         // Ignore out-of-order responses so a slow interval fetch can't revert a fresh punch.
         if (seq === loadSeq.current) setRecords(data)
       }
     } catch { /* keep current */ }
-  }, [])
+  }, [today])
 
   const loadWeek = useCallback(async () => {
     // Anchor on the business-timezone day at noon UTC (DST-safe) so Monday→yesterday
@@ -79,10 +85,17 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
     }
   }
 
-  const recordsByEmp = new Map<string, PunchRecord[]>()
+  // `records` now spans yesterday + today, so we can detect open sessions from yesterday.
+  // Today-only is what counts toward "horas hoje" and the daily progress bar.
+  const recordsAllByEmp = new Map<string, PunchRecord[]>()
+  const recordsTodayByEmp = new Map<string, PunchRecord[]>()
   records.forEach(r => {
-    if (!recordsByEmp.has(r.employee_id)) recordsByEmp.set(r.employee_id, [])
-    recordsByEmp.get(r.employee_id)!.push(r)
+    if (!recordsAllByEmp.has(r.employee_id)) recordsAllByEmp.set(r.employee_id, [])
+    recordsAllByEmp.get(r.employee_id)!.push(r)
+    if (r.date === today) {
+      if (!recordsTodayByEmp.has(r.employee_id)) recordsTodayByEmp.set(r.employee_id, [])
+      recordsTodayByEmp.get(r.employee_id)!.push(r)
+    }
   })
   const weekByEmp = new Map<string, PunchRecord[]>()
   weekRecords.forEach(r => {
@@ -92,24 +105,33 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
 
   const workers = employees.filter(e => e.id !== currentUserId)
   const statuses = workers.map(emp => {
-    const empRecords = recordsByEmp.get(emp.id) ?? []
-    const sortedAsc = [...empRecords].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    const lastType = sortedAsc.at(-1)?.type
+    const empAll   = recordsAllByEmp.get(emp.id) ?? []
+    const empToday = recordsTodayByEmp.get(emp.id) ?? []
+    // State is determined by the latest record across the loaded window so an unclosed
+    // entrada from yesterday correctly shows the employee as "working" today.
+    const sortedAll = [...empAll].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    const lastRecord = sortedAll.at(-1)
+    const lastType = lastRecord?.type
     const isWorking = lastType != null && WORKING_TYPES.includes(lastType)
     const isOnLunch = lastType === 'inicio_almoco'
     const isOnCafe  = lastType === 'pausa_cafe'
     const isIn = isWorking || isOnLunch || isOnCafe
-    const hasBreaks = empRecords.some(r => EXPLICIT_BREAK_TYPES.includes(r.type))
+    const stateFromPriorDay = isIn && lastRecord != null && lastRecord.date !== today
+
+    // Today's worked minutes uses only today's records — yesterday's open session does not
+    // credit time to today.
+    const sortedToday = [...empToday].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    const hasBreaks = empToday.some(r => EXPLICIT_BREAK_TYPES.includes(r.type))
     let liveNetMin = 0
     if (hasBreaks) {
-      const bd = calcTimeBreakdown(empRecords)
-      const lastWorkStart = isWorking ? sortedAsc.slice().reverse().find(r => WORKING_TYPES.includes(r.type)) : undefined
+      const bd = calcTimeBreakdown(empToday)
+      const lastWorkStart = isWorking && !stateFromPriorDay ? sortedToday.slice().reverse().find(r => WORKING_TYPES.includes(r.type)) : undefined
       const ongoingMin = lastWorkStart ? (liveMs - new Date(lastWorkStart.timestamp).getTime()) / 60_000 : 0
       liveNetMin = Math.max(0, bd.workedMin + ongoingMin)
     } else {
-      const lastEntry = isWorking ? sortedAsc.slice().reverse().find(r => r.type === 'entrada') : undefined
+      const lastEntry = isWorking && !stateFromPriorDay ? sortedToday.slice().reverse().find(r => r.type === 'entrada') : undefined
       const currentSessionMin = lastEntry ? (liveMs - new Date(lastEntry.timestamp).getTime()) / 60_000 : 0
-      liveNetMin = Math.max(0, calcNetMinutes(empRecords, 0) + currentSessionMin - emp.lunch_break_minutes)
+      liveNetMin = Math.max(0, calcNetMinutes(empToday, 0) + currentSessionMin - emp.lunch_break_minutes)
     }
     const liveEarnings = emp.hourly_rate && liveNetMin > 0
       ? ((liveNetMin / 60) * emp.hourly_rate).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
@@ -117,20 +139,20 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
     const pastWeekRecs = weekByEmp.get(emp.id) ?? []
     const pastWeekMin = pastWeekRecs.length > 0 ? (calcOvertimePeriod(pastWeekRecs, 0, emp.lunch_break_minutes) ?? 0) : 0
     const weekTotal = Math.round(pastWeekMin + liveNetMin)
-    return { emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal }
+    return { emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal, lastRecord, stateFromPriorDay }
   })
 
   const onlineCount   = statuses.filter(s => s.isIn).length
   const breakCount    = statuses.filter(s => s.isOnLunch || s.isOnCafe).length
-  const outCount      = statuses.filter(s => !s.isIn && recordsByEmp.has(s.emp.id)).length
-  const absentCount   = statuses.filter(s => !recordsByEmp.has(s.emp.id)).length
+  const outCount      = statuses.filter(s => !s.isIn && recordsTodayByEmp.has(s.emp.id)).length
+  const absentCount   = statuses.filter(s => !recordsTodayByEmp.has(s.emp.id)).length
   const totalMinToday = statuses.reduce((sum, s) => sum + s.liveNetMin, 0)
 
   const filteredStatuses = statuses.filter(s => {
     if (filter === 'working') return s.isWorking
     if (filter === 'break')   return s.isOnLunch || s.isOnCafe
-    if (filter === 'out')     return !s.isIn && recordsByEmp.has(s.emp.id)
-    if (filter === 'absent')  return !recordsByEmp.has(s.emp.id)
+    if (filter === 'out')     return !s.isIn && recordsTodayByEmp.has(s.emp.id)
+    if (filter === 'absent')  return !recordsTodayByEmp.has(s.emp.id)
     return true
   })
 
@@ -198,7 +220,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                 <div className="desc">Ajuste o filtro acima.</div>
               </div>
             </div>
-          ) : filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings }) => {
+          ) : filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, stateFromPriorDay, lastRecord }) => {
             const targetMin = emp.workday_hours * 60
             const pct = Math.min(100, targetMin > 0 ? (liveNetMin / targetMin) * 100 : 0)
             return (
@@ -225,8 +247,8 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                     {isWorking && <span className="chip success"><span className="dot"/>{t('status.on_duty')}</span>}
                     {isOnLunch && <span className="chip warn"><span className="dot"/>{t('status.at_lunch')}</span>}
                     {isOnCafe  && <span className="chip warn"><span className="dot"/>{t('status.coffee_break')}</span>}
-                    {!isIn && recordsByEmp.has(emp.id) && <span className="chip outline">{t('status.no_records')}</span>}
-                    {!recordsByEmp.has(emp.id) && <span className="chip outline">—</span>}
+                    {!isIn && recordsTodayByEmp.has(emp.id) && <span className="chip outline">{t('status.no_records')}</span>}
+                    {!recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
                   </div>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--fg-muted)', marginBottom: 6 }}>
@@ -270,7 +292,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
         {filteredStatuses.length === 0 && workers.length > 0 && (
           <div className="empty"><div className="desc">Nenhum funcionário neste estado.</div></div>
         )}
-        {filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal }) => {
+        {filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal, stateFromPriorDay, lastRecord }) => {
           const targetMin = emp.workday_hours * 60
           const pct = Math.min(100, targetMin > 0 ? (liveNetMin / targetMin) * 100 : 0)
           return (
@@ -288,9 +310,13 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{emp.name}</div>
                 <div style={{ fontSize: 12, marginTop: 2, color: 'var(--fg-muted)' }}>
                   {isWorking
-                    ? <span style={{ color: 'var(--success-fg)' }}>{t('status.on_duty')} · {liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}</span>
-                    : isOnLunch ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.at_lunch')}</span>
-                    : isOnCafe  ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.coffee_break')}</span>
+                    ? <span style={{ color: 'var(--success-fg)' }}>
+                        {t('status.on_duty')} · {stateFromPriorDay && lastRecord
+                          ? <span style={{ color: 'var(--warning-fg)' }}>desde {new Date(lastRecord.timestamp).toLocaleString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · sem saída</span>
+                          : liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}
+                      </span>
+                    : isOnLunch ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.at_lunch')}{stateFromPriorDay && ' (desde ontem)'}</span>
+                    : isOnCafe  ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.coffee_break')}{stateFromPriorDay && ' (desde ontem)'}</span>
                     : <span>{liveNetMin > 0 ? `${fmtMinutes(Math.round(liveNetMin))} ${t('common.today')}` : t('status.no_records')}</span>
                   }
                 </div>
@@ -310,8 +336,8 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                 {isWorking    && <span className="chip success">Trabalhando</span>}
                 {isOnLunch    && <span className="chip warn">Almoço</span>}
                 {isOnCafe     && <span className="chip warn">Pausa</span>}
-                {!isIn && recordsByEmp.has(emp.id) && <span className="chip outline">Saiu</span>}
-                {!recordsByEmp.has(emp.id) && <span className="chip outline">—</span>}
+                {!isIn && recordsTodayByEmp.has(emp.id) && <span className="chip outline">Saiu</span>}
+                {!recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
               </div>
               <button
                 onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
