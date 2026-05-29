@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import type { Employee } from '@/lib/types'
 import { avatarInitials } from '@/lib/utils'
-import { empColor, SL } from '../../_lib/helpers'
+import { empColor } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
-import { IconUserPlus } from '../icons'
+import { IconUserPlus, IconSearch } from '../icons'
 
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
   const { t } = useLang()
@@ -166,6 +166,9 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
   const [loading, setLoading] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [lockingId, setLockingId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'employee'>('all')
+  const [activeFilter, setActiveFilter] = useState<'active' | 'inactive' | 'all'>('active')
 
   const handleToggleLock = async (emp: Employee) => {
     setLockingId(emp.id)
@@ -202,13 +205,24 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
     onRefresh()
   }
 
+  const filtered = employees.filter(e => {
+    if (activeFilter === 'active' && e.active === false) return false
+    if (activeFilter === 'inactive' && e.active !== false) return false
+    if (roleFilter !== 'all' && e.role !== roleFilter) return false
+    const q = search.trim().toLowerCase()
+    if (q && !e.name.toLowerCase().includes(q) && !e.username.toLowerCase().includes(q) && !(e.email ?? '').toLowerCase().includes(q)) return false
+    return true
+  })
+  const activeCount = employees.filter(e => e.active !== false).length
+  const inactiveCount = employees.length - activeCount
+
   return (
     <>
       {/* Page header */}
       <div className="page-head">
         <div>
           <div className="page-title">{t('tab.funcionarios')}</div>
-          <div className="page-sub">{employees.length} {t('emp.active')}</div>
+          <div className="page-sub">{activeCount} ativos · {inactiveCount} inativos</div>
         </div>
         <div className="page-actions">
           <button className="btn primary" onClick={() => document.getElementById('emp-add-form')?.scrollIntoView({ behavior: 'smooth' })}>
@@ -217,57 +231,121 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
         </div>
       </div>
 
+      {/* Filter bar */}
       <div className="card">
-        <div style={{ padding: '16px 20px' }}>
-          <SL>{employees.length} {t('emp.active')}</SL>
-          {err && <div className="alert-inline err" style={{ marginBottom: 12 }}>{err}</div>}
-          {employees.map(emp => (
-            <div key={emp.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 12, marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div className={`avatar size-28 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {emp.name}
-                      {emp.role === 'admin' && <span className="chip accent" style={{ fontSize: 10 }}>Admin</span>}
-                      {emp.role === 'manager' && <span className="chip accent" style={{ fontSize: 10 }}>{t('auth.role.manager')}</span>}
-                      {emp.lock_profile && <span className="chip danger" style={{ fontSize: 10 }}>{t('emp.profile_locked')}</span>}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
-                      @{emp.username} · {emp.workday_hours}h ·{' '}
-                      {emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min ${t('emp.lunch_break')}` : t('emp.lunch.none')}
-                      {emp.hourly_rate != null && ` · €${Number(emp.hourly_rate).toFixed(2)}/h`}
-                      {emp.email && ` · ${emp.email}`}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    onClick={() => handleToggleLock(emp)}
-                    disabled={lockingId === emp.id}
-                    className={`btn ghost sm icon${emp.lock_profile ? ' danger' : ''}`}
-                    title={emp.lock_profile ? t('emp.unlock_profile') : t('emp.lock_profile')}
-                    style={{ opacity: lockingId === emp.id ? 0.5 : 1 }}
-                  >
-                    {emp.lock_profile ? '🔒' : '🔓'}
-                  </button>
-                  <button onClick={() => setEditingId(editingId === emp.id ? null : emp.id)} className="btn ghost sm icon" title="Configurações">⚙</button>
-                  {emp.role !== 'admin' && (
-                    <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">{t('emp.remove')}</button>
-                  )}
-                </div>
-              </div>
-              {editingId === emp.id && (
-                <EmployeeSettings emp={emp} onDone={() => { setEditingId(null); onRefresh() }} />
-              )}
-            </div>
-          ))}
+        <div style={{ padding: '12px 16px', display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: '1 1 220px', maxWidth: 320 }}>
+            <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-subtle)', display: 'inline-flex' }}>
+              <IconSearch size={13} />
+            </span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por nome, usuário ou e-mail"
+              className="input search"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as 'all' | 'admin' | 'manager' | 'employee')} className="input" style={{ width: 'auto' }}>
+            <option value="all">Todos os cargos</option>
+            <option value="admin">Administradores</option>
+            <option value="manager">Gestores</option>
+            <option value="employee">Funcionários</option>
+          </select>
+          <div className="seg">
+            <button className={activeFilter === 'active' ? 'active' : ''} onClick={() => setActiveFilter('active')}>Ativos</button>
+            <button className={activeFilter === 'inactive' ? 'active' : ''} onClick={() => setActiveFilter('inactive')}>Inativos</button>
+            <button className={activeFilter === 'all' ? 'active' : ''} onClick={() => setActiveFilter('all')}>Todos</button>
+          </div>
         </div>
       </div>
 
+      {err && <div className="alert-inline err">{err}</div>}
+
+      {/* Employee table */}
+      <div className="card">
+        {filtered.length === 0 ? (
+          <div className="empty">
+            <div className="title">Nenhum funcionário encontrado</div>
+            <div className="desc">Tente ajustar os filtros ou a busca.</div>
+          </div>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Cargo</th>
+                <th className="right">Jornada</th>
+                <th className="right">Almoço</th>
+                <th className="right">Valor/h</th>
+                <th>Status</th>
+                <th style={{ width: 130 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(emp => (
+                <Fragment key={emp.id}>
+                  <tr className={editingId === emp.id ? 'selected' : ''}>
+                    <td>
+                      <div className="cell-emp">
+                        <div className={`avatar size-28 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
+                        <div className="cell-emp-info">
+                          <div className="cell-emp-name">{emp.name}</div>
+                          <div className="cell-emp-sub">@{emp.username}{emp.email ? ` · ${emp.email}` : ''}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      {emp.role === 'admin' && <span className="chip accent" style={{ fontSize: 10 }}>Admin</span>}
+                      {emp.role === 'manager' && <span className="chip accent" style={{ fontSize: 10 }}>{t('auth.role.manager')}</span>}
+                      {emp.role === 'employee' && <span className="muted" style={{ fontSize: 12 }}>{t('auth.role.employee')}</span>}
+                    </td>
+                    <td className="right tnum">{emp.workday_hours}h</td>
+                    <td className="right tnum muted">{emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min` : '—'}</td>
+                    <td className="right tnum">{emp.hourly_rate != null ? `€${Number(emp.hourly_rate).toFixed(2)}` : <span className="muted">—</span>}</td>
+                    <td>
+                      {emp.active === false
+                        ? <span className="chip outline" style={{ fontSize: 10 }}>Inativo</span>
+                        : <span className="chip success" style={{ fontSize: 10 }}><span className="dot"/>Ativo</span>}
+                      {emp.lock_profile && <span className="chip danger" style={{ fontSize: 10, marginLeft: 4 }}>{t('emp.profile_locked')}</span>}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => handleToggleLock(emp)}
+                          disabled={lockingId === emp.id}
+                          className={`btn ghost sm icon${emp.lock_profile ? ' danger' : ''}`}
+                          title={emp.lock_profile ? t('emp.unlock_profile') : t('emp.lock_profile')}
+                          style={{ opacity: lockingId === emp.id ? 0.5 : 1 }}
+                        >
+                          {emp.lock_profile ? '🔒' : '🔓'}
+                        </button>
+                        <button onClick={() => setEditingId(editingId === emp.id ? null : emp.id)} className="btn ghost sm icon" title="Configurações">⚙</button>
+                        {emp.role !== 'admin' && (
+                          <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">{t('emp.remove')}</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {editingId === emp.id && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '0 16px 16px', borderBottom: '1px solid var(--border)' }}>
+                        <EmployeeSettings emp={emp} onDone={() => { setEditingId(null); onRefresh() }} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
       <div className="card" id="emp-add-form">
-        <div style={{ padding: '16px 20px' }}>
-          <SL>{t('emp.add_new')}</SL>
+        <div className="card-head">
+          <div className="card-title">{t('emp.add_new')}</div>
+        </div>
+        <div className="card-body">
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
             <div className="form-grid-2">
               <div className="field"><label>{t('emp.name')}</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Maria Silva" className="input" required /></div>
