@@ -135,8 +135,28 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 4)
 
-  // Alerts: absent employees
+  // Alerts: absent employees + late arrivals
   const absentEmps = empData.filter(e => e.recs.length === 0).slice(0, 4)
+  const lateArrivals = empData
+    .map(({ emp, recs }) => {
+      if (!emp.expected_start || recs.length === 0) return null
+      const firstEntrada = recs
+        .filter(r => r.type === 'entrada')
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0]
+      if (!firstEntrada) return null
+      const arrived = new Date(firstEntrada.timestamp)
+      const [eh, em] = emp.expected_start.split(':').map(Number)
+      const expectedToday = new Date(arrived)
+      expectedToday.setHours(eh, em, 0, 0)
+      const lateMin = Math.round((arrived.getTime() - expectedToday.getTime()) / 60_000)
+      if (lateMin <= 5) return null // ignore on-time arrivals (up to 5min grace)
+      const arrivedAt = arrived.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+      return { emp, lateMin, arrivedAt, expectedAt: emp.expected_start }
+    })
+    .filter((x): x is { emp: Employee; lateMin: number; arrivedAt: string; expectedAt: string } => x !== null)
+    .sort((a, b) => b.lateMin - a.lateMin)
+    .slice(0, 3)
+  const alertsCount = absentEmps.length + lateArrivals.length
 
   // Recent punches feed
   const recentPunches = [...todayRecs]
@@ -354,18 +374,36 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
           </div>
 
           {/* Alerts */}
-          {absentEmps.length > 0 && (
+          {alertsCount > 0 && (
             <div className="card">
               <div className="card-head">
                 <div className="card-title">Atenção</div>
-                <span className="chip warn">{absentEmps.length}</span>
+                <span className="chip warn">{alertsCount}</span>
               </div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {lateArrivals.map(({ emp, lateMin, arrivedAt, expectedAt }) => {
+                  const h = Math.floor(lateMin / 60), m = lateMin % 60
+                  const lateLabel = h > 0 ? `${h}h${m > 0 ? `${m}` : ''}` : `${m}min`
+                  return (
+                    <div key={`late-${emp.id}`} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{
+                        width: 6, height: 6, borderRadius: '50%', marginTop: 5, flexShrink: 0,
+                        background: 'var(--warning)',
+                      }} />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{emp.name} chegou {lateLabel} atrasado</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
+                          bateu às {arrivedAt} · esperado {expectedAt}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
                 {absentEmps.map(({ emp }) => (
                   <div key={emp.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                     <span style={{
                       width: 6, height: 6, borderRadius: '50%', marginTop: 5, flexShrink: 0,
-                      background: 'var(--warning)',
+                      background: 'var(--danger-fg)',
                     }} />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{emp.name} sem registro hoje</div>
