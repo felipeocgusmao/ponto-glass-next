@@ -26,6 +26,7 @@
 
 <br/>
 
+[![CI](https://img.shields.io/github/actions/workflow/status/felipeocgusmao/ponto-glass-next/ci.yml?branch=master&style=for-the-badge&label=CI)](https://github.com/felipeocgusmao/ponto-glass-next/actions/workflows/ci.yml)
 [![Deploy](https://img.shields.io/badge/deploy-vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://ponto-glass-next.vercel.app)
 [![Next.js](https://img.shields.io/badge/next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
 [![Supabase](https://img.shields.io/badge/supabase-postgresql-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
@@ -297,79 +298,75 @@ ponto_glass_next/
 
 ## ◈ como rodar localmente
 
-**1. Clone**
+### Pré-requisitos
+
+- **Node.js 20+** (ou 18 LTS)
+- **npm** 10+ (vem com Node)
+- Conta gratuita em [supabase.com](https://supabase.com)
+- (opcional) conta em [vercel.com](https://vercel.com) para deploy
+
+### Passo 1 — Clonar e instalar
+
 ```bash
 git clone https://github.com/felipeocgusmao/ponto-glass-next.git
 cd ponto-glass-next
-```
-
-**2. Instale as dependências**
-```bash
 npm install
 ```
 
-**3. Configure as variáveis de ambiente**
+### Passo 2 — Criar o projeto no Supabase
+
+1. Criar projeto novo em [app.supabase.com](https://app.supabase.com)
+2. **Project Settings → API**: copiar `Project URL` e `service_role` key
+3. **SQL Editor**: copiar e executar o conteúdo de `supabase/schema.sql`
+4. (opcional) Aplicar migrações datadas em `supabase/migrations/` na ordem cronológica
+
+> **Banco já existente?** O `schema.sql` inclui blocos `IF NOT EXISTS` idempotentes — pode correr o ficheiro inteiro sem perder dados.
+
+### Passo 3 — Configurar variáveis de ambiente
+
 ```bash
 cp .env.example .env.local
 ```
 
-Edite `.env.local`:
+Mínimo para arrancar:
+
 ```env
-# Supabase (obrigatório)
-NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
-# JWT (obrigatório) — openssl rand -base64 32
-JWT_SECRET=sua-chave-secreta-minimo-32-caracteres
+# JWT — gerar com: openssl rand -base64 32
+JWT_SECRET=cole-aqui-uma-string-aleatoria-com-32-caracteres-ou-mais
 
-# Recuperação de emergência (recomendado)
-RECOVERY_SECRET=chave-de-recuperacao-de-emergencia
+# Fuso horário da empresa (IANA name)
+NEXT_PUBLIC_BUSINESS_TZ=Europe/Madrid
 
-# Cron de ausências (obrigatório para o alerta automático de ausência funcionar)
-# Gere: openssl rand -base64 32
-CRON_SECRET=chave-secreta-do-cron
-
-# Web Push / PWA (opcional — desativa notificações push se omitido)
-# Gere: node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys()))"
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=
-VAPID_PRIVATE_KEY=
-VAPID_EMAIL=mailto:admin@empresa.com
-
-# E-mail via Microsoft Graph (preferido — OAuth Client Credentials)
-# Crie uma app no Azure AD com permissão Mail.Send (Application).
-MS_TENANT_ID=
-MS_CLIENT_ID=
-MS_CLIENT_SECRET=
-MS_SENDER_EMAIL=noreply@empresa.com
-
-# E-mail via SMTP (fallback automático se Graph não estiver configurado ou falhar)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=PontoGlass <noreply@empresa.com>
-NEXT_PUBLIC_APP_URL=https://ponto-glass-next.vercel.app
-
-# Sentry (opcional — desativa monitorização se omitido)
-NEXT_PUBLIC_SENTRY_DSN=
-SENTRY_ORG=
-SENTRY_PROJECT=
-SENTRY_AUTH_TOKEN=
+# Senha do admin que será criado no primeiro login (mín. 8 chars)
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=trocar-esta-senha-no-primeiro-login
 ```
 
-**4. Crie o banco**
+Variáveis adicionais e respetivas instruções estão comentadas no `.env.example` (Vercel KV, VAPID, Microsoft Graph, SMTP, Sentry, recovery).
 
-Execute `supabase/schema.sql` no SQL Editor do seu projeto Supabase.
+### Passo 4 — Arrancar
 
-> **Banco já existente?** O arquivo inclui blocos de migração comentados (v1→v2, v2→v3…) — execute apenas os blocos correspondentes à versão que você já tem.
-
-**5. Rode**
 ```bash
 npm run dev
 ```
 
-Abra [http://localhost:3000](http://localhost:3000).  
-Login: `admin` / `admin123` — **troque a senha no primeiro acesso.**
+Abra [http://localhost:3000](http://localhost:3000) e faça login com `admin` + `INITIAL_ADMIN_PASSWORD`. **Troque a senha imediatamente** depois do primeiro login (perfil → trocar palavra-passe) e **remova `INITIAL_ADMIN_PASSWORD` do ambiente**.
+
+### Comandos úteis
+
+```bash
+npm run dev          # Next.js dev server (turbopack)
+npm run build        # Build de produção
+npm run start        # Servir o build local
+npm run lint         # ESLint
+npm test             # Vitest (run once)
+npm run test:watch   # Vitest em watch mode
+npm run check        # lint + test + build (mesmo que o CI corre)
+```
 
 <br/>
 
@@ -589,6 +586,17 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ☐  Relatório mensal automático por e-mail                → issue #9
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
+
+<br/>
+
+---
+
+## ◈ documentação técnica
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — diagrama Mermaid + fluxo de auth + ciclo de ponto + API surface + schema
+- [`docs/SECURITY.md`](docs/SECURITY.md) — JWT + cookies + bcrypt + rate limit + revogação + geofencing
+- [`supabase/schema.sql`](supabase/schema.sql) — schema completo + migrações v1→v10
+- [`.env.example`](.env.example) — todas as variáveis com comentários e instruções
 
 <br/>
 
