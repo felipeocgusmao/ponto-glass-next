@@ -929,8 +929,8 @@ export default function PontoPage() {
                           {cr.status === 'approved' ? t('corr.status.approved') : cr.status === 'rejected' ? t('corr.status.rejected') : t('corr.status.pending')}
                         </span>
                       </div>
-                      {cr.reason && <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontStyle: 'italic' }}>"{cr.reason}"</div>}
-                      {cr.reviewer_note && <div style={{ fontSize: 11, color: 'var(--danger-fg)', marginTop: 2 }}>{t('corr.reviewer_note')}: "{cr.reviewer_note}"</div>}
+                      {cr.reason && <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontStyle: 'italic' }}>&ldquo;{cr.reason}&rdquo;</div>}
+                      {cr.reviewer_note && <div style={{ fontSize: 11, color: 'var(--danger-fg)', marginTop: 2 }}>{t('corr.reviewer_note')}: &ldquo;{cr.reviewer_note}&rdquo;</div>}
                     </div>
                   )
                 })}

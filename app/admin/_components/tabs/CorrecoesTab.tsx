@@ -166,7 +166,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
                   </div>
                   {cr.reason && (
                     <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 4, fontStyle: 'italic' }}>
-                      "{cr.reason}"
+                      &ldquo;{cr.reason}&rdquo;
                     </div>
                   )}
                   <div style={{ fontSize: 10, color: 'var(--fg-subtle)', marginTop: 4 }}>
@@ -236,7 +236,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
                   </div>
                   {cr.reviewer_note && (
                     <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 2, fontStyle: 'italic' }}>
-                      {t('corr.reviewer_note')}: "{cr.reviewer_note}"
+                      {t('corr.reviewer_note')}: &ldquo;{cr.reviewer_note}&rdquo;
                     </div>
                   )}
                 </div>

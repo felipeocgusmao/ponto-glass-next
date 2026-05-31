@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint · Test · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        env:
+          # Build only — these can be dummy values, the build doesn't hit the network.
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ci-only-not-used
+          JWT_SECRET: ci-only-jwt-secret-min-32-characters-1234
+          NEXT_PUBLIC_BUSINESS_TZ: Europe/Madrid
+        run: npm run build
