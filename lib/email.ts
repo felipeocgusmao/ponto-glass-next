@@ -96,6 +96,142 @@ export async function sendPasswordResetEmail(opts: {
   } catch { return false }
 }
 
+export async function sendMonthlyReportEmployeeEmail(opts: {
+  to: string
+  name: string
+  period: string
+  workedMin: number
+  overtimeMin: number
+  earnings: number | null
+  days: number
+  incompleteDays: number
+  appUrl: string
+}): Promise<boolean> {
+  const subject = `Relatório de ponto — ${opts.period}`
+  const fmtH = (min: number) => {
+    const abs = Math.abs(Math.round(min))
+    const h = Math.floor(abs / 60), m = abs % 60
+    return `${h}h ${String(m).padStart(2, '0')}m`
+  }
+  const overtimeColor = opts.overtimeMin >= 0 ? '#22c55e' : '#ef4444'
+  const overtimeLabel = (opts.overtimeMin >= 0 ? '+' : '−') + fmtH(opts.overtimeMin)
+  const incompleteRow = opts.incompleteDays > 0
+    ? `<tr><td style="padding:10px 16px;color:#6b7280;border-bottom:1px solid #e5e7eb">Dias incompletos</td><td style="padding:10px 16px;text-align:right;font-weight:600;color:#ef4444;border-bottom:1px solid #e5e7eb">⚠ ${opts.incompleteDays}</td></tr>`
+    : ''
+  const earningsRow = opts.earnings != null
+    ? `<tr><td style="padding:10px 16px;color:#6b7280">Ganhos estimados</td><td style="padding:10px 16px;text-align:right;font-weight:600">${opts.earnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</td></tr>`
+    : ''
+  const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif">
+<div style="max-width:540px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+  <div style="background:#6366f1;padding:28px 32px 24px">
+    <div style="color:#fff;font-size:20px;font-weight:700">PontoGlass</div>
+    <div style="color:rgba(255,255,255,.8);font-size:13px;margin-top:4px">Relatório mensal de ponto</div>
+  </div>
+  <div style="padding:28px 32px">
+    <p style="margin:0 0 20px;font-size:15px;color:#111827">Olá <strong>${opts.name}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#374151">Segue o resumo do seu ponto referente a <strong>${opts.period}</strong>.</p>
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+      <tr><td style="padding:10px 16px;color:#6b7280;border-bottom:1px solid #e5e7eb">Dias trabalhados</td><td style="padding:10px 16px;text-align:right;font-weight:600;border-bottom:1px solid #e5e7eb">${opts.days}</td></tr>
+      <tr><td style="padding:10px 16px;color:#6b7280;border-bottom:1px solid #e5e7eb">Total de horas</td><td style="padding:10px 16px;text-align:right;font-weight:600;border-bottom:1px solid #e5e7eb">${fmtH(opts.workedMin)}</td></tr>
+      <tr><td style="padding:10px 16px;color:#6b7280;border-bottom:1px solid #e5e7eb">Horas extras</td><td style="padding:10px 16px;text-align:right;font-weight:700;color:${overtimeColor};border-bottom:1px solid #e5e7eb">${overtimeLabel}</td></tr>
+      ${incompleteRow}${earningsRow}
+    </table>
+    ${opts.incompleteDays > 0 ? `<p style="margin:16px 0 0;font-size:12px;color:#ef4444">⚠ Tem ${opts.incompleteDays} dia(s) sem saída registada. Submeta uma correcção para regularizar.</p>` : ''}
+    <div style="margin-top:24px">
+      <a href="${opts.appUrl}/ponto" style="display:inline-block;padding:10px 22px;background:#6366f1;color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600">Ver os meus registos</a>
+    </div>
+  </div>
+  <div style="padding:16px 32px;background:#f9fafb;font-size:11px;color:#9ca3af">Este e-mail foi enviado automaticamente pelo PontoGlass. Não responda a este endereço.</div>
+</div></body></html>`
+
+  if (hasGraphConfig()) {
+    return sendViaGraph({ subject, body: { contentType: 'HTML', content: html }, toRecipients: [{ emailAddress: { address: opts.to, name: opts.name } }] })
+  }
+  const transporter = getTransporter()
+  if (!transporter) return false
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
+  try { await transporter.sendMail({ from, to: opts.to, subject, html }); return true }
+  catch { return false }
+}
+
+export async function sendMonthlyReportAdminEmail(opts: {
+  to: string
+  adminName: string
+  period: string
+  rows: { name: string; workedMin: number; overtimeMin: number; earnings: number | null; days: number; incompleteDays: number }[]
+  totalWorkedMin: number
+  totalEarnings: number
+  appUrl: string
+}): Promise<boolean> {
+  const subject = `Relatório consolidado — ${opts.period}`
+  const fmtH = (min: number) => {
+    const abs = Math.abs(Math.round(min))
+    const h = Math.floor(abs / 60), m = abs % 60
+    return `${h}h ${String(m).padStart(2, '0')}m`
+  }
+  const tableRows = opts.rows.map(r => {
+    const otColor = r.overtimeMin >= 0 ? '#22c55e' : '#ef4444'
+    const otLabel = (r.overtimeMin >= 0 ? '+' : '−') + fmtH(r.overtimeMin)
+    const earnCell = r.earnings != null ? r.earnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' }) : '—'
+    const incCell = r.incompleteDays > 0 ? `<span style="color:#ef4444">⚠ ${r.incompleteDays}</span>` : '—'
+    return `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${r.name}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${r.days}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${fmtH(r.workedMin)}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:${otColor};font-weight:600">${otLabel}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${earnCell}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${incCell}</td>
+    </tr>`
+  }).join('')
+  const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif">
+<div style="max-width:680px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+  <div style="background:#6366f1;padding:28px 32px 24px">
+    <div style="color:#fff;font-size:20px;font-weight:700">PontoGlass</div>
+    <div style="color:rgba(255,255,255,.8);font-size:13px;margin-top:4px">Relatório consolidado — ${opts.period}</div>
+  </div>
+  <div style="padding:28px 32px">
+    <p style="margin:0 0 20px;font-size:15px;color:#111827">Olá <strong>${opts.adminName}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#374151">Resumo de ponto de todos os funcionários em <strong>${opts.period}</strong>.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#f3f4f6">
+          <th style="padding:10px 12px;text-align:left;font-weight:600;color:#374151">Funcionário</th>
+          <th style="padding:10px 12px;text-align:center;font-weight:600;color:#374151">Dias</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:600;color:#374151">Horas</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:600;color:#374151">Extras</th>
+          <th style="padding:10px 12px;text-align:right;font-weight:600;color:#374151">Ganhos</th>
+          <th style="padding:10px 12px;text-align:center;font-weight:600;color:#374151">Incompletos</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+      <tfoot>
+        <tr style="background:#f9fafb;font-weight:700">
+          <td style="padding:10px 12px">Total</td>
+          <td style="padding:10px 12px"></td>
+          <td style="padding:10px 12px;text-align:right">${fmtH(opts.totalWorkedMin)}</td>
+          <td style="padding:10px 12px"></td>
+          <td style="padding:10px 12px;text-align:right">${opts.totalEarnings > 0 ? opts.totalEarnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' }) : '—'}</td>
+          <td style="padding:10px 12px"></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div style="margin-top:24px">
+      <a href="${opts.appUrl}/admin" style="display:inline-block;padding:10px 22px;background:#6366f1;color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600">Ver painel de administração</a>
+    </div>
+  </div>
+  <div style="padding:16px 32px;background:#f9fafb;font-size:11px;color:#9ca3af">Este e-mail foi enviado automaticamente pelo PontoGlass. Não responda a este endereço.</div>
+</div></body></html>`
+
+  if (hasGraphConfig()) {
+    return sendViaGraph({ subject, body: { contentType: 'HTML', content: html }, toRecipients: [{ emailAddress: { address: opts.to, name: opts.adminName } }] })
+  }
+  const transporter = getTransporter()
+  if (!transporter) return false
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
+  try { await transporter.sendMail({ from, to: opts.to, subject, html }); return true }
+  catch { return false }
+}
+
 export async function sendCorrectionEmail(opts: {
   to: string
   employeeName: string
