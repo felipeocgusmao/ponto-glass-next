@@ -438,83 +438,86 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
         </div>
       </div>
 
-      {/* Recent punches */}
-      <div className="card">
-        <div className="card-head">
-          <div className="card-title">Últimas batidas</div>
-        </div>
-        <div className="card-body flush">
-          {recentPunches.length === 0 ? (
-            <div className="empty">
-              <div className="desc">Nenhuma batida hoje.</div>
-            </div>
-          ) : recentPunches.map(r => {
-            const emp = employees.find(e => e.id === r.employee_id)
-            const ci = emp ? empColor(emp.id) : 1
-            const time = new Date(r.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
-            return (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
-                <div className={`avatar av-c${ci}`}>{avatarInitials(r.employee_name)}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 500 }}>{r.employee_name}</div>
-                  <div style={{ marginTop: 2 }}>
-                    <span className={`chip ${PUNCH_TONE[r.type] || 'outline'}`} style={{ fontSize: 11 }}>
-                      {PUNCH_LABEL[r.type] ?? r.type}
-                    </span>
-                  </div>
-                </div>
-                <div className="tnum muted" style={{ fontSize: 11.5 }}>{time}</div>
+      {/* Chart + Recent punches */}
+      <div className="grid-3">
+        {/* Bar chart */}
+        <div className="card">
+          <div className="card-head">
+            <div className="card-title">Horas trabalhadas · últimos {chartDays.length} dias úteis</div>
+          </div>
+          <div className="card-body">
+            {/* Split the chart into a bars row (flex:1 → has a resolvable height for the % bars)
+                and a labels row, so the bars actually render. Previously each column was
+                flex-direction: column with the bar using height: X% inside an auto-height
+                parent — the percentage didn't resolve and the bars never appeared. */}
+            <div style={{ height: 160, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 3, minHeight: 0 }}>
+                {chartData.map(({ date, min }) => {
+                  const pct = (min / chartMax) * 100
+                  const isToday = date === todayStr
+                  return (
+                    <div
+                      key={`bar-${date}`}
+                      style={{
+                        flex: 1, maxWidth: 40,
+                        height: `${Math.max(pct, 3)}%`,
+                        background: isToday ? 'var(--accent)' : 'var(--accent-soft)',
+                        borderRadius: 'var(--r-xs) var(--r-xs) 0 0',
+                        transition: 'height 0.4s ease',
+                      }}
+                      title={`${fmtDate(date)}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`}
+                    />
+                  )
+                })}
               </div>
-            )
-          })}
+              <div style={{ display: 'flex', gap: 3, marginTop: 6 }}>
+                {chartData.map(({ date }) => {
+                  const d = new Date(date + 'T12:00:00')
+                  const isToday = date === todayStr
+                  return (
+                    <div
+                      key={`lbl-${date}`}
+                      style={{ flex: 1, maxWidth: 40, textAlign: 'center', fontSize: 10, color: isToday ? 'var(--accent)' : 'var(--fg-subtle)', fontWeight: isToday ? 700 : 400 }}
+                      className="tnum"
+                    >
+                      {d.getDate()}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Chart — full width at the bottom */}
-      <div className="card">
-        <div className="card-head">
-          <div className="card-title">Horas trabalhadas · últimos {chartDays.length} dias úteis</div>
-        </div>
-        <div className="card-body">
-          {/* Split the chart into a bars row (flex:1 → has a resolvable height for the % bars)
-              and a labels row, so the bars actually render. Previously each column was
-              flex-direction: column with the bar using height: X% inside an auto-height
-              parent — the percentage didn't resolve and the bars never appeared. */}
-          <div style={{ height: 220, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 6, minHeight: 0 }}>
-              {chartData.map(({ date, min }) => {
-                const pct = (min / chartMax) * 100
-                const isToday = date === todayStr
-                return (
-                  <div
-                    key={`bar-${date}`}
-                    style={{
-                      flex: 1,
-                      height: `${Math.max(pct, 3)}%`,
-                      background: isToday ? 'var(--accent)' : 'var(--accent-soft)',
-                      borderRadius: 'var(--r-xs) var(--r-xs) 0 0',
-                      transition: 'height 0.4s ease',
-                    }}
-                    title={`${fmtDate(date)}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`}
-                  />
-                )
-              })}
-            </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              {chartData.map(({ date }) => {
-                const d = new Date(date + 'T12:00:00')
-                const isToday = date === todayStr
-                return (
-                  <div
-                    key={`lbl-${date}`}
-                    style={{ flex: 1, textAlign: 'center', fontSize: 10, color: isToday ? 'var(--accent)' : 'var(--fg-subtle)', fontWeight: isToday ? 700 : 400 }}
-                    className="tnum"
-                  >
-                    {d.getDate()}
+        {/* Recent punches */}
+        <div className="card">
+          <div className="card-head">
+            <div className="card-title">Últimas batidas</div>
+          </div>
+          <div className="card-body flush">
+            {recentPunches.length === 0 ? (
+              <div className="empty">
+                <div className="desc">Nenhuma batida hoje.</div>
+              </div>
+            ) : recentPunches.map(r => {
+              const emp = employees.find(e => e.id === r.employee_id)
+              const ci = emp ? empColor(emp.id) : 1
+              const time = new Date(r.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+              return (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
+                  <div className={`avatar av-c${ci}`}>{avatarInitials(r.employee_name)}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{r.employee_name}</div>
+                    <div style={{ marginTop: 2 }}>
+                      <span className={`chip ${PUNCH_TONE[r.type] || 'outline'}`} style={{ fontSize: 11 }}>
+                        {PUNCH_LABEL[r.type] ?? r.type}
+                      </span>
+                    </div>
                   </div>
-                )
-              })}
-            </div>
+                  <div className="tnum muted" style={{ fontSize: 11.5 }}>{time}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
