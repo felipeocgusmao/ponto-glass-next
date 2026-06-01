@@ -58,6 +58,8 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
   const [error, setError] = useState('')
   const [truncated, setTruncated] = useState(false)
   const [dayExceptions, setDayExceptions] = useState<string[]>([])
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailMsg, setEmailMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const handleFromChange = (val: string) => { setFrom(val); if (val > to) setTo(val) }
   const handleToChange   = (val: string) => { setTo(val);   if (val < from) setFrom(val) }
@@ -87,6 +89,22 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
     } catch { setError(t('error.connect')) }
     finally { setLoading(false) }
   }, [from, to, filterEmpId, t])
+
+  const sendEmailReport = async () => {
+    setEmailSending(true); setEmailMsg(null)
+    try {
+      const d = new Date(from + 'T12:00:00')
+      const res = await fetch('/api/cron/monthly-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year: d.getFullYear(), month: d.getMonth() + 1 }),
+      })
+      const data = await res.json()
+      if (res.ok) setEmailMsg({ ok: true, text: `Relatório enviado: ${data.sent} e-mail(s) entregue(s) — ${data.period}` })
+      else setEmailMsg({ ok: false, text: data.error ?? t('error.connect') })
+    } catch { setEmailMsg({ ok: false, text: t('error.connect') }) }
+    finally { setEmailSending(false) }
+  }
 
   const byEmp = useMemo(() => {
     const m: Record<string, { name: string; records: PunchRecord[] }> = {}
@@ -153,11 +171,18 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
               ><IconDownload size={13}/> PDF</button>
             </>
           )}
+          <button onClick={sendEmailReport} disabled={emailSending} className="btn" title="Enviar relatório do período seleccionado por e-mail">
+            {emailSending ? 'A enviar…' : '✉ E-mail'}
+          </button>
           <button onClick={load} disabled={loading} className="btn primary">
             <IconRefresh size={13}/> {loading ? t('relat.generating') : 'Gerar'}
           </button>
         </div>
       </div>
+
+      {emailMsg && (
+        <div className={`alert-inline ${emailMsg.ok ? 'ok' : 'err'}`}>{emailMsg.text}</div>
+      )}
 
       {/* Filters */}
       <div className="card">
