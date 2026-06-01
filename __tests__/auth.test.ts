@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll } from 'vitest'
 
 beforeAll(() => {
   process.env.JWT_SECRET = 'test-secret-minimum-32-characters-ok'
-  process.env.NODE_ENV = 'test'
 })
 
 describe('JWT auth', () => {

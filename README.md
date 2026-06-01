@@ -583,7 +583,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Monitorização Sentry (cliente + servidor, source maps)
   ☐  Domínio personalizado por empresa                     → issue #5
   ☐  Multi-empresa (tenancy)                               → issue #6
-  ☐  Relatório mensal automático por e-mail                → issue #9
+  ✓  Relatório mensal automático por e-mail (cron + disparo manual)
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
 
