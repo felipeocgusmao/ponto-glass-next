@@ -36,8 +36,10 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
   const now = new Date()
   const todayStr = businessDate()
-  const firstOfMonth = `${todayStr.slice(0, 7)}-01`
   const next30Str = new Date(now.getTime() + 30 * 86400000).toISOString().split('T')[0]
+  // Chart wants last 14 working days regardless of month boundary; 30 calendar days back
+  // covers it comfortably even after long weekends.
+  const chartFromStr = new Date(now.getTime() - 30 * 86400000).toISOString().split('T')[0]
 
   const [monthRecs, setMonthRecs] = useState<PunchRecord[]>([])
   const [todayRecs, setTodayRecs] = useState<PunchRecord[]>([])
@@ -49,7 +51,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     setLoading(true)
     try {
       const [mRes, tRes, eRes] = await Promise.all([
-        fetch(`/api/reports?from=${firstOfMonth}&to=${todayStr}`),
+        fetch(`/api/reports?from=${chartFromStr}&to=${todayStr}`),
         fetch('/api/records?today=true'),
         fetch(`/api/day-exceptions?from=${todayStr}&to=${next30Str}`),
       ])
@@ -58,7 +60,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
       if (eRes.ok) setExceptions(await eRes.json())
     } catch { /* silent */ }
     finally { setLoading(false) }
-  }, [firstOfMonth, todayStr, next30Str])
+  }, [chartFromStr, todayStr, next30Str])
 
   useEffect(() => { load() }, [load])
 
@@ -119,8 +121,8 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
   const positiveBank = bankValues.filter(v => v > 0).length
   const negativeBank = bankValues.filter(v => v < 0).length
 
-  // Chart: last 14 working days of month
-  const workingDays = getWorkingDays(firstOfMonth, todayStr)
+  // Chart: last 14 working days (going back from today, regardless of month boundary)
+  const workingDays = getWorkingDays(chartFromStr, todayStr)
   const chartDays = workingDays.slice(-14)
   const byDateEmp = new Map<string, Map<string, PunchRecord[]>>()
   monthRecs.forEach(r => {
@@ -441,7 +443,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
         {/* Bar chart */}
         <div className="card">
           <div className="card-head">
-            <div className="card-title">Horas trabalhadas · últimos {chartDays.length} dias</div>
+            <div className="card-title">Horas trabalhadas · últimos {chartDays.length} dias úteis</div>
           </div>
           <div className="card-body">
             {/* Split the chart into a bars row (flex:1 → has a resolvable height for the % bars)

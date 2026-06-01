@@ -213,7 +213,8 @@ ul, ol { list-style: none; }
 .app[data-collapsed="true"] .sb-section-label,
 .app[data-collapsed="true"] .sb-user-meta { display: none; }
 .app[data-collapsed="true"] .sb-head { padding: 14px 12px; justify-content: center; }
-.app[data-collapsed="true"] .sb-collapse { display: none; }
+.app[data-collapsed="true"] .sb-logo { display: none; }
+.app[data-collapsed="true"] .sb-collapse { width: 32px; height: 32px; }
 .app[data-collapsed="true"] .sb-item { justify-content: center; padding: 6px; }
 .app[data-collapsed="true"] .sb-user { justify-content: center; }
 
