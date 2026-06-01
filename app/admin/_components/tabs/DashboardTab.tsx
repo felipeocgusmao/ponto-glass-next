@@ -441,11 +441,11 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
       {/* Chart + Recent punches */}
       <div className="grid-3">
         {/* Bar chart */}
-        <div className="card">
+        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="card-head">
             <div className="card-title">Horas trabalhadas · últimos {chartDays.length} dias úteis</div>
           </div>
-          <div className="card-body">
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', flex: 1 }}>
             {/* Split the chart into a bars row (flex:1 → has a resolvable height for the % bars)
                 and a labels row, so the bars actually render. Previously each column was
                 flex-direction: column with the bar using height: X% inside an auto-height
