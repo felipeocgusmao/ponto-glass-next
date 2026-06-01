@@ -118,3 +118,102 @@ describe('fmtMinutes', () => {
     expect(fmtMinutes(480)).toBe('8h 00m')
   })
 })
+
+import { calcWorkedMinutesPeriod, calcOvertimePeriod, calcOvertimeToday, calcHours, calcEarnings } from '../lib/utils'
+
+describe('calcWorkedMinutesPeriod', () => {
+  it('sums net minutes across multiple days (deducts lunch per day)', () => {
+    const records = [
+      rec('entrada', '2026-05-26T08:00:00Z'),
+      rec('saída',   '2026-05-26T17:00:00Z'),
+      rec('entrada', '2026-05-27T08:00:00Z'),
+      rec('saída',   '2026-05-27T17:00:00Z'),
+    ]
+    // each day: 9h - 60min lunch = 480min; total = 960
+    expect(calcWorkedMinutesPeriod(records, 60)).toBe(960)
+  })
+
+  it('returns 0 for empty records', () => {
+    expect(calcWorkedMinutesPeriod([], 60)).toBe(0)
+  })
+
+  it('incomplete day (no saída) contributes 0 to period total', () => {
+    const records = [
+      rec('entrada', '2026-05-26T08:00:00Z'),
+      rec('saída',   '2026-05-26T17:00:00Z'),
+      rec('entrada', '2026-05-27T08:00:00Z'), // no saída
+    ]
+    expect(calcWorkedMinutesPeriod(records, 60)).toBe(480)
+  })
+})
+
+describe('calcOvertimePeriod', () => {
+  it('positive overtime when worked more than workday', () => {
+    const records = [
+      rec('entrada', '2026-05-26T08:00:00Z'),
+      rec('saída',   '2026-05-26T18:00:00Z'), // 10h - 60min lunch = 540min vs 480min target → +60min
+    ]
+    expect(calcOvertimePeriod(records, 480, 60)).toBe(60)
+  })
+
+  it('negative overtime when worked less than workday', () => {
+    const records = [
+      rec('entrada', '2026-05-26T09:00:00Z'),
+      rec('saída',   '2026-05-26T15:00:00Z'), // 6h - 60min lunch = 300min vs 480min → -180min
+    ]
+    expect(calcOvertimePeriod(records, 480, 60)).toBe(-180)
+  })
+
+  it('returns null for empty records', () => {
+    expect(calcOvertimePeriod([], 480, 60)).toBeNull()
+  })
+})
+
+describe('calcOvertimeToday', () => {
+  it('returns overtime for a completed day', () => {
+    const records = [
+      rec('entrada', '2026-05-26T08:00:00Z'),
+      rec('saída',   '2026-05-26T17:00:00Z'), // 9h - 60min = 480min → 0 overtime
+    ]
+    expect(calcOvertimeToday(records, 480, 60)).toBe(0)
+  })
+
+  it('returns null when no work recorded', () => {
+    expect(calcOvertimeToday([], 480, 60)).toBeNull()
+  })
+})
+
+describe('calcHours', () => {
+  it('formats a worked period correctly', () => {
+    const records = [
+      rec('entrada', '2026-05-26T08:00:00Z'),
+      rec('saída',   '2026-05-26T16:30:00Z'), // 8.5h - 60min = 450min = 7h30m
+    ]
+    expect(calcHours(records, 60)).toBe('7h 30m')
+  })
+
+  it('returns — for no records', () => {
+    expect(calcHours([], 60)).toBe('—')
+  })
+
+  it('returns — for incomplete day (no saída)', () => {
+    expect(calcHours([rec('entrada', '2026-05-26T08:00:00Z')], 60)).toBe('—')
+  })
+})
+
+describe('calcEarnings', () => {
+  it('computes earnings from worked minutes and hourly rate', () => {
+    const records = [
+      rec('entrada', '2026-05-26T08:00:00Z'),
+      rec('saída',   '2026-05-26T16:00:00Z'), // 8h - 60min = 420min = 7h
+    ]
+    // 7h × 10€/h = 70€
+    const result = calcEarnings(records, 10, 60)
+    expect(result).toContain('70')
+  })
+
+  it('returns 0€ for no records', () => {
+    const result = calcEarnings([], 10, 60)
+    expect(result).toContain('0')
+  })
+})
