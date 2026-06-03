@@ -6,6 +6,7 @@ import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
 import { CalendarView } from './_components/CalendarView'
 import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, openPayslip, businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
+import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
 import SettingsModal from '@/app/admin/_components/SettingsModal'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
@@ -155,6 +156,10 @@ export default function PontoPage() {
   const [pwdSaving, setPwdSaving] = useState(false)
   const [pwdMsg, setPwdMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  // offline queue
+  const [isOnline, setIsOnline] = useState(true)
+  const [queueCount, setQueueCount] = useState(0)
+
   // punch-out confirmation
   const [confirmingOut, setConfirmingOut] = useState(false)
 
@@ -288,6 +293,33 @@ export default function PontoPage() {
   }
 
   useEffect(() => { loadUser(); loadRecords() }, [loadUser, loadRecords])
+
+  useEffect(() => {
+    setIsOnline(navigator.onLine)
+    setQueueCount(getQueue().length)
+    const handleOnline = async () => {
+      setIsOnline(true)
+      const result = await flushQueue()
+      setQueueCount(getQueue().length)
+      if (result.synced > 0) {
+        showToast(t('ponto.queue_synced').replace('{n}', String(result.synced)))
+        loadRecords()
+      }
+    }
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    const handleSwMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'SYNC_PUNCH_QUEUE') handleOnline()
+    }
+    navigator.serviceWorker?.addEventListener('message', handleSwMessage)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      navigator.serviceWorker?.removeEventListener('message', handleSwMessage)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { if (user) setProfileEmail(user.email ?? '') }, [user])
   useEffect(() => {
     const n = new Date()
@@ -404,9 +436,27 @@ export default function PontoPage() {
     toastTimer.current = setTimeout(() => setToast(''), 2200)
   }
 
+  const queueOfflinePunch = (type: PunchType) => {
+    enqueue(type)
+    setQueueCount(c => c + 1)
+    showToast(t('ponto.offline_queued'))
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then(reg => (reg as any).sync?.register('punch-queue'))
+        .catch(() => {})
+    }
+  }
+
   const punch = async (type: PunchType) => {
     if (!user || punching) return
     setPunching(true)
+
+    if (!navigator.onLine) {
+      queueOfflinePunch(type)
+      setPunching(false)
+      return
+    }
+
     const geoMode = user.geo_mode ?? 'optional'
     let geo: { lat: number; lng: number } | null = null
     if (geoMode !== 'disabled') {
@@ -435,7 +485,7 @@ export default function PontoPage() {
         const d = await res.json()
         showToast(d.error ?? 'Erro ao registrar')
       }
-    } catch { showToast(t('ponto.connect_error')) }
+    } catch { queueOfflinePunch(type) }
     finally { setPunching(false) }
   }
 
@@ -577,6 +627,24 @@ export default function PontoPage() {
       </header>
 
       <main className="emp-main" style={{ paddingBottom: 72 }}>
+
+        {/* ── OFFLINE / QUEUE BANNER ────────────────────────────────────── */}
+        {(!isOnline || queueCount > 0) && (
+          <div style={{
+            background: !isOnline ? 'rgba(234,179,8,0.10)' : 'rgba(99,102,241,0.10)',
+            border: `1px solid ${!isOnline ? 'var(--warning, #ca8a04)' : 'var(--accent)'}`,
+            borderRadius: 'var(--r-md)',
+            padding: '8px 14px',
+            display: 'flex', alignItems: 'center', gap: 8,
+            marginBottom: 8, fontSize: 12,
+          }}>
+            <span style={{ fontSize: 14 }}>{!isOnline ? '📡' : '🔄'}</span>
+            <span style={{ color: 'var(--fg)' }}>
+              {!isOnline ? t('ponto.offline') : t('ponto.queue_synced').replace('{n}', String(queueCount)).replace('!', '')}
+              {!isOnline && queueCount > 0 && <span style={{ color: 'var(--fg-muted)', marginLeft: 4 }}>· {queueCount} pendente{queueCount !== 1 ? 's' : ''}</span>}
+            </span>
+          </div>
+        )}
 
         {/* ── OVERTIME REMINDER BANNER ───────────────────────────────────── */}
         {tab === 'ponto' && state === 'working' && overtime > 15 && !reminderDismissed && (
@@ -1075,6 +1143,15 @@ export default function PontoPage() {
           >
             <div style={{ position: 'relative', display: 'inline-flex' }}>
               <Icon size={20} />
+              {id === 'ponto' && queueCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -3, right: -5,
+                  minWidth: 14, height: 14, borderRadius: 7,
+                  background: 'var(--warning, #ca8a04)', color: '#fff',
+                  fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 3px', lineHeight: 1,
+                }}>{queueCount}</span>
+              )}
               {id === 'correcoes' && corrBadge > 0 && (
                 <span style={{
                   position: 'absolute', top: -3, right: -5,

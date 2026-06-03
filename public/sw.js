@@ -57,6 +57,16 @@ self.addEventListener('push', e => {
   )
 })
 
+// Background Sync: when device reconnects, notify open clients so they flush
+// the localStorage punch queue (SW can't read localStorage directly).
+self.addEventListener('sync', e => {
+  if (e.tag !== 'punch-queue') return
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(cs => cs.forEach(c => c.postMessage({ type: 'SYNC_PUNCH_QUEUE' })))
+  )
+})
+
 self.addEventListener('notificationclick', e => {
   e.notification.close()
   const url = e.notification.data ?? '/ponto'
