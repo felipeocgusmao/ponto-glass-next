@@ -343,6 +343,9 @@ const t = {
     'ponto.reminder':         'Esqueceu de bater saída?',
     'ponto.reminder.body':    'Já passaram {n} min do fim do seu horário.',
     'ponto.reminder.dismiss': 'Já sei, obrigado',
+    'ponto.offline':          'Sem ligação à internet',
+    'ponto.offline_queued':   'Batida guardada offline. Será sincronizada quando houver ligação.',
+    'ponto.queue_synced':     '{n} batida(s) sincronizada(s)!',
 
     // ── Profile tab (/ponto) ──────────────────────────────────────────────
     'tab.perfil':          'Perfil',
@@ -722,6 +725,9 @@ const t = {
     'ponto.reminder':         'Esqueceu de bater saída?',
     'ponto.reminder.body':    'Já passaram {n} min do fim do seu horário.',
     'ponto.reminder.dismiss': 'Já sei, obrigado',
+    'ponto.offline':          'Sem ligação à internet',
+    'ponto.offline_queued':   'Batida guardada offline. Será sincronizada quando houver ligação.',
+    'ponto.queue_synced':     '{n} batida(s) sincronizada(s)!',
 
     // ── Profile tab (/ponto) ──────────────────────────────────────────────
     'tab.perfil':          'Perfil',
@@ -1092,6 +1098,9 @@ const t = {
     'ponto.reminder':         'Did you forget to clock out?',
     'ponto.reminder.body':    '{n} min past your end-of-shift time.',
     'ponto.reminder.dismiss': 'Got it, thanks',
+    'ponto.offline':          'No internet connection',
+    'ponto.offline_queued':   'Punch saved offline. Will sync when back online.',
+    'ponto.queue_synced':     '{n} punch(es) synced!',
 
     // ── Profile tab (/ponto) ──────────────────────────────────────────────
     'tab.perfil':          'Profile',
@@ -1473,6 +1482,9 @@ const t = {
     'ponto.reminder':         '¿Olvidaste fichar la salida?',
     'ponto.reminder.body':    'Llevas {n} min de tu horario.',
     'ponto.reminder.dismiss': 'Ya lo sé, gracias',
+    'ponto.offline':          'Sin conexión a internet',
+    'ponto.offline_queued':   'Fichaje guardado offline. Se sincronizará cuando haya conexión.',
+    'ponto.queue_synced':     '¡{n} fichaje(s) sincronizado(s)!',
 
     // ── Kiosk ─────────────────────────────────────────────────────────────
     'kiosk.title':        'Terminal de Fichaje',
