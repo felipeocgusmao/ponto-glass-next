@@ -250,7 +250,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
           </div>
           <div className="kpi-delta" style={{ gap: 6 }}>
             {onBreak > 0 && <span className="chip warn dot">{onBreak} em pausa</span>}
-            {absent > 0 && <span className="chip outline">{absent} sem registro</span>}
+            {absent > 0 && <span className="chip outline">{absent} {t('dash.no_reg')}</span>}
           </div>
         </div>
 
@@ -326,7 +326,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                           {state === 'lunch'   && since && <>almoço desde {since}{stateFromPriorDay && ' (ontem)'}</>}
                           {state === 'coffee'  && since && <>pausa café desde {since}{stateFromPriorDay && ' (ontem)'}</>}
                           {state === 'off' && since && <>saiu às {since}</>}
-                          {recs.length === 0 && <>sem registro hoje</>}
+                          {recs.length === 0 && <>{t('dash.no_reg_today')}</>}
                         </div>
                       </div>
                     </div>
@@ -425,7 +425,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                       background: 'var(--danger-fg)',
                     }} />
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{emp.name} sem registro hoje</div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{emp.name} {t('dash.no_reg_today')}</div>
                       <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
                         Nenhuma batida registada
                       </div>
@@ -465,7 +465,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                         borderRadius: 'var(--r-xs) var(--r-xs) 0 0',
                         transition: 'height 0.4s ease',
                       }}
-                      title={`${fmtDate(date)}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`}
+                      title={`${fmtDate(date)}: ${min > 0 ? fmtMinutes(min) : t('dash.no_records')}`}
                     />
                   )
                 })}

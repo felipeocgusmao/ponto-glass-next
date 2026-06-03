@@ -241,7 +241,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar por nome, usuário ou e-mail"
+              placeholder={t('emp.search_placeholder')}
               className="input search"
               style={{ width: '100%' }}
             />

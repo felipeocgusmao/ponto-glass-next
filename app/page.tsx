@@ -91,6 +91,13 @@ export default async function HomePage() {
           }}>
             Aceder ao sistema →
           </Link>
+          <Link href="/demo" style={{
+            padding: '12px 28px', background: 'var(--surface-2)', color: 'var(--fg)',
+            borderRadius: 'var(--r-sm)', textDecoration: 'none', fontSize: 15, fontWeight: 600,
+            border: '1px solid var(--border)',
+          }}>
+            Demo ao vivo
+          </Link>
           <a
             href="https://github.com/felipeocgusmao/ponto-glass-next"
             target="_blank" rel="noopener noreferrer"

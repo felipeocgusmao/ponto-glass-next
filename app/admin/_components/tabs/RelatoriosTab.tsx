@@ -352,7 +352,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                         {chartData.map(({ date, min }) => {
                           const pct = Math.min(100, (min / maxMin) * 100)
                           const d = new Date(date + 'T12:00:00')
-                          const label = `${pad(d.getDate())}/${pad(d.getMonth()+1)}: ${min > 0 ? fmtMinutes(min) : 'sem registros'}`
+                          const label = `${pad(d.getDate())}/${pad(d.getMonth()+1)}: ${min > 0 ? fmtMinutes(min) : t('relat.no_records')}`
                           return (
                             <div key={date} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} title={label}>
                               <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: pct > 0 ? `${pct}%` : 3, background: min === 0 ? 'var(--border)' : 'var(--accent)', opacity: min === 0 ? 1 : 0.7 }} />
