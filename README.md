@@ -594,6 +594,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
 ## ◈ documentação técnica
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — diagrama Mermaid + fluxo de auth + ciclo de ponto + API surface + schema
+- [`docs/SCHEMA.md`](docs/SCHEMA.md) — referência humana das tabelas (colunas, tipos, FKs, índices)
 - [`docs/SECURITY.md`](docs/SECURITY.md) — JWT + cookies + bcrypt + rate limit + revogação + geofencing
 - [`supabase/schema.sql`](supabase/schema.sql) — schema completo + migrações v1→v10
 - [`.env.example`](.env.example) — todas as variáveis com comentários e instruções
