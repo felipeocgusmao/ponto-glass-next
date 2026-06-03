@@ -75,6 +75,8 @@ export default function Sidebar({
           className="sb-collapse"
           onClick={onToggleCollapse}
           title={collapsed ? 'Expandir' : 'Recolher'}
+          aria-label={collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+          aria-expanded={!collapsed}
         >
           <span style={{ display: 'flex', transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
             <IconChevronsLeft size={14} />

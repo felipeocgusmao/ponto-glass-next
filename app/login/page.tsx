@@ -209,8 +209,8 @@ export default function LoginPage() {
                     <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Insere o teu username e receberás um email com o link para redefinir a senha.</div>
                   </div>
                   <div className="field">
-                    <label>{t('auth.username')}</label>
-                    <input className="input" placeholder="seu.usuario" value={forgotUsername}
+                    <label htmlFor="forgot-username">{t('auth.username')}</label>
+                    <input id="forgot-username" className="input" placeholder="seu.usuario" value={forgotUsername}
                       onChange={e => setForgotUsername(e.target.value)} autoFocus
                       autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ height: 38 }} required />
                   </div>
@@ -229,24 +229,26 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="login-form">
             <div className="field">
-              <label>{t('auth.username')}</label>
-              <input className="input" placeholder="seu.usuario" value={username}
+              <label htmlFor="login-username">{t('auth.username')}</label>
+              <input id="login-username" className="input" placeholder="seu.usuario" value={username}
                 onChange={e => setUsername(e.target.value)} disabled={loading}
                 autoFocus={!username} autoComplete="username"
                 autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ height: 38 }}/>
             </div>
 
             <div className="field">
-              <label>{t('auth.password')}</label>
+              <label htmlFor="login-password">{t('auth.password')}</label>
               <div className="login-pwd-wrap">
-                <input ref={pwdRef} className="input" type={showPwd ? 'text' : 'password'}
+                <input id="login-password" ref={pwdRef} className="input" type={showPwd ? 'text' : 'password'}
                   placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
                   disabled={loading} autoFocus={!!username} autoComplete="current-password"
                   style={{ height: 38, paddingRight: 38, width: '100%' }}/>
                 <button type="button" className="login-pwd-toggle"
                   onClick={() => { setShowPwd(s => !s); pwdRef.current?.focus() }}
-                  title={showPwd ? t('auth.password') : t('auth.password')} tabIndex={-1}>
-                  {showPwd ? <EyeIcon size={14}/> : <EyeOffIcon size={14}/>}
+                  aria-label={showPwd ? 'Ocultar senha' : 'Mostrar senha'}
+                  aria-controls="login-password"
+                  tabIndex={-1}>
+                  {showPwd ? <EyeIcon size={14} aria-hidden /> : <EyeOffIcon size={14} aria-hidden />}
                 </button>
               </div>
             </div>

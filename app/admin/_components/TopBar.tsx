@@ -73,8 +73,9 @@ export default function TopBar({
         className="theme-toggle"
         onClick={onToggleTheme}
         title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
+        aria-label={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
       >
-        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+        {theme === 'dark' ? <SunIcon aria-hidden /> : <MoonIcon aria-hidden />}
       </button>
 
       <div style={{ position: 'relative' }}>

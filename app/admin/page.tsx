@@ -194,7 +194,7 @@ export default function AdminPage() {
           onNavigate={t => { setTab(t); if (t === 'correcoes') refreshPendingCount() }}
           notifItems={notifItems}
         />
-        <div className="page">
+        <div className="page" id="main-content">
           <MissingExitBanner />
           {tab === 'meu_ponto'    && <MeuPontoTab user={user} />}
           {tab === 'dashboard'    && <DashboardTab employees={employees} />}
