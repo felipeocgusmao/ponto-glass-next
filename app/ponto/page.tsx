@@ -876,13 +876,13 @@ export default function PontoPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
               <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.date')}</label>
-                <input type="date" className="input" value={corrDate} onChange={e => setCorrDate(e.target.value)} max={businessDate()} />
+                <label htmlFor="corr-date" style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.date')}</label>
+                <input id="corr-date" type="date" className="input" value={corrDate} onChange={e => setCorrDate(e.target.value)} max={businessDate()} />
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <div className="field" style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.type')}</label>
-                  <select className="input" value={corrType} onChange={e => setCorrType(e.target.value)}>
+                  <label htmlFor="corr-type" style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.type')}</label>
+                  <select id="corr-type" className="input" value={corrType} onChange={e => setCorrType(e.target.value)}>
                     <option value="entrada">{t('punch.entrada')}</option>
                     <option value="saída">{t('punch.saída')}</option>
                     <option value="inicio_almoco">{t('punch.inicio_almoco')}</option>
@@ -892,13 +892,13 @@ export default function PontoPage() {
                   </select>
                 </div>
                 <div className="field" style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.time')}</label>
-                  <input type="time" className="input" value={corrTime} onChange={e => setCorrTime(e.target.value)} />
+                  <label htmlFor="corr-time" style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.time')}</label>
+                  <input id="corr-time" type="time" className="input" value={corrTime} onChange={e => setCorrTime(e.target.value)} />
                 </div>
               </div>
               <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.reason')}</label>
-                <input type="text" className="input" value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder={t('corr.reason_placeholder')} />
+                <label htmlFor="corr-reason" style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.reason')}</label>
+                <input id="corr-reason" type="text" className="input" value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder={t('corr.reason_placeholder')} />
               </div>
 
               {corrMsg && (

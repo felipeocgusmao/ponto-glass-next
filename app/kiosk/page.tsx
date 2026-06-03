@@ -179,8 +179,8 @@ export default function KioskPage() {
             <span>{hh}</span><span className="emp-clock-sep">:</span><span>{mm}</span>
             <span style={{ fontSize: 13, opacity: 0.5, marginLeft: 2 }}>:{ss}</span>
           </div>
-          <button onClick={() => router.push('/admin')} className="btn ghost sm icon" title="Admin">
-            <ArrowIcon size={15}/>
+          <button onClick={() => router.push('/admin')} className="btn ghost sm icon" title="Admin" aria-label="Ir para o painel de admin">
+            <ArrowIcon size={15} aria-hidden />
           </button>
         </div>
       </header>
@@ -286,7 +286,7 @@ export default function KioskPage() {
                 <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--fg)' }}>{selected.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('kiosk.select_type')}</div>
               </div>
-              <button onClick={closeModal} className="btn ghost sm icon">✕</button>
+              <button onClick={closeModal} className="btn ghost sm icon" aria-label="Fechar">✕</button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 20 }}>
