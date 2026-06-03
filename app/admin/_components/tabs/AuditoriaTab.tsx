@@ -141,8 +141,8 @@ export function AuditoriaTab() {
           <div className="empty"><div className="title">{t('common.loading')}</div></div>
         ) : filtered.length === 0 ? (
           <div className="empty">
-            <div className="title">{logs.length === 0 ? t('audit.none') : 'Nenhum registro corresponde'}</div>
-            {logs.length > 0 && <div className="desc">Ajuste a busca ou os filtros.</div>}
+            <div className="title">{logs.length === 0 ? t('audit.none') : t('reg.none')}</div>
+            {logs.length > 0 && <div className="desc">{t('audit.filter_hint')}</div>}
           </div>
         ) : (
           <table className="table">

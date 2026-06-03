@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    locale: 'pt_PT',
+    locale: 'pt_BR',
     url: 'https://ponto-glass-next.vercel.app',
     siteName: 'PontoGlass',
     title: 'PontoGlass — o tempo, finalmente, tem forma',

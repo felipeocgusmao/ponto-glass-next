@@ -283,7 +283,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                   return true
                 })
                 if (filteredRecords.length === 0) {
-                  return <div className="empty"><div className="title">Nenhum registro corresponde</div><div className="desc">Ajuste a busca, o tipo ou o período.</div></div>
+                  return <div className="empty"><div className="title">{t('reg.none')}</div><div className="desc">{t('reg.filter_hint')}</div></div>
                 }
                 const totalPages = Math.ceil(filteredRecords.length / PAGE_SIZE)
                 const paged = filteredRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
