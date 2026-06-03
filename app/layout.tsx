@@ -12,13 +12,37 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'PontoGlass',
-  description: 'Controle de ponto digital',
+  metadataBase: new URL('https://ponto-glass-next.vercel.app'),
+  title: {
+    default: 'PontoGlass — o tempo, finalmente, tem forma',
+    template: '%s · PontoGlass',
+  },
+  description: 'Sistema de ponto digital — leve, seguro e bonito. JWT, PWA, push notifications, geofencing, multi-idioma. Open source.',
+  applicationName: 'PontoGlass',
+  authors: [{ name: 'Felipe Gusmão', url: 'https://github.com/felipeocgusmao' }],
+  keywords: ['ponto eletrónico', 'ponto digital', 'time tracking', 'controle de ponto', 'PWA', 'Next.js', 'Supabase', 'TypeScript'],
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'PontoGlass',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'pt_PT',
+    url: 'https://ponto-glass-next.vercel.app',
+    siteName: 'PontoGlass',
+    title: 'PontoGlass — o tempo, finalmente, tem forma',
+    description: 'Sistema de ponto digital — leve, seguro e bonito. JWT, PWA, push notifications, geofencing, multi-idioma. Open source.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'PontoGlass — o tempo, finalmente, tem forma',
+    description: 'Sistema de ponto digital — leve, seguro e bonito. Open source.',
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 }
 

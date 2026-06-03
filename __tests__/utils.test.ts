@@ -7,6 +7,7 @@ import {
   haversineMeters,
   fmtMinutes,
   isIncompleteDay,
+  avatarInitials,
 } from '../lib/utils'
 import type { PunchRecord } from '../lib/types'
 
@@ -116,6 +117,49 @@ describe('fmtMinutes', () => {
     expect(fmtMinutes(90)).toBe('1h 30m')
     expect(fmtMinutes(45)).toBe('45m')
     expect(fmtMinutes(480)).toBe('8h 00m')
+  })
+  it('formats zero as plain minutes', () => {
+    expect(fmtMinutes(0)).toBe('0m')
+  })
+  it('treats negative minutes as positive magnitude', () => {
+    expect(fmtMinutes(-90)).toBe('1h 30m')
+    expect(fmtMinutes(-45)).toBe('45m')
+  })
+})
+
+describe('avatarInitials', () => {
+  it('uses first letter of first two words', () => {
+    expect(avatarInitials('Felipe Gusmão')).toBe('FG')
+  })
+  it('handles single name', () => {
+    expect(avatarInitials('João')).toBe('J')
+  })
+  it('uppercases lowercase input', () => {
+    expect(avatarInitials('ana silva')).toBe('AS')
+  })
+  it('limits to two initials even with longer names', () => {
+    expect(avatarInitials('Maria José da Silva')).toBe('MJ')
+  })
+  it('returns empty string for empty input', () => {
+    expect(avatarInitials('')).toBe('')
+  })
+})
+
+describe('businessDate', () => {
+  it('returns a YYYY-MM-DD string', () => {
+    const date = businessDate(new Date('2026-05-28T12:00:00Z'))
+    expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+  it('returns the same date for instants well within the same business day', () => {
+    // Both noons UTC fall on the same calendar day in any reasonable timezone.
+    const morning = businessDate(new Date('2026-05-28T09:00:00Z'))
+    const afternoon = businessDate(new Date('2026-05-28T15:00:00Z'))
+    expect(morning).toBe(afternoon)
+  })
+  it('advances by one day across a full 24h gap', () => {
+    const d1 = businessDate(new Date('2026-05-28T12:00:00Z'))
+    const d2 = businessDate(new Date('2026-05-29T12:00:00Z'))
+    expect(d1).not.toBe(d2)
   })
 })
 
