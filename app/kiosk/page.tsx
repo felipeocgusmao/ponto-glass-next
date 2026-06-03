@@ -179,6 +179,9 @@ export default function KioskPage() {
             <span>{hh}</span><span className="emp-clock-sep">:</span><span>{mm}</span>
             <span style={{ fontSize: 13, opacity: 0.5, marginLeft: 2 }}>:{ss}</span>
           </div>
+          <button onClick={() => router.push('/kiosk/glass')} className="btn ghost sm icon" title="Modo glass (smart glasses)" aria-label="Abrir modo glass para smart glasses" style={{ fontSize: 14 }}>
+            🥽
+          </button>
           <button onClick={() => router.push('/admin')} className="btn ghost sm icon" title="Admin" aria-label="Ir para o painel de admin">
             <ArrowIcon size={15} aria-hidden />
           </button>
