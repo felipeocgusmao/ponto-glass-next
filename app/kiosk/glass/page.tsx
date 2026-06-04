@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { WORKING_TYPES } from '@/lib/utils'
+import { getSpeechRecognition, isSpeechSynthesisAvailable, parseVoiceCommand, speak } from '@/lib/voice'
 
 type WorkState = 'working' | 'pause' | 'out' | 'absent'
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
@@ -69,6 +70,28 @@ export default function KioskGlassPage() {
   const countdownRaf = useRef<number | null>(null)
   const punchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Voice command (Web Speech API) — typed by hand because lib.dom omits SpeechRecognition.
+  type RecognitionInstance = {
+    start(): void; stop(): void; abort(): void
+    lang: string; continuous: boolean; interimResults: boolean
+    onresult: ((e: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null
+    onend: (() => void) | null
+    onerror: (() => void) | null
+  }
+  const [voiceSupported, setVoiceSupported] = useState(false)
+  const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing'>('idle')
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const recognitionRef = useRef<RecognitionInstance | null>(null)
+  // Stable refs so the recognition callback always sees the latest state without re-binding the listener.
+  const employeesRef = useRef<Employee[]>([])
+  const todayRecsRef = useRef<PunchRecord[]>([])
+  const pendingEmpRef = useRef<Employee | null>(null)
+  const selectedIdxRef = useRef(0)
+  useEffect(() => { employeesRef.current = employees }, [employees])
+  useEffect(() => { todayRecsRef.current = todayRecs }, [todayRecs])
+  useEffect(() => { pendingEmpRef.current = pendingEmp }, [pendingEmp])
+  useEffect(() => { selectedIdxRef.current = selectedIdx }, [selectedIdx])
+
   useEffect(() => {
     const i = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(i)
@@ -98,9 +121,93 @@ export default function KioskGlassPage() {
     return () => clearInterval(i)
   }, [load])
 
-  // Keyboard / D-pad navigation (smart-glasses touchpad maps to arrow keys + enter)
+  // Voice command setup — runs once on mount. Speech Recognition is non-standard
+  // (Chrome/Edge/Safari iOS 14.5+; not Firefox). Falls back silently to D-pad-only
+  // operation when unsupported. Listening is push-to-talk (button or 'M' key).
+  useEffect(() => {
+    const Ctor = getSpeechRecognition()
+    if (!Ctor) return
+    setVoiceSupported(true)
+    const rec = new Ctor()
+    rec.lang = 'pt-PT'
+    rec.continuous = false
+    rec.interimResults = false
+
+    rec.onresult = (e: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => {
+      const last = e.results[e.results.length - 1]
+      if (!last?.isFinal) return
+      const transcript = last[0]?.transcript ?? ''
+      setVoiceTranscript(transcript)
+      setVoiceState('processing')
+      handleTranscript(transcript)
+    }
+    rec.onerror = () => { setVoiceState('idle') }
+    rec.onend = () => {
+      // Drop back to idle only if we weren't still handing off to the punch flow.
+      setVoiceState(prev => (prev === 'listening' ? 'idle' : prev))
+    }
+
+    recognitionRef.current = rec
+    return () => { try { rec.abort() } catch { /* ignore */ } }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const toggleListening = useCallback(() => {
+    const rec = recognitionRef.current
+    if (!rec) return
+    if (voiceState === 'listening') { try { rec.stop() } catch { /* ignore */ } ; setVoiceState('idle'); return }
+    setVoiceTranscript('')
+    setVoiceState('listening')
+    try { rec.start() } catch { setVoiceState('idle') }
+  }, [voiceState])
+
+  const handleTranscript = useCallback((text: string) => {
+    const cmd = parseVoiceCommand(text, employeesRef.current.map(e => ({ id: e.id, name: e.name })))
+    if (cmd.kind === 'cancel') {
+      if (pendingEmpRef.current) { cancelPunch(); speak('Cancelado.') }
+      setVoiceState('idle')
+      return
+    }
+    if (cmd.kind === 'select') {
+      const idx = employeesRef.current.findIndex(e => e.id === cmd.employeeId)
+      if (idx >= 0) {
+        setSelectedIdx(idx)
+        const emp = employeesRef.current[idx]
+        speak(`${emp.name.split(' ')[0]} selecionado.`)
+      }
+      setVoiceState('idle')
+      return
+    }
+    if (cmd.kind === 'punch') {
+      const emp = employeesRef.current[selectedIdxRef.current]
+      if (emp) startPunch(emp, { source: 'voice', overrideType: cmd.type })
+      setVoiceState('idle')
+      return
+    }
+    if (cmd.kind === 'select-and-punch') {
+      const idx = employeesRef.current.findIndex(e => e.id === cmd.employeeId)
+      if (idx >= 0) {
+        setSelectedIdx(idx)
+        startPunch(employeesRef.current[idx], { source: 'voice', overrideType: cmd.type })
+      }
+      setVoiceState('idle')
+      return
+    }
+    // Unknown — let the user know we heard but didn't understand.
+    speak('Não entendi o comando.')
+    setVoiceState('idle')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Keyboard / D-pad navigation (smart-glasses touchpad maps to arrow keys + enter).
+  // 'M' (or 'V') toggles voice listening when supported.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.key === 'm' || e.key === 'M' || e.key === 'v' || e.key === 'V') && voiceSupported && !pendingEmp) {
+        e.preventDefault()
+        toggleListening()
+        return
+      }
       if (pendingEmp) {
         if (e.key === 'Escape' || e.key === 'Backspace') cancelPunch()
         return
@@ -119,7 +226,7 @@ export default function KioskGlassPage() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employees, selectedIdx, pendingEmp])
+  }, [employees, selectedIdx, pendingEmp, voiceSupported, toggleListening])
 
   const cancelPunch = () => {
     if (countdownRaf.current) cancelAnimationFrame(countdownRaf.current)
@@ -130,7 +237,7 @@ export default function KioskGlassPage() {
     setCountdownPct(100)
   }
 
-  const startPunch = (emp: Employee) => {
+  const startPunch = (emp: Employee, opts: { source?: 'voice' | 'tap'; overrideType?: PunchType } = {}) => {
     cancelPunch()
     setResult(null)
     setPendingEmp(emp)
@@ -142,12 +249,12 @@ export default function KioskGlassPage() {
       if (pct > 0) countdownRaf.current = requestAnimationFrame(tick)
     }
     countdownRaf.current = requestAnimationFrame(tick)
-    punchTimer.current = setTimeout(() => doPunch(emp), COUNTDOWN_MS)
+    punchTimer.current = setTimeout(() => doPunch(emp, opts.overrideType), COUNTDOWN_MS)
   }
 
-  const doPunch = async (emp: Employee) => {
-    const recs = todayRecs.filter(r => r.employee_id === emp.id)
-    const type = nextPunch(recs)
+  const doPunch = async (emp: Employee, overrideType?: PunchType) => {
+    const recs = todayRecsRef.current.filter(r => r.employee_id === emp.id)
+    const type = overrideType ?? nextPunch(recs)
     try {
       const res = await fetch('/api/punch', {
         method: 'POST',
@@ -157,12 +264,19 @@ export default function KioskGlassPage() {
       if (res.ok) {
         const rec: PunchRecord = await res.json()
         setTodayRecs(prev => [...prev.filter(r => r.id !== rec.id), rec])
-        setResult({ ok: true, msg: `${emp.name.split(' ')[0]}: ${LABELS[type]}` })
+        const firstName = emp.name.split(' ')[0]
+        setResult({ ok: true, msg: `${firstName}: ${LABELS[type]}` })
+        // Spoken confirmation — helpful when the glass user can't easily read the screen.
+        speak(`${LABELS[type].toLowerCase()} registada para ${firstName}.`)
       } else {
         const d = await res.json()
         setResult({ ok: false, msg: d.error ?? 'ERRO' })
+        speak('Erro ao registar ponto.')
       }
-    } catch { setResult({ ok: false, msg: 'SEM REDE' }) }
+    } catch {
+      setResult({ ok: false, msg: 'SEM REDE' })
+      speak('Sem ligação.')
+    }
     finally {
       setPendingEmp(null)
       setCountdownPct(100)
@@ -189,9 +303,27 @@ export default function KioskGlassPage() {
         <div style={{ color: '#fbbf24', fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', letterSpacing: '-0.02em' }}>
           {hh}:{mm}
         </div>
-        <button onClick={() => router.push('/kiosk')} style={exitBtnStyle} aria-label="Voltar ao kiosk normal">
-          ✕
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {voiceSupported && (
+            <button
+              onClick={toggleListening}
+              style={{
+                ...exitBtnStyle,
+                background: voiceState === 'listening' ? '#fbbf24' : 'transparent',
+                color: voiceState === 'listening' ? '#000' : '#fbbf24',
+                borderColor: voiceState === 'listening' ? '#fbbf24' : '#fbbf24',
+                fontSize: 18, lineHeight: 1,
+              }}
+              aria-label={voiceState === 'listening' ? 'Parar escuta de voz' : 'Ativar comando de voz'}
+              title="Comando de voz (M)"
+            >
+              {voiceState === 'listening' ? '●' : '🎙'}
+            </button>
+          )}
+          <button onClick={() => router.push('/kiosk')} style={exitBtnStyle} aria-label="Voltar ao kiosk normal">
+            ✕
+          </button>
+        </div>
       </header>
 
       {result && (
@@ -279,7 +411,17 @@ export default function KioskGlassPage() {
       )}
 
       <footer style={footerStyle}>
-        ← → SELECIONAR · ENTER PARA BATER · ESC PARA CANCELAR
+        {voiceState === 'listening' && (
+          <span style={{ color: '#000', background: '#fbbf24', padding: '2px 8px', borderRadius: 3, marginRight: 10 }}>
+            ● A ESCUTAR…
+          </span>
+        )}
+        {voiceState !== 'listening' && voiceTranscript && (
+          <span style={{ color: '#94a3b8', marginRight: 10, textTransform: 'none' }}>
+            ouvi: &ldquo;{voiceTranscript}&rdquo;
+          </span>
+        )}
+        ← → SELECIONAR · ENTER PARA BATER · ESC PARA CANCELAR{voiceSupported ? ' · M PARA VOZ' : ''}
       </footer>
     </div>
   )

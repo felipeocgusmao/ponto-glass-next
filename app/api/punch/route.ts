@@ -3,10 +3,9 @@ import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
-import { calcWorkDate, haversineMeters } from '@/lib/utils'
+import { calcWorkDate } from '@/lib/utils'
 import { rateLimit } from '@/lib/rateLimit'
-
-const VALID_TYPES = ['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
+import { validateGeofence, isDuplicatePunch, isValidPunchType } from '@/lib/punchValidation'
 
 export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
@@ -17,7 +16,7 @@ export async function POST(request: NextRequest) {
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
   const { type, employeeId: targetId, latitude, longitude } = await request.json()
-  if (!VALID_TYPES.includes(type))
+  if (!isValidPunchType(type))
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
 
   let empId = user.id
@@ -61,34 +60,19 @@ export async function POST(request: NextRequest) {
       empShiftStart = empData.shift_start ?? '00:00'
 
       // Geofencing only when the migration is in place and the columns exist.
-      if (geofenceAvailable) {
-        const e = empData as { geo_mode?: string | null; workplace_lat?: number | null; workplace_lng?: number | null; max_distance_meters?: number | null }
-        const { geo_mode, workplace_lat, workplace_lng, max_distance_meters } = e
-        if (
-          geo_mode !== 'disabled' &&
-          workplace_lat != null && workplace_lng != null && max_distance_meters != null
-        ) {
-          if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-            return NextResponse.json(
-              { error: 'Localização obrigatória para este funcionário.' },
-              { status: 400 }
-            )
-          }
-          const dist = haversineMeters(latitude, longitude, workplace_lat, workplace_lng)
-          if (dist > max_distance_meters) {
-            return NextResponse.json(
-              { error: `Fora do local de trabalho (${Math.round(dist)}m de distância, máximo ${max_distance_meters}m).` },
-              { status: 400 }
-            )
-          }
-        } else if (geo_mode === 'required') {
-          if (typeof latitude !== 'number' || typeof longitude !== 'number')
-            return NextResponse.json({ error: 'Localização obrigatória.' }, { status: 400 })
-        }
-      } else if (empData.geo_mode === 'required') {
-        if (typeof latitude !== 'number' || typeof longitude !== 'number')
-          return NextResponse.json({ error: 'Localização obrigatória.' }, { status: 400 })
-      }
+      // When the columns are missing we fall through to the basic geo_mode check.
+      const geoCheck = geofenceAvailable
+        ? validateGeofence({
+            geoMode: (empData as { geo_mode?: string | null }).geo_mode as 'required' | 'optional' | 'disabled' | null,
+            latitude, longitude,
+            workplaceLat: (empData as { workplace_lat?: number | null }).workplace_lat,
+            workplaceLng: (empData as { workplace_lng?: number | null }).workplace_lng,
+            maxDistanceMeters: (empData as { max_distance_meters?: number | null }).max_distance_meters,
+          })
+        : validateGeofence({ geoMode: empData.geo_mode as 'required' | 'optional' | 'disabled' | null, latitude, longitude })
+
+      if (!geoCheck.ok)
+        return NextResponse.json({ error: geoCheck.error }, { status: geoCheck.status })
     }
   }
 
@@ -98,7 +82,7 @@ export async function POST(request: NextRequest) {
   const { data: lastRec } = await supabase
     .from('records').select('type, timestamp')
     .eq('employee_id', empId).order('timestamp', { ascending: false }).limit(1).maybeSingle()
-  if (lastRec && lastRec.type === type && Date.now() - new Date(lastRec.timestamp).getTime() < 60_000)
+  if (isDuplicatePunch(lastRec?.type, lastRec?.timestamp, type))
     return NextResponse.json({ error: 'Registo duplicado. Aguarde um momento.' }, { status: 409 })
 
   const now = new Date()
