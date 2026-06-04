@@ -94,7 +94,8 @@ Existe **um URL** e **uma senha**.
 │   E-mail      →   Microsoft Graph API  (+ SMTP fallback)│
 │   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
 │   Cron        →   Vercel Cron Jobs  (ausências, saída)  │
-│   Testes      →   Vitest  (unit) + Playwright  (E2E)    │
+│   Voz         →   Web Speech API  (reconhecimento + TTS)│
+│   Testes      →   Vitest  (79 unit) + Playwright  (E2E) │
 │   Monitor     →   Sentry  (erros cliente + servidor)    │
 │   Geofencing  →   Haversine  (raio por funcionário)     │
 │   Horas       →   Centesimal  (base 100, quarto de hora)│
@@ -116,8 +117,9 @@ Cada peça foi escolhida com intenção:
 | **Microsoft Graph + SMTP** | Graph API como transporte principal (OAuth Client Credentials), SMTP como fallback automático |
 | **jsPDF + AutoTable** | Geração de PDF no cliente, sem dependências de servidor |
 | **Vercel Cron Jobs** | Tarefas agendadas: alerta de ausência (manhã) e alerta de saída não registada (17h) |
-| **Vitest** | Testes unitários rápidos para a lógica de cálculo de horas, auth e rate limit |
+| **Vitest** | 79 testes unitários para cálculo de horas, auth, rate limit, geofencing, de-dup e voz |
 | **Playwright** | Testes E2E do fluxo principal (landing, auth, demo, SEO) |
+| **Web Speech API** | Reconhecimento de voz (SpeechRecognition) + síntese de fala (TTS) no `/kiosk/glass` |
 | **Sentry** | Captura de erros e source maps automáticos via `withSentryConfig` |
 | **Haversine** | Cálculo de distância para validação opcional de geofencing por funcionário |
 | **Horas centesimais** | Relatórios em base 100 (`7,75` = 7h45) com arredondamento ao quarto de hora |
@@ -156,7 +158,7 @@ Nenhuma configuração manual de banco necessária.
 
 **Recuperação de emergência:** rota `/api/auth/recover` com `RECOVERY_SECRET` para quando o admin perde o acesso.
 
-**Modo Quiosque:** página `/kiosk` para tablet/ecrã compartilhado — qualquer funcionário bate o ponto sem fazer login individual. Variante `/kiosk/glass` otimizada para **smart glasses Android** (640×400 landscape, alto contraste, navegação por D-pad/teclado, batida com contagem regressiva de 3s cancelável).
+**Modo Quiosque:** página `/kiosk` para tablet/ecrã compartilhado — qualquer funcionário bate o ponto sem fazer login individual. Variante `/kiosk/glass` otimizada para **smart glasses Android** (640×400 landscape, alto contraste, navegação por D-pad/teclado, batida com contagem regressiva de 3s cancelável). Suporta **comandos de voz** via Web Speech API: pressione **M** (ou toque 🎙) e diga *"Maria entrada"* — o sistema seleciona a pessoa, bate o ponto e confirma com TTS em PT-PT. Funciona com nomes parciais, sem acentos, e reconhece sinónimos (`"almoço"`, `"pausa"`, `"voltei do almoço"`, `"cancelar"`). Gracioso em Firefox (botão some se a API não existir).
 
 **Horas centesimais:** relatórios, holerites, CSV, banco de horas e ganhos exibem o tempo em **base 100** — `7h45m → 7,75`. Cada dia é arredondado ao **quarto de hora mais próximo** (`:00 / :15 / :30 / :45`), então o total na tela sempre bate com a soma das linhas. O cronómetro ao vivo do `/ponto` continua exato em tempo real.
 
@@ -295,6 +297,8 @@ ponto_glass_next/
 │   ├── LangContext.tsx        ← contexto React de idioma
 │   ├── types.ts              ← Employee, EmployeeProfile, PunchRecord, CorrectionRequest…
 │   ├── punchQueue.ts         ← fila offline de batidas (localStorage + flush ao reconectar)
+│   ├── punchValidation.ts    ← validateGeofence, isDuplicatePunch, isValidPunchType (puras + testáveis)
+│   ├── voice.ts              ← parseVoiceCommand, getSpeechRecognition, speak (TTS)
 │   └── utils.ts              ← calcHours, calcNetMinutes, calcEarnings, fmtCentesimal, roundToQuarter…
 │
 ├── middleware.ts              ← RBAC: protege rotas por role (admin/manager/employee)
@@ -304,7 +308,7 @@ ponto_glass_next/
 ├── sentry.server.config.ts    ← inicialização Sentry no servidor
 ├── vitest.config.ts           ← configuração Vitest (jsdom, exclui e2e/)
 ├── playwright.config.ts        ← configuração Playwright (E2E, Chromium)
-├── __tests__/                 ← testes unitários (utils, auth, rateLimit)
+├── __tests__/                 ← 79 testes unitários (utils, auth, rateLimit, voice, punchValidation, entryReminder)
 ├── e2e/                       ← testes E2E (landing, auth, demo, SEO)
 └── supabase/
     ├── schema.sql             ← schema do banco com RLS + migrações comentadas
@@ -601,12 +605,14 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Comentário em registo (nota livre do admin/gerente, ≤ 500 chars)
   ✓  Aviso de shift_start incomum (alerta amarelo ao configurar turno diurno com horário > 00:00)
   ✓  E-mail via Microsoft Graph API (OAuth Client Credentials) com fallback SMTP automático
-  ✓  Testes Vitest (utils, auth, rateLimit) + E2E Playwright (landing, auth, demo, SEO)
+  ✓  Testes Vitest (79 unit: utils, auth, rateLimit, voice, punchValidation, entryReminder) + E2E Playwright
   ✓  Monitorização Sentry (cliente + servidor, source maps)
   ✓  Horas centesimais (base 100) com arredondamento ao quarto de hora em relatórios/banco/ganhos
   ✓  Lembrete push de quarto de hora (bater entrada/saída em :00/:15/:30/:45)
   ✓  Modo offline — fila de batidas no localStorage + Background Sync ao reconectar
   ✓  Modo Glass — /kiosk/glass para smart glasses Android (alto contraste, D-pad)
+  ✓  Voz no Glass — Web Speech API: dizer "Maria entrada" seleciona + bate + confirma com TTS PT-PT
+  ✓  Lógica de validação de punch extraída (punchValidation.ts) — geofencing, de-dup e tipos testáveis sem mock
   ✓  Página /demo com credenciais fictícias (noindex) + landing pública
   ✓  Acessibilidade — focus rings, aria-labels, skip-link, labels associados
   ✓  SEO — metadata Open Graph, OG image dinâmica, JSON-LD, robots.txt, sitemap.xml
