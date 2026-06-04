@@ -2,16 +2,15 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Employee, HourBankAdjustment } from '@/lib/types'
-import { fmtMinutes, businessDate, avatarInitials } from '@/lib/utils'
+import { fmtCentesimalSigned, businessDate, avatarInitials } from '@/lib/utils'
 import { empColor } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import { IconRefresh, IconArrowUp, IconArrowDown } from '../icons'
 
 type Balance = { balanceMin: number; adjustments: HourBankAdjustment[] }
 
-function fmtSigned(min: number) {
-  return (min >= 0 ? '+' : '') + fmtMinutes(Math.abs(min))
-}
+// Banco de horas (centesimal): +1,25 / −0,50
+const fmtSigned = (min: number) => fmtCentesimalSigned(min)
 
 export function BancoHorasTab({ employees }: { employees: Employee[] }) {
   const { t } = useLang()
@@ -176,7 +175,7 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
                     </td>
                     <td className="right muted" style={{ fontSize: 12 }}>
                       {last
-                        ? <span>{last.date} <span style={{ color: last.minutes > 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>({last.minutes > 0 ? '+' : ''}{last.minutes}min)</span></span>
+                        ? <span>{last.date} <span style={{ color: last.minutes > 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>({fmtCentesimalSigned(last.minutes)})</span></span>
                         : <span className="muted">—</span>}
                     </td>
                     <td className="right">
@@ -252,8 +251,8 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
                   <tr key={a.id}>
                     <td className="tnum muted" style={{ fontSize: 12 }}>{a.date}</td>
                     <td>{a.reason}</td>
-                    <td className="right tnum" style={{ fontWeight: 600, color: a.minutes >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
-                      {a.minutes >= 0 ? '+' : ''}{a.minutes}min
+                    <td className="right tnum" style={{ fontWeight: 600, color: a.minutes >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }} title={`${a.minutes >= 0 ? '+' : ''}${a.minutes} min`}>
+                      {fmtCentesimalSigned(a.minutes)}
                     </td>
                     <td>
                       <button onClick={() => handleDelete(a.id)} className="btn ghost sm icon" title="Remover">✕</button>

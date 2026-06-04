@@ -346,6 +346,10 @@ const t = {
     'ponto.offline':          'Sem ligação à internet',
     'ponto.offline_queued':   'Batida guardada offline. Será sincronizada quando houver ligação.',
     'ponto.queue_synced':     '{n} batida(s) sincronizada(s)!',
+    'ponto.notif.entry.title': 'Hora de bater a entrada',
+    'ponto.notif.entry.body':  'Bata a entrada às {time} para fechar no horário certinho.',
+    'ponto.notif.exit.title':  'Hora de bater a saída',
+    'ponto.notif.exit.body':   'Bata a saída às {time} para fechar no horário certinho.',
 
     // ── Profile tab (/ponto) ──────────────────────────────────────────────
     'tab.perfil':          'Perfil',
@@ -728,6 +732,10 @@ const t = {
     'ponto.offline':          'Sem ligação à internet',
     'ponto.offline_queued':   'Batida guardada offline. Será sincronizada quando houver ligação.',
     'ponto.queue_synced':     '{n} batida(s) sincronizada(s)!',
+    'ponto.notif.entry.title': 'Hora de bater a entrada',
+    'ponto.notif.entry.body':  'Bata a entrada às {time} para fechar no horário certinho.',
+    'ponto.notif.exit.title':  'Hora de bater a saída',
+    'ponto.notif.exit.body':   'Bata a saída às {time} para fechar no horário certinho.',
 
     // ── Profile tab (/ponto) ──────────────────────────────────────────────
     'tab.perfil':          'Perfil',
@@ -1101,6 +1109,10 @@ const t = {
     'ponto.offline':          'No internet connection',
     'ponto.offline_queued':   'Punch saved offline. Will sync when back online.',
     'ponto.queue_synced':     '{n} punch(es) synced!',
+    'ponto.notif.entry.title': 'Time to clock in',
+    'ponto.notif.entry.body':  'Clock in at {time} to land on the next quarter mark.',
+    'ponto.notif.exit.title':  'Time to clock out',
+    'ponto.notif.exit.body':   'Clock out at {time} to land on the next quarter mark.',
 
     // ── Profile tab (/ponto) ──────────────────────────────────────────────
     'tab.perfil':          'Profile',
@@ -1485,6 +1497,10 @@ const t = {
     'ponto.offline':          'Sin conexión a internet',
     'ponto.offline_queued':   'Fichaje guardado offline. Se sincronizará cuando haya conexión.',
     'ponto.queue_synced':     '¡{n} fichaje(s) sincronizado(s)!',
+    'ponto.notif.entry.title': 'Hora de fichar entrada',
+    'ponto.notif.entry.body':  'Ficha la entrada a las {time} para cerrar en la marca correcta.',
+    'ponto.notif.exit.title':  'Hora de fichar salida',
+    'ponto.notif.exit.body':   'Ficha la salida a las {time} para cerrar en la marca correcta.',
 
     // ── Kiosk ─────────────────────────────────────────────────────────────
     'kiosk.title':        'Terminal de Fichaje',
