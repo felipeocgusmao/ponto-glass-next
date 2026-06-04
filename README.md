@@ -94,9 +94,10 @@ Existe **um URL** e **uma senha**.
 │   E-mail      →   Microsoft Graph API  (+ SMTP fallback)│
 │   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
 │   Cron        →   Vercel Cron Jobs  (ausências, saída)  │
-│   Testes      →   Vitest  (utils, auth, rateLimit)      │
+│   Testes      →   Vitest  (unit) + Playwright  (E2E)    │
 │   Monitor     →   Sentry  (erros cliente + servidor)    │
 │   Geofencing  →   Haversine  (raio por funcionário)     │
+│   Horas       →   Centesimal  (base 100, quarto de hora)│
 │   Deploy      →   Vercel  (Edge Network global)         │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
@@ -116,8 +117,10 @@ Cada peça foi escolhida com intenção:
 | **jsPDF + AutoTable** | Geração de PDF no cliente, sem dependências de servidor |
 | **Vercel Cron Jobs** | Tarefas agendadas: alerta de ausência (manhã) e alerta de saída não registada (17h) |
 | **Vitest** | Testes unitários rápidos para a lógica de cálculo de horas, auth e rate limit |
+| **Playwright** | Testes E2E do fluxo principal (landing, auth, demo, SEO) |
 | **Sentry** | Captura de erros e source maps automáticos via `withSentryConfig` |
 | **Haversine** | Cálculo de distância para validação opcional de geofencing por funcionário |
+| **Horas centesimais** | Relatórios em base 100 (`7,75` = 7h45) com arredondamento ao quarto de hora |
 
 <br/>
 
@@ -153,7 +156,15 @@ Nenhuma configuração manual de banco necessária.
 
 **Recuperação de emergência:** rota `/api/auth/recover` com `RECOVERY_SECRET` para quando o admin perde o acesso.
 
-**Modo Quiosque:** página `/kiosk` para tablet/ecrã compartilhado — qualquer funcionário bate o ponto sem fazer login individual.
+**Modo Quiosque:** página `/kiosk` para tablet/ecrã compartilhado — qualquer funcionário bate o ponto sem fazer login individual. Variante `/kiosk/glass` otimizada para **smart glasses Android** (640×400 landscape, alto contraste, navegação por D-pad/teclado, batida com contagem regressiva de 3s cancelável).
+
+**Horas centesimais:** relatórios, holerites, CSV, banco de horas e ganhos exibem o tempo em **base 100** — `7h45m → 7,75`. Cada dia é arredondado ao **quarto de hora mais próximo** (`:00 / :15 / :30 / :45`), então o total na tela sempre bate com a soma das linhas. O cronómetro ao vivo do `/ponto` continua exato em tempo real.
+
+**Lembrete de quarto de hora:** notificação push ~2 min antes de cada marca de 15 min, para a pessoa bater entrada/saída "no horário certinho". Entrada a partir do `expected_start` (ou 08:00); saída a partir do `expected_end` (ou jornada cumprida). Almoço e pausa-café ficam de fora.
+
+**Modo offline:** quando o dispositivo está sem rede, a batida é guardada no `localStorage` e sincronizada automaticamente ao reconectar (com Background Sync no Service Worker e indicador visual de pendências).
+
+**Página de demonstração:** `/demo` lista credenciais fictícias (admin / gerente / funcionário) com dados de exemplo, para avaliação rápida sem precisar criar conta. Marcada como `noindex`.
 
 <br/>
 
@@ -217,7 +228,9 @@ ponto_glass_next/
 │   ├── ponto/page.tsx            ← shell fullscreen do funcionário (relógio, histórico, banco, correções)
 │   │   └── _components/
 │   │       └── CalendarView      ← grelha de mês com dias coloridos (trabalhado/ausente/feriado)
+│   ├── demo/page.tsx             ← página pública de credenciais demo (noindex)
 │   ├── kiosk/page.tsx            ← modo quiosque (tablet compartilhado, sem login individual)
+│   │   └── glass/page.tsx        ← variante para smart glasses Android (640×400, alto contraste)
 │   ├── admin/page.tsx            ← painel admin/gerente (sidebar agrupada, 10 abas por role)
 │   │   ├── _lib/
 │   │   │   └── useNotifications  ← hook que agrega correções pendentes, saídas em falta, ausências
@@ -278,15 +291,18 @@ ponto_glass_next/
 │   ├── i18n.ts               ← traduções PT-PT / PT-BR / EN / ES
 │   ├── LangContext.tsx        ← contexto React de idioma
 │   ├── types.ts              ← Employee, EmployeeProfile, PunchRecord, CorrectionRequest…
-│   └── utils.ts              ← calcHours, calcNetMinutes, calcEarnings, fmtMinutes…
+│   ├── punchQueue.ts         ← fila offline de batidas (localStorage + flush ao reconectar)
+│   └── utils.ts              ← calcHours, calcNetMinutes, calcEarnings, fmtCentesimal, roundToQuarter…
 │
 ├── middleware.ts              ← RBAC: protege rotas por role (admin/manager/employee)
-├── public/sw.js               ← Service Worker (cache + push notifications)
+├── public/sw.js               ← Service Worker (cache + push + Background Sync da fila offline)
 ├── vercel.json                ← Vercel Cron Jobs (absence-check 09:00 + missing-exit 17:00 UTC)
 ├── sentry.client.config.ts    ← inicialização Sentry no cliente
 ├── sentry.server.config.ts    ← inicialização Sentry no servidor
-├── vitest.config.ts           ← configuração Vitest (jsdom)
+├── vitest.config.ts           ← configuração Vitest (jsdom, exclui e2e/)
+├── playwright.config.ts        ← configuração Playwright (E2E, Chromium)
 ├── __tests__/                 ← testes unitários (utils, auth, rateLimit)
+├── e2e/                       ← testes E2E (landing, auth, demo, SEO)
 └── supabase/
     ├── schema.sql             ← schema do banco com RLS + migrações comentadas
     └── migrations/            ← migrações datadas (geofencing, RLS policies, backfill)
@@ -365,6 +381,8 @@ npm run start        # Servir o build local
 npm run lint         # ESLint
 npm test             # Vitest (run once)
 npm run test:watch   # Vitest em watch mode
+npm run e2e          # Playwright (E2E)
+npm run e2e:ui       # Playwright em modo UI
 npm run check        # lint + test + build (mesmo que o CI corre)
 ```
 
@@ -579,8 +597,16 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Comentário em registo (nota livre do admin/gerente, ≤ 500 chars)
   ✓  Aviso de shift_start incomum (alerta amarelo ao configurar turno diurno com horário > 00:00)
   ✓  E-mail via Microsoft Graph API (OAuth Client Credentials) com fallback SMTP automático
-  ✓  Testes Vitest (utils, auth, rateLimit)
+  ✓  Testes Vitest (utils, auth, rateLimit) + E2E Playwright (landing, auth, demo, SEO)
   ✓  Monitorização Sentry (cliente + servidor, source maps)
+  ✓  Horas centesimais (base 100) com arredondamento ao quarto de hora em relatórios/banco/ganhos
+  ✓  Lembrete push de quarto de hora (bater entrada/saída em :00/:15/:30/:45)
+  ✓  Modo offline — fila de batidas no localStorage + Background Sync ao reconectar
+  ✓  Modo Glass — /kiosk/glass para smart glasses Android (alto contraste, D-pad)
+  ✓  Página /demo com credenciais fictícias (noindex) + landing pública
+  ✓  Acessibilidade — focus rings, aria-labels, skip-link, labels associados
+  ✓  SEO — metadata Open Graph, OG image dinâmica, JSON-LD, robots.txt, sitemap.xml
+  ✓  CI no GitHub Actions (lint + test + build) com badge
   ☐  Domínio personalizado por empresa                     → issue #5
   ☐  Multi-empresa (tenancy)                               → issue #6
   ✓  Relatório mensal automático por e-mail (cron + disparo manual)
