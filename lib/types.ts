@@ -47,6 +47,9 @@ export interface EmployeeProfile extends JWTUser {
   email: string | null
   lock_profile?: boolean
   theme?: 'dark' | 'light'
+  expected_start?: string | null
+  expected_end?: string | null
+  shift_start?: string | null
 }
 
 export interface AuditLog {

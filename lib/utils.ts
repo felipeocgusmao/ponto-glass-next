@@ -135,6 +135,39 @@ export function fmtMinutes(min: number): string {
   return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`
 }
 
+// ── Centesimal hours (base 100) + quarter-hour rounding ─────────────────────────
+// In "industrial" / centesimal hour notation each hour is split into 100 units
+// instead of 60. So 7h45m → 7,75 and 7h13m → 7,21. The system rounds *worked
+// minutes per day* to the nearest 15-minute mark first, so reported values always
+// land on .00 / .25 / .50 / .75 — never a fractional centesimal like 7,21.
+
+/** Round minutes to the nearest 15-minute mark. Negative values round in magnitude. */
+export function roundToQuarter(min: number): number {
+  const sign = min < 0 ? -1 : 1
+  const rounded = sign * Math.round(Math.abs(min) / 15) * 15
+  // Normalise -0 → 0 so === / Object.is comparisons stay clean.
+  return rounded === 0 ? 0 : rounded
+}
+
+/** Format minutes as centesimal hours, e.g. 45 → "0,75", 465 → "7,75", -60 → "1,00". */
+export function fmtCentesimal(min: number): string {
+  const abs = Math.abs(min)
+  return (abs / 60).toFixed(2).replace('.', ',')
+}
+
+/** Like fmtCentesimal but with a leading + / − sign — used for hour-bank deltas. */
+export function fmtCentesimalSigned(min: number): string {
+  const sign = min < 0 ? '−' : '+'
+  return sign + fmtCentesimal(min)
+}
+
+/** Daily net minutes rounded to the nearest 15-min mark. The canonical
+ *  "official" value used by reports, holerites, hour-bank and earnings.
+ *  Live counters on /ponto stay exact via calcNetMinutes / calcTimeBreakdown. */
+export function calcDayRounded(records: PunchRecord[], lunchBreakMinutes = 0): number {
+  return roundToQuarter(calcNetMinutes(records, lunchBreakMinutes))
+}
+
 export function calcOvertimeToday(
   records: PunchRecord[],
   workdayMinutes = WORKDAY_MINUTES,
@@ -157,13 +190,17 @@ export function calcOvertimePeriod(
   })
   if (byDay.size === 0) return null
   let totalNet = 0
-  byDay.forEach((dayRecs) => { totalNet += calcNetMinutes(dayRecs, lunchBreakMinutes) })
+  // Sum the *rounded* daily net so overtime is computed against the same values
+  // the employee sees in reports and the hour bank (matches centesimal rules).
+  byDay.forEach((dayRecs) => { totalNet += calcDayRounded(dayRecs, lunchBreakMinutes) })
   if (!totalNet) return null
   return totalNet - workdayMinutes * byDay.size
 }
 
 // Day-aware total worked minutes over a period: each day's net is computed (and its
 // lunch deducted) separately, then summed — matching the CSV/PDF/payslip exports.
+// Each day is rounded to the nearest 15-min mark before summing so the displayed
+// total agrees with the rounded daily values printed on relatórios/holerites.
 // Use this for on-screen period totals instead of calcNetMinutes(allRecords, lunch),
 // which would subtract a single lunch for the whole range.
 export function calcWorkedMinutesPeriod(records: PunchRecord[], lunchBreakMinutes = 0): number {
@@ -173,7 +210,7 @@ export function calcWorkedMinutesPeriod(records: PunchRecord[], lunchBreakMinute
     byDay.get(r.date)!.push(r)
   })
   let total = 0
-  byDay.forEach((dayRecs) => { total += calcNetMinutes(dayRecs, lunchBreakMinutes) })
+  byDay.forEach((dayRecs) => { total += calcDayRounded(dayRecs, lunchBreakMinutes) })
   return total
 }
 
@@ -220,7 +257,7 @@ export function exportCSV(
     empDays.get(r.date)!.push(r)
   })
 
-  const COL_HEADERS = ['Data', 'Entrada', 'Saida', 'Almoco (min)', 'Cafe (min)', 'Total Horas', 'Valor/h (EUR)', 'Ganhos (EUR)']
+  const COL_HEADERS = ['Data', 'Entrada', 'Saida', 'Almoco (min)', 'Cafe (min)', 'Horas (centesimal)', 'Valor/h (EUR)', 'Ganhos (EUR)']
   const NCOLS = COL_HEADERS.length
   const fmtEur = (val: number) => val.toFixed(2).replace('.', ',')
 
@@ -263,7 +300,9 @@ export function exportCSV(
       )
       const explicit = hasExplicitBreaks(day)
       const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
-      const netMin     = explicit ? workedMin : Math.max(0, pairMinutes(day) - autoLunch)
+      const exactNet   = explicit ? workedMin : Math.max(0, pairMinutes(day) - autoLunch)
+      // Round each day to the nearest 15-min mark so the CSV total = sum of displayed rows.
+      const netMin     = roundToQuarter(exactNet)
       const incomplete = isIncompleteDay(day)
       const dispLunch  = explicit ? lunchMin  : autoLunch
       const dispCoffee = explicit ? coffeeMin : 0
@@ -285,7 +324,7 @@ export function exportCSV(
         exits.join(' / ')   || '-',
         String(dispLunch),
         String(dispCoffee),
-        incomplete ? 'INCOMPLETO (sem saida)' : (netMin > 0 ? fmtMinutes(netMin) : '-'),
+        incomplete ? 'INCOMPLETO (sem saida)' : (netMin > 0 ? fmtCentesimal(netMin) : '-'),
         rate != null ? rate.toFixed(2).replace('.', ',') : '-',
         rate != null ? fmtEur(dayEarnings) : '-',
       )
@@ -294,14 +333,14 @@ export function exportCSV(
       empTotalEarnings += dayEarnings
     })
 
-    row(`SUBTOTAL ${empName.toUpperCase()}`, '', '', '', '', fmtMinutes(empTotalMin), '', rate != null ? fmtEur(empTotalEarnings) : '-')
+    row(`SUBTOTAL ${empName.toUpperCase()}`, '', '', '', '', fmtCentesimal(empTotalMin), '', rate != null ? fmtEur(empTotalEarnings) : '-')
     blankRow()
 
     grandTotalMin += empTotalMin
     grandTotalEarnings += empTotalEarnings
   })
 
-  row('TOTAL GERAL', '', '', '', '', fmtMinutes(grandTotalMin), '', fmtEur(grandTotalEarnings))
+  row('TOTAL GERAL', '', '', '', '', fmtCentesimal(grandTotalMin), '', fmtEur(grandTotalEarnings))
 
   const csv = `sep=${SEP}\n` + lines.join('\n')
   const encoder = new TextEncoder()
@@ -375,7 +414,9 @@ export async function exportPDF(
       const day = [...empDays.get(date)!].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       const explicit = day.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
       const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
-      const netMin = explicit ? workedMin : Math.max(0, calcNetMinutes(day, autoLunch))
+      const exactNet = explicit ? workedMin : Math.max(0, calcNetMinutes(day, autoLunch))
+      // Round each day to the nearest 15-min mark so the PDF total = sum of displayed rows.
+      const netMin = roundToQuarter(exactNet)
       const incomplete = isIncompleteDay(day)
       const dispLunch = explicit ? lunchMin : autoLunch
       const dispCoffee = explicit ? coffeeMin : 0
@@ -393,7 +434,7 @@ export async function exportPDF(
         exits.join(' / ') || '-',
         dispLunch > 0 ? String(dispLunch) : '-',
         dispCoffee > 0 ? String(dispCoffee) : '-',
-        incomplete ? 'Incompleto' : (netMin > 0 ? fmtMinutes(netMin) : '-'),
+        incomplete ? 'Incompleto' : (netMin > 0 ? fmtCentesimal(netMin) : '-'),
       ]
       if (hasRate) {
         row.push(rate!.toFixed(2))
@@ -404,10 +445,10 @@ export async function exportPDF(
       empTotalEarnings += dayEarnings
     })
 
-    const totalRow: (string | number)[] = ['TOTAL', '', '', '', '', fmtMinutes(empTotalMin)]
+    const totalRow: (string | number)[] = ['TOTAL', '', '', '', '', fmtCentesimal(empTotalMin)]
     if (hasRate) { totalRow.push(''); totalRow.push(empTotalEarnings.toFixed(2) + ' €') }
 
-    const head: string[] = ['Data', 'Entrada', 'Saída', 'Almoço (min)', 'Café (min)', 'Horas']
+    const head: string[] = ['Data', 'Entrada', 'Saída', 'Almoço (min)', 'Café (min)', 'Horas (centesimal)']
     if (hasRate) { head.push('€/hora'); head.push('Ganhos (€)') }
 
     if (yPos > 240) { doc.addPage(); yPos = 20 }
@@ -439,7 +480,7 @@ export async function exportPDF(
     if (yPos > 250) { doc.addPage(); yPos = 20 }
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
-    doc.text(`TOTAL GERAL: ${fmtMinutes(grandTotalMin)}${grandTotalEarnings > 0 ? ` · ${grandTotalEarnings.toFixed(2)} €` : ''}`, 14, yPos)
+    doc.text(`TOTAL GERAL: ${fmtCentesimal(grandTotalMin)}${grandTotalEarnings > 0 ? ` · ${grandTotalEarnings.toFixed(2)} €` : ''}`, 14, yPos)
   }
 
   doc.save(filename)
@@ -466,7 +507,9 @@ export function openPayslip(
     const day = [...byDate.get(date)!].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     const explicit = day.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
     const { workedMin, lunchMin: lMin, coffeeMin } = calcTimeBreakdown(day)
-    const netMin = explicit ? workedMin : Math.max(0, day.filter(r => r.type === 'entrada').length > 0 ? workedMin - lunchMin : 0)
+    const exactNet = explicit ? workedMin : Math.max(0, day.filter(r => r.type === 'entrada').length > 0 ? workedMin - lunchMin : 0)
+    // Round each day to the nearest 15-min mark so the holerite total = sum of displayed rows.
+    const netMin = roundToQuarter(exactNet)
     const incomplete = isIncompleteDay(day)
     const dispLunch = explicit ? lMin : lunchMin
     const dispCoffee = explicit ? coffeeMin : 0
@@ -479,7 +522,7 @@ export function openPayslip(
     totalMin += netMin; totalEarnings += earn
     const rateCell = hourlyRate != null ? `<td>${Number(hourlyRate).toFixed(2).replace('.', ',')} €</td>` : ''
     const earnCell = hourlyRate != null ? `<td>${earn.toFixed(2).replace('.', ',')} €</td>` : ''
-    const totalCell = incomplete ? '<span style="color:#c00;font-weight:600">Incompleto</span>' : (netMin > 0 ? fmtMinutes(netMin) : '-')
+    const totalCell = incomplete ? '<span style="color:#c00;font-weight:600">Incompleto</span>' : (netMin > 0 ? fmtCentesimal(netMin) : '-')
     return `<tr><td>${dateLabel}</td><td>${entries.join(' / ') || '-'}</td><td>${exits.join(' / ') || '-'}</td><td>${dispLunch}</td><td>${dispCoffee}</td><td>${totalCell}</td>${rateCell}${earnCell}</tr>`
   }).join('')
   const rateHeader = hourlyRate != null ? '<th>€/hora</th>' : ''
@@ -495,8 +538,8 @@ td{border:1px solid #ddd;padding:7px 10px;font-size:12px}.total-row{font-weight:
 @media print{.btn{display:none}}</style></head><body>
 <h1>Holerite — ${safeName}</h1>
 <div class="sub">Período: ${safePeriod} · Jornada: ${workdayHours}h · Almoço: ${lunchMin > 0 ? lunchMin + 'min' : 'sem desconto'}${hourlyRate != null ? ` · €${Number(hourlyRate).toFixed(2)}/h` : ''}</div>
-<table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Almoço (min)</th><th>Café (min)</th><th>Total Horas</th>${rateHeader}${earnHeader}</tr></thead>
-<tbody>${rows}<tr class="total-row"><td colspan="5">TOTAL</td><td>${fmtMinutes(totalMin)}</td>${rateTotal}${earnTotal}</tr></tbody></table>
+<table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Almoço (min)</th><th>Café (min)</th><th>Horas (centesimal)</th>${rateHeader}${earnHeader}</tr></thead>
+<tbody>${rows}<tr class="total-row"><td colspan="5">TOTAL</td><td>${fmtCentesimal(totalMin)}</td>${rateTotal}${earnTotal}</tr></tbody></table>
 <button class="btn" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
 </body></html>`
   const win = window.open('', '_blank')

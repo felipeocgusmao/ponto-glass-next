@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
-import { calcNetMinutes, businessDate } from '@/lib/utils'
+import { calcDayRounded, businessDate } from '@/lib/utils'
 import type { PunchRecord } from '@/lib/types'
 
 export async function GET(request: NextRequest) {
@@ -50,7 +50,9 @@ export async function GET(request: NextRequest) {
 
   byDay.forEach((dayRecs) => {
     if (!dayRecs.some(r => r.type === 'saída')) return
-    rawBalanceMin += calcNetMinutes(dayRecs, lunchMin) - workdayMin
+    // Hour bank operates on the *rounded* (centesimal-friendly) daily total so the
+    // balance the employee sees matches the value printed on holerites/relatórios.
+    rawBalanceMin += calcDayRounded(dayRecs, lunchMin) - workdayMin
   })
 
   const { data: adjustments } = await supabase

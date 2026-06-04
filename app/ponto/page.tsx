@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
 import { CalendarView } from './_components/CalendarView'
-import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, openPayslip, businessDate } from '@/lib/utils'
+import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, fmtCentesimal, fmtCentesimalSigned, roundToQuarter, openPayslip, businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
 import SettingsModal from '@/app/admin/_components/SettingsModal'
@@ -399,6 +399,75 @@ export default function PontoPage() {
       notify('Jornada concluída 🔔', 'Já completaste a jornada de hoje. Não te esqueças de registar a saída!', 'overtime-alert')
     }
   }, [now, records, user])
+
+  // ── Quarter-hour reminder ─────────────────────────────────────────────────────
+  // Because reports/holerites round each day to the nearest 15-min mark, the cleanest
+  // record is one batched exactly on :00 / :15 / :30 / :45. This effect fires ~2 min
+  // before the next quarter mark when the next expected punch is entrada (state =
+  // absent, after the employee's expected_start / 08:00 fallback) or saída (state =
+  // working, after expected_end / workday completed). Almoço and pausa-café are out.
+  useEffect(() => {
+    if (!user) return
+    if (typeof window === 'undefined' || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    if (!now) return
+
+    const myRecs = records.filter(r => r.employee_id === user.id)
+    const { state: ws } = getWorkState(myRecs)
+    if (ws !== 'working' && ws !== 'absent') return // skip lunch/coffee/out
+
+    const nowMin = now.getHours() * 60 + now.getMinutes()
+    const minsUntilQuarter = (15 - (nowMin % 15)) % 15
+    if (minsUntilQuarter > 2 || minsUntilQuarter === 0) return // only fire 1–2 min before
+
+    const targetMin = nowMin + minsUntilQuarter
+    const hh = String(Math.floor(targetMin / 60) % 24).padStart(2, '0')
+    const mm = String(targetMin % 60).padStart(2, '0')
+    const targetLabel = `${hh}:${mm}`
+    const today = businessDate()
+
+    const parseHM = (s: string | null | undefined): number | null => {
+      if (!s) return null
+      const [h, m] = s.split(':').map(Number)
+      if (isNaN(h) || isNaN(m)) return null
+      return h * 60 + m
+    }
+
+    const notify = (title: string, body: string, tag: string) => {
+      navigator.serviceWorker.ready
+        .then(reg => reg.showNotification(title, { body, icon: '/icon-192.svg', badge: '/icon-192.svg', tag }))
+        .catch(() => {})
+    }
+
+    if (ws === 'absent') {
+      // Fallback: no expected_start configured → start nudging from 08:00 local.
+      const startMin = parseHM(user.expected_start) ?? 8 * 60
+      if (nowMin < startMin) return
+      const key = `pg.notif.q.entry.${today}.${targetLabel}`
+      if (localStorage.getItem(key)) return
+      localStorage.setItem(key, '1')
+      notify(
+        t('ponto.notif.entry.title'),
+        t('ponto.notif.entry.body').replace('{time}', targetLabel),
+        `quarter-entry-${targetLabel}`,
+      )
+      return
+    }
+
+    // ws === 'working'
+    const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
+    const endMin = parseHM(user.expected_end)
+    const workdayMin = user.workday_hours * 60
+    const eligible = endMin != null ? nowMin >= endMin : liveMin >= workdayMin
+    if (!eligible) return
+    const key = `pg.notif.q.exit.${today}.${targetLabel}`
+    if (localStorage.getItem(key)) return
+    localStorage.setItem(key, '1')
+    notify(
+      t('ponto.notif.exit.title'),
+      t('ponto.notif.exit.body').replace('{time}', targetLabel),
+      `quarter-exit-${targetLabel}`,
+    )
+  }, [now, records, user, t])
   useEffect(() => {
     const saved = localStorage.getItem('pg.theme') as 'dark' | 'light' | null
     if (saved) setTheme(saved)
@@ -561,10 +630,13 @@ export default function PontoPage() {
     byDay.get(r.date)!.push(r)
   })
   const sortedDays = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a))
+  // Sum the rounded daily totals so the month total matches the sum of the
+  // displayed rows (each rounded to the nearest quarter-hour).
   const totalMonthMin = sortedDays.reduce((sum, date) => {
     const recs = byDay.get(date)!
     const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
-    return sum + Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
+    const exact = Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
+    return sum + roundToQuarter(exact)
   }, 0)
   // working weekdays in the loaded month with no records = absent
   const absentDays: string[] = (() => {
@@ -816,7 +888,7 @@ export default function PontoPage() {
               </div>
               {!calendarView && totalMonthMin > 0 && (
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--fg)' }}>{fmtMinutes(totalMonthMin)}</span>
+                  <span style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--fg)' }} title={fmtMinutes(totalMonthMin)}>{fmtCentesimal(totalMonthMin)}</span>
                   <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('history.worked_month')}</span>
                 </div>
               )}
@@ -869,7 +941,9 @@ export default function PontoPage() {
                   }
                   const recs = byDay.get(date)!.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
                   const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
-                  const dayMin = Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
+                  const exactDayMin = Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
+                  // Historical rows display the rounded centesimal value (matches relatório / holerite).
+                  const dayMin = roundToQuarter(exactDayMin)
                   const dt = new Date(date + 'T12:00:00')
                   const isToday = date === businessDate()
                   return (
@@ -882,7 +956,7 @@ export default function PontoPage() {
                           {isToday && <span className="chip accent" style={{ fontSize: 9, marginLeft: 6 }}>hoje</span>}
                         </div>
                         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)', color: dayMin > 0 ? 'var(--fg)' : 'var(--fg-subtle)' }}>
-                          {dayMin > 0 ? fmtMinutes(dayMin) : '—'}
+                          {dayMin > 0 ? fmtCentesimal(dayMin) : '—'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -919,7 +993,7 @@ export default function PontoPage() {
                   color: bankBalance >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)',
                   letterSpacing: '-0.03em',
                 }}>
-                  {bankBalance >= 0 ? '+' : '-'}{fmtMinutes(Math.abs(bankBalance))}
+                  {fmtCentesimalSigned(bankBalance)}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--fg-muted)', marginTop: 8 }}>
                   {bankBalance >= 0 ? t('bank.surplus') : t('bank.deficit')}

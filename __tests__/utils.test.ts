@@ -261,3 +261,64 @@ describe('calcEarnings', () => {
     expect(result).toContain('0')
   })
 })
+
+import { roundToQuarter, fmtCentesimal, fmtCentesimalSigned, calcDayRounded } from '../lib/utils'
+
+describe('roundToQuarter', () => {
+  it('snaps to the nearest 15-min mark (down then up)', () => {
+    expect(roundToQuarter(0)).toBe(0)
+    expect(roundToQuarter(7)).toBe(0)       // < 7.5 → down
+    expect(roundToQuarter(8)).toBe(15)      // > 7.5 → up
+    expect(roundToQuarter(13)).toBe(15)     // user's example: 17h13 → 17h15
+    expect(roundToQuarter(22)).toBe(15)
+    expect(roundToQuarter(23)).toBe(30)
+    expect(roundToQuarter(60)).toBe(60)
+    expect(roundToQuarter(465)).toBe(465)   // 7h45 → 7h45
+  })
+  it('handles negatives by magnitude', () => {
+    expect(roundToQuarter(-13)).toBe(-15)
+    expect(roundToQuarter(-7)).toBe(0)
+  })
+  it('breaks ties upward (JS Math.round behaviour)', () => {
+    expect(roundToQuarter(7.5)).toBe(15)
+    expect(roundToQuarter(22.5)).toBe(30)
+  })
+})
+
+describe('fmtCentesimal', () => {
+  it('formats whole hours and quarters', () => {
+    expect(fmtCentesimal(0)).toBe('0,00')
+    expect(fmtCentesimal(15)).toBe('0,25')
+    expect(fmtCentesimal(30)).toBe('0,50')
+    expect(fmtCentesimal(45)).toBe('0,75')
+    expect(fmtCentesimal(60)).toBe('1,00')
+    expect(fmtCentesimal(465)).toBe('7,75')  // 7h45m
+  })
+  it('treats negatives as magnitudes (no sign)', () => {
+    expect(fmtCentesimal(-60)).toBe('1,00')
+  })
+})
+
+describe('fmtCentesimalSigned', () => {
+  it('prefixes + for credit and − for debit', () => {
+    expect(fmtCentesimalSigned(60)).toBe('+1,00')
+    expect(fmtCentesimalSigned(-60)).toBe('−1,00')
+    expect(fmtCentesimalSigned(0)).toBe('+0,00')
+    expect(fmtCentesimalSigned(-15)).toBe('−0,25')
+  })
+})
+
+describe('calcDayRounded', () => {
+  it('rounds the day net to the nearest quarter (with auto-lunch)', () => {
+    // entrada 08:00 → saída 17:13 → 9h13 gross. Auto-lunch 60min → 8h13 net (493 min).
+    // Rounded to nearest 15-min = 495 min.
+    const records: PunchRecord[] = [
+      rec('entrada', '2026-05-26T08:00:00Z'),
+      rec('saída',   '2026-05-26T17:13:00Z'),
+    ]
+    expect(calcDayRounded(records, 60)).toBe(495)
+  })
+  it('returns 0 for empty records', () => {
+    expect(calcDayRounded([], 60)).toBe(0)
+  })
+})
