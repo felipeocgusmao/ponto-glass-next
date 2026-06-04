@@ -156,9 +156,11 @@ Nenhuma configuração manual de banco necessária.
 
 **Recuperação de emergência:** rota `/api/auth/recover` com `RECOVERY_SECRET` para quando o admin perde o acesso.
 
-**Modo Quiosque:** página `/kiosk` para tablet/ecrã compartilhado — qualquer funcionário bate o ponto sem fazer login individual. Variante `/kiosk/glass` otimizada para **smart glasses Android** (640×400 landscape, alto contraste, navegação por D-pad/teclado, batida com contagem regressiva de 3s cancelável).
+**Modo Quiosque:** página `/kiosk` para tablet/ecrã compartilhado — qualquer funcionário bate o ponto sem fazer login individual. Variante `/kiosk/glass` otimizada para **smart glasses Android** (640×400 landscape, alto contraste, navegação por D-pad/teclado, comando de voz “entrada”/“saída” via Web Speech API, batida com contagem regressiva de 3s cancelável).
 
 **Horas centesimais:** relatórios, holerites, CSV, banco de horas e ganhos exibem o tempo em **base 100** — `7h45m → 7,75`. Cada dia é arredondado ao **quarto de hora mais próximo** (`:00 / :15 / :30 / :45`), então o total na tela sempre bate com a soma das linhas. O cronómetro ao vivo do `/ponto` continua exato em tempo real.
+
+**Lembrete de entrada pelo servidor:** rota protegida por `CRON_SECRET`, acionada por GitHub Actions a cada ~5 min em dias úteis (`APP_URL` + `CRON_SECRET`), encontra funcionários com `expected_start` na próxima hora, ainda sem `entrada`, e envia Web Push via VAPID mesmo se `/ponto` não estiver aberto. A agenda fica fora do `vercel.json` para não quebrar deploys no Vercel Hobby.
 
 **Lembrete de quarto de hora:** notificação push ~2 min antes de cada marca de 15 min, para a pessoa bater entrada/saída "no horário certinho". Entrada a partir do `expected_start` (ou 08:00); saída a partir do `expected_end` (ou jornada cumprida). Almoço e pausa-café ficam de fora.
 
@@ -267,6 +269,7 @@ ponto_glass_next/
 │       ├── employees/            ← CRUD funcionários + horário esperado + turno noturno
 │       │   └── [id]/
 │       ├── cron/
+│       │   ├── entry-reminder/   ← push de entrada previsto na próxima hora (CRON_SECRET)
 │       │   ├── absence-check/    ← push de ausência (protegido por CRON_SECRET)
 │       │   └── missing-exit/     ← alerta de saída não registada às 17h (protegido por CRON_SECRET)
 │       ├── hour-bank/            ← saldo do banco de horas + ajustes manuais
@@ -588,7 +591,8 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Reset de senha por e-mail
   ✓  Tema claro/escuro persistido no banco por funcionário
   ✓  Lock de perfil por funcionário
-  ✓  Exportação PDF (relatório A4 com cabeçalho, tabelas por funcionário e totais)
+  ✓  Exportação PDF/Excel lazy-loaded (relatório A4 com cabeçalho, tabelas por funcionário e totais)
+  ✓  Lembrete push de entrada pelo servidor (GitHub Actions a cada 5 min; expected_start na próxima hora)
   ✓  Notificação push de ausência (cron 09:00 UTC dias úteis, protegido por CRON_SECRET)
   ✓  Alerta de saída não registada (cron 17:00 UTC, push aos admins)
   ✓  Vista calendário mensal no histórico do funcionário (cores por estado do dia)
@@ -597,12 +601,12 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Comentário em registo (nota livre do admin/gerente, ≤ 500 chars)
   ✓  Aviso de shift_start incomum (alerta amarelo ao configurar turno diurno com horário > 00:00)
   ✓  E-mail via Microsoft Graph API (OAuth Client Credentials) com fallback SMTP automático
-  ✓  Testes Vitest (utils, auth, rateLimit) + E2E Playwright (landing, auth, demo, SEO)
+  ✓  Testes Vitest (utils, auth, rateLimit, APIs punch/hour-bank/correções) + E2E Playwright (landing, auth, demo, SEO)
   ✓  Monitorização Sentry (cliente + servidor, source maps)
   ✓  Horas centesimais (base 100) com arredondamento ao quarto de hora em relatórios/banco/ganhos
   ✓  Lembrete push de quarto de hora (bater entrada/saída em :00/:15/:30/:45)
   ✓  Modo offline — fila de batidas no localStorage + Background Sync ao reconectar
-  ✓  Modo Glass — /kiosk/glass para smart glasses Android (alto contraste, D-pad)
+  ✓  Modo Glass — /kiosk/glass para smart glasses Android (alto contraste, D-pad, voz)
   ✓  Página /demo com credenciais fictícias (noindex) + landing pública
   ✓  Acessibilidade — focus rings, aria-labels, skip-link, labels associados
   ✓  SEO — metadata Open Graph, OG image dinâmica, JSON-LD, robots.txt, sitemap.xml

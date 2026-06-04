@@ -1,0 +1,33 @@
+name: Entry Reminder Cron
+
+on:
+  schedule:
+    # GitHub Actions is the 5-minute scheduler for this reminder because
+    # Vercel Hobby deploys fail for cron expressions more frequent than daily.
+    - cron: '*/5 * * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  notify:
+    name: Trigger server entry reminders
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call cron endpoint
+        env:
+          APP_URL: ${{ vars.APP_URL || secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ]; then
+            echo "APP_URL must be configured as a repository variable or secret" >&2
+            exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "CRON_SECRET must be configured as a repository secret" >&2
+            exit 1
+          fi
+
+          curl --fail --show-error --silent \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL%/}/api/cron/entry-reminder"

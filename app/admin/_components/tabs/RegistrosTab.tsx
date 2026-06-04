@@ -6,7 +6,6 @@ import { businessDate } from '@/lib/utils'
 import { SL } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
-import * as XLSX from 'xlsx'
 import { IconDownload, IconRefresh, IconSearch } from '../icons'
 
 const PAGE_SIZE = 25
@@ -161,7 +160,8 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
   const empName = (r: { employee_id: string; employee_name: string }) =>
     employees.find(e => e.id === r.employee_id)?.name ?? r.employee_name
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
+    const XLSX = await import('xlsx')
     const rows = records.map(r => ({
       Funcionário: empName(r),
       Data: r.date,

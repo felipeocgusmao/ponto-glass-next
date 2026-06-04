@@ -8,6 +8,54 @@ import { WORKING_TYPES } from '@/lib/utils'
 type WorkState = 'working' | 'pause' | 'out' | 'absent'
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 
+type VoiceStatus = 'idle' | 'listening' | 'unsupported'
+type VoiceCommand = 'entrada' | 'saída'
+
+interface SpeechRecognitionEventLike extends Event {
+  results: {
+    length: number
+    [index: number]: {
+      length: number
+      [index: number]: { transcript: string }
+    }
+  }
+}
+
+interface SpeechRecognitionLike extends EventTarget {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  maxAlternatives: number
+  start: () => void
+  stop: () => void
+  abort: () => void
+  onstart: (() => void) | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
+
+function getSpeechRecognitionCtor(): SpeechRecognitionConstructor | null {
+  if (typeof window === 'undefined') return null
+  const w = window as Window & {
+    SpeechRecognition?: SpeechRecognitionConstructor
+    webkitSpeechRecognition?: SpeechRecognitionConstructor
+  }
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
+}
+
+function parseVoiceCommand(transcript: string): VoiceCommand | null {
+  const normalized = transcript
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  if (/\b(entrada|entrar|iniciar)\b/.test(normalized)) return 'entrada'
+  if (/\b(saida|sair|terminar|finalizar)\b/.test(normalized)) return 'saída'
+  return null
+}
+
 function getState(recs: PunchRecord[]): WorkState {
   if (!recs.length) return 'absent'
   const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -64,10 +112,13 @@ export default function KioskGlassPage() {
   const [pendingEmp, setPendingEmp] = useState<Employee | null>(null)
   const [countdownPct, setCountdownPct] = useState(100)
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle')
+  const [voiceHint, setVoiceHint] = useState('TOQUE NO MIC · DIGA ENTRADA OU SAÍDA')
 
   const recsSeq = useRef(0)
   const countdownRaf = useRef<number | null>(null)
   const punchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
 
   useEffect(() => {
     const i = setInterval(() => setNow(new Date()), 1000)
@@ -97,6 +148,84 @@ export default function KioskGlassPage() {
     const i = setInterval(load, 30_000)
     return () => clearInterval(i)
   }, [load])
+
+  const handleVoiceCommand = useCallback((command: VoiceCommand, transcript: string) => {
+    const emp = employees[selectedIdx]
+    if (!emp) return
+    if (pendingEmp) {
+      setVoiceHint('AGUARDE · BATIDA EM ANDAMENTO')
+      return
+    }
+
+    const recs = todayRecs.filter(r => r.employee_id === emp.id)
+    const next = nextPunch(recs)
+    if (next !== command) {
+      setResult({ ok: false, msg: `COMANDO ${LABELS[command]} · PRÓXIMO: ${LABELS[next]}` })
+      setVoiceHint(`OUVI: ${transcript.toUpperCase()}`)
+      setTimeout(() => setResult(null), 2200)
+      return
+    }
+
+    setVoiceHint(`OUVI: ${transcript.toUpperCase()}`)
+    startPunch(emp)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employees, selectedIdx, pendingEmp, todayRecs])
+
+  const toggleVoice = useCallback(() => {
+    if (recognitionRef.current && voiceStatus === 'listening') {
+      recognitionRef.current.stop()
+      setVoiceStatus('idle')
+      setVoiceHint('MIC PAUSADO')
+      return
+    }
+
+    const Recognition = getSpeechRecognitionCtor()
+    if (!Recognition) {
+      setVoiceStatus('unsupported')
+      setVoiceHint('VOZ INDISPONÍVEL NESTE NAVEGADOR')
+      return
+    }
+
+    const recognition = new Recognition()
+    recognition.lang = 'pt-BR'
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+    recognition.onstart = () => {
+      setVoiceStatus('listening')
+      setVoiceHint('OUVINDO… DIGA ENTRADA OU SAÍDA')
+    }
+    recognition.onend = () => {
+      setVoiceStatus('idle')
+      recognitionRef.current = null
+    }
+    recognition.onerror = () => {
+      setVoiceStatus('idle')
+      setVoiceHint('NÃO ENTENDI · TENTE DE NOVO')
+      recognitionRef.current = null
+    }
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript?.trim() ?? ''
+      const command = parseVoiceCommand(transcript)
+      if (!command) {
+        setVoiceHint(transcript ? `OUVI: ${transcript.toUpperCase()}` : 'SEM COMANDO')
+        return
+      }
+      handleVoiceCommand(command, transcript)
+    }
+
+    recognitionRef.current = recognition
+    try { recognition.start() }
+    catch {
+      setVoiceStatus('idle')
+      setVoiceHint('MIC INDISPONÍVEL')
+      recognitionRef.current = null
+    }
+  }, [handleVoiceCommand, voiceStatus])
+
+  useEffect(() => {
+    return () => { recognitionRef.current?.abort() }
+  }, [])
 
   // Keyboard / D-pad navigation (smart-glasses touchpad maps to arrow keys + enter)
   useEffect(() => {
@@ -189,9 +318,23 @@ export default function KioskGlassPage() {
         <div style={{ color: '#fbbf24', fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono, monospace)', letterSpacing: '-0.02em' }}>
           {hh}:{mm}
         </div>
-        <button onClick={() => router.push('/kiosk')} style={exitBtnStyle} aria-label="Voltar ao kiosk normal">
-          ✕
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={toggleVoice}
+            style={{
+              ...micBtnStyle,
+              borderColor: voiceStatus === 'listening' ? '#fbbf24' : '#475569',
+              color: voiceStatus === 'listening' ? '#000' : '#fbbf24',
+              background: voiceStatus === 'listening' ? '#fbbf24' : 'transparent',
+            }}
+            aria-label={voiceStatus === 'listening' ? 'Parar comando de voz' : 'Iniciar comando de voz'}
+          >
+            {voiceStatus === 'listening' ? '●' : '🎙'}
+          </button>
+          <button onClick={() => router.push('/kiosk')} style={exitBtnStyle} aria-label="Voltar ao kiosk normal">
+            ✕
+          </button>
+        </div>
       </header>
 
       {result && (
@@ -279,7 +422,7 @@ export default function KioskGlassPage() {
       )}
 
       <footer style={footerStyle}>
-        ← → SELECIONAR · ENTER PARA BATER · ESC PARA CANCELAR
+        ← → SELECIONAR · ENTER · MIC: ENTRADA/SAÍDA · {voiceHint}
       </footer>
     </div>
   )
@@ -303,6 +446,12 @@ const headerStyle: React.CSSProperties = {
 const exitBtnStyle: React.CSSProperties = {
   background: 'transparent', border: '1px solid #475569',
   color: '#94a3b8', fontSize: 14, fontWeight: 700,
+  width: 32, height: 32, borderRadius: 4, cursor: 'pointer',
+}
+
+const micBtnStyle: React.CSSProperties = {
+  border: '1px solid #475569',
+  color: '#fbbf24', fontSize: 14, fontWeight: 900,
   width: 32, height: 32, borderRadius: 4, cursor: 'pointer',
 }
 
