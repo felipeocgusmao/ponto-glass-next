@@ -160,6 +160,8 @@ Nenhuma configuração manual de banco necessária.
 
 **Horas centesimais:** relatórios, holerites, CSV, banco de horas e ganhos exibem o tempo em **base 100** — `7h45m → 7,75`. Cada dia é arredondado ao **quarto de hora mais próximo** (`:00 / :15 / :30 / :45`), então o total na tela sempre bate com a soma das linhas. O cronómetro ao vivo do `/ponto` continua exato em tempo real.
 
+**Lembrete de entrada pelo servidor:** cron protegido por `CRON_SECRET` roda a cada ~5 min em dias úteis, encontra funcionários com `expected_start` na próxima hora, ainda sem `entrada`, e envia Web Push via VAPID mesmo se `/ponto` não estiver aberto.
+
 **Lembrete de quarto de hora:** notificação push ~2 min antes de cada marca de 15 min, para a pessoa bater entrada/saída "no horário certinho". Entrada a partir do `expected_start` (ou 08:00); saída a partir do `expected_end` (ou jornada cumprida). Almoço e pausa-café ficam de fora.
 
 **Modo offline:** quando o dispositivo está sem rede, a batida é guardada no `localStorage` e sincronizada automaticamente ao reconectar (com Background Sync no Service Worker e indicador visual de pendências).
@@ -267,6 +269,7 @@ ponto_glass_next/
 │       ├── employees/            ← CRUD funcionários + horário esperado + turno noturno
 │       │   └── [id]/
 │       ├── cron/
+│       │   ├── entry-reminder/   ← push de entrada previsto na próxima hora (CRON_SECRET)
 │       │   ├── absence-check/    ← push de ausência (protegido por CRON_SECRET)
 │       │   └── missing-exit/     ← alerta de saída não registada às 17h (protegido por CRON_SECRET)
 │       ├── hour-bank/            ← saldo do banco de horas + ajustes manuais
@@ -589,6 +592,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Tema claro/escuro persistido no banco por funcionário
   ✓  Lock de perfil por funcionário
   ✓  Exportação PDF (relatório A4 com cabeçalho, tabelas por funcionário e totais)
+  ✓  Lembrete push de entrada pelo servidor (cron a cada 5 min; expected_start na próxima hora)
   ✓  Notificação push de ausência (cron 09:00 UTC dias úteis, protegido por CRON_SECRET)
   ✓  Alerta de saída não registada (cron 17:00 UTC, push aos admins)
   ✓  Vista calendário mensal no histórico do funcionário (cores por estado do dia)
