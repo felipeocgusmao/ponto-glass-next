@@ -1,0 +1,119 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase'
+import { BUSINESS_TZ, businessDate } from '@/lib/utils'
+import { businessClockMinutes, dueEntryReminderIds, formatClock, parseTimeToMinutes } from '@/lib/entryReminder'
+import webpush from 'web-push'
+
+const LOOK_AHEAD_MINUTES = 60
+const ACTION = 'entry_reminder_sent'
+
+if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  )
+}
+
+export async function GET(request: NextRequest) {
+  const auth = request.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const now = new Date()
+  const today = businessDate(now)
+  const dow = new Date(`${today}T12:00:00Z`).getUTCDay()
+  if (dow === 0 || dow === 6)
+    return NextResponse.json({ notified: 0, due: 0, skipped: 'weekend' })
+
+  const { data: exceptions } = await supabase
+    .from('day_exceptions')
+    .select('employee_id')
+    .eq('date', today)
+
+  if ((exceptions ?? []).some(e => !e.employee_id))
+    return NextResponse.json({ notified: 0, due: 0, skipped: 'holiday' })
+
+  const offIds = new Set((exceptions ?? []).map(e => e.employee_id).filter(Boolean))
+  const nowMinutes = businessClockMinutes(now, BUSINESS_TZ)
+
+  const { data: employees } = await supabase
+    .from('employees')
+    .select('id, name, expected_start')
+    .eq('active', true)
+    .eq('role', 'employee')
+    .not('expected_start', 'is', null)
+
+  const dueIds = dueEntryReminderIds(employees ?? [], nowMinutes, LOOK_AHEAD_MINUTES)
+  const dueEmployees = (employees ?? []).filter(employee => dueIds.has(employee.id) && !offIds.has(employee.id))
+  if (!dueEmployees.length) return NextResponse.json({ notified: 0, due: 0 })
+
+  const ids = dueEmployees.map(employee => employee.id)
+  const { data: entries } = await supabase
+    .from('records')
+    .select('employee_id')
+    .eq('date', today)
+    .eq('type', 'entrada')
+    .in('employee_id', ids)
+
+  const presentIds = new Set((entries ?? []).map(r => r.employee_id))
+  const absentEmployees = dueEmployees.filter(employee => !presentIds.has(employee.id))
+  if (!absentEmployees.length) return NextResponse.json({ notified: 0, due: dueEmployees.length })
+
+  const absentIds = absentEmployees.map(employee => employee.id)
+  const { data: sentLogs } = await supabase
+    .from('audit_logs')
+    .select('target_id')
+    .eq('action', ACTION)
+    .contains('details', { date: today })
+    .in('target_id', absentIds)
+
+  const alreadySentIds = new Set((sentLogs ?? []).map(log => log.target_id).filter(Boolean))
+  const pendingEmployees = absentEmployees.filter(employee => !alreadySentIds.has(employee.id))
+  if (!pendingEmployees.length)
+    return NextResponse.json({ notified: 0, due: dueEmployees.length, already_sent: absentEmployees.length })
+
+  const { data: subs } = await supabase
+    .from('push_subscriptions')
+    .select('employee_id, subscription')
+    .in('employee_id', pendingEmployees.map(employee => employee.id))
+
+  if (!subs?.length)
+    return NextResponse.json({ notified: 0, due: dueEmployees.length, without_subscription: pendingEmployees.length })
+
+  const subByEmployee = new Map(subs.map(sub => [sub.employee_id, sub.subscription]))
+  let sent = 0
+  const logs: Array<Record<string, unknown>> = []
+
+  await Promise.allSettled(
+    pendingEmployees.map(async employee => {
+      const subscription = subByEmployee.get(employee.id)
+      if (!subscription) return
+      const expectedMinutes = parseTimeToMinutes(employee.expected_start)
+      const expectedLabel = expectedMinutes == null ? employee.expected_start ?? 'agora' : formatClock(expectedMinutes)
+      const payload = JSON.stringify({
+        title: 'Hora de bater a entrada',
+        body: `A tua entrada prevista é às ${expectedLabel}. Bate o ponto para começar o dia.`,
+        tag: `entry-reminder-${today}-${employee.id}`,
+        url: '/ponto',
+      })
+
+      try {
+        await webpush.sendNotification(subscription as webpush.PushSubscription, payload)
+        sent++
+        logs.push({
+          actor_id: null,
+          actor_name: 'cron:entry-reminder',
+          action: ACTION,
+          target_id: employee.id,
+          target_name: employee.name,
+          details: { date: today, expected_start: employee.expected_start, timezone: BUSINESS_TZ },
+        })
+      } catch { /* subscription may be expired or VAPID may be missing */ }
+    })
+  )
+
+  if (logs.length) await supabase.from('audit_logs').insert(logs)
+
+  return NextResponse.json({ notified: sent, due: dueEmployees.length, pending: pendingEmployees.length })
+}
