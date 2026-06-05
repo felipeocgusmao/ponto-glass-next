@@ -240,10 +240,6 @@ export function avatarInitials(name: string): string {
   return name.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('')
 }
 
-export function todayISO(): string {
-  return businessDate()
-}
-
 export function exportCSV(
   records: PunchRecord[],
   filename: string,
