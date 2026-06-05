@@ -69,10 +69,19 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
 
   useEffect(() => { load() }, [load])
   useEffect(() => { loadWeek() }, [loadWeek])
-  useEffect(() => { const iv = setInterval(() => setLiveMs(Date.now()), 30_000); return () => clearInterval(iv) }, [])
-  useEffect(() => { const iv = setInterval(load, 60_000); return () => clearInterval(iv) }, [load])
+  useEffect(() => {
+    const iv = setInterval(() => { if (document.visibilityState === 'visible') setLiveMs(Date.now()) }, 30_000)
+    return () => clearInterval(iv)
+  }, [])
+  useEffect(() => {
+    const iv = setInterval(() => { if (document.visibilityState === 'visible') load() }, 60_000)
+    return () => clearInterval(iv)
+  }, [load])
   // Refresh the weekly window too, so it stays correct if the tab is left open past midnight.
-  useEffect(() => { const iv = setInterval(loadWeek, 60_000); return () => clearInterval(iv) }, [loadWeek])
+  useEffect(() => {
+    const iv = setInterval(() => { if (document.visibilityState === 'visible') loadWeek() }, 60_000)
+    return () => clearInterval(iv)
+  }, [loadWeek])
 
   const handlePunch = async (emp: Employee, type: 'entrada' | 'saída') => {
     setPunching(emp.id); setMsg(null)

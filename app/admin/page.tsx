@@ -99,7 +99,9 @@ export default function AdminPage() {
     loadUser()
     loadEmployees()
     refreshPendingCount()
-    const interval = setInterval(refreshPendingCount, 60_000)
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') refreshPendingCount()
+    }, 60_000)
     return () => clearInterval(interval)
   }, [loadUser, loadEmployees, refreshPendingCount])
 

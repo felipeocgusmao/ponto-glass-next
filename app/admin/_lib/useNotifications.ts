@@ -83,7 +83,7 @@ export function useNotifications({
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
-    const iv = setInterval(load, 60_000)
+    const iv = setInterval(() => { if (document.visibilityState === 'visible') load() }, 60_000)
     const onRec = () => load()
     const onFocus = () => load()
     window.addEventListener('pg:records-changed', onRec)

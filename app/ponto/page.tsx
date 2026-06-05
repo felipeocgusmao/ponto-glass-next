@@ -348,44 +348,53 @@ export default function PontoPage() {
   }, [])
 
   useEffect(() => {
-    const iv = setInterval(loadRecords, 30_000)
+    const iv = setInterval(() => {
+      if (document.visibilityState === 'visible') loadRecords()
+    }, 30_000)
     return () => clearInterval(iv)
   }, [loadRecords])
 
-  // Push notifications: 15-min warning + overtime alert
+  // Push notifications: 15-min warning + overtime alert.
+  // Runs on its own 60s interval so it does not re-run on every clock tick.
   useEffect(() => {
-    if (!user || !records.length) return
-    if (typeof window === 'undefined' || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    if (typeof window === 'undefined' || typeof Notification === 'undefined') return
 
-    const myRecs = records.filter(r => r.employee_id === user.id)
-    const { state: ws } = getWorkState(myRecs)
-    if (ws !== 'working') return
+    const check = () => {
+      if (!user || !records.length) return
+      if (Notification.permission !== 'granted') return
 
-    const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
-    const targetMin = user.workday_hours * 60
-    const remaining = targetMin - liveMin
-    const overtime = liveMin - targetMin
+      const myRecs = records.filter(r => r.employee_id === user.id)
+      const { state: ws } = getWorkState(myRecs)
+      if (ws !== 'working') return
 
-    const today = businessDate()
-    const key15 = `pg.notif.warn15.${today}.${user.id}`
-    const keyOt = `pg.notif.overtime.${today}.${user.id}`
+      const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
+      const targetMin = user.workday_hours * 60
+      const remaining = targetMin - liveMin
+      const overtime = liveMin - targetMin
+      const today = businessDate()
+      const key15 = `pg.notif.warn15.${today}.${user.id}`
+      const keyOt = `pg.notif.overtime.${today}.${user.id}`
 
-    const notify = (title: string, body: string, tag: string) => {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.showNotification(title, { body, icon: '/icon-192.svg', badge: '/icon-192.svg', tag })
-      }).catch(() => {})
+      const notify = (title: string, body: string, tag: string) => {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification(title, { body, icon: '/icon-192.svg', badge: '/icon-192.svg', tag })
+        }).catch(() => {})
+      }
+
+      if (remaining > 0 && remaining <= 15 && !localStorage.getItem(key15)) {
+        localStorage.setItem(key15, '1')
+        notify('Hora de terminar em breve ⏱', `Faltam ${Math.round(remaining)} min para completar a tua jornada.`, 'end-warning')
+      }
+      if (overtime >= 1 && !localStorage.getItem(keyOt)) {
+        localStorage.setItem(keyOt, '1')
+        notify('Jornada concluída 🔔', 'Já completaste a jornada de hoje. Não te esqueças de registar a saída!', 'overtime-alert')
+      }
     }
 
-    if (remaining > 0 && remaining <= 15 && !localStorage.getItem(key15)) {
-      localStorage.setItem(key15, '1')
-      notify('Hora de terminar em breve ⏱', `Faltam ${Math.round(remaining)} min para completar a tua jornada.`, 'end-warning')
-    }
-
-    if (overtime >= 1 && !localStorage.getItem(keyOt)) {
-      localStorage.setItem(keyOt, '1')
-      notify('Jornada concluída 🔔', 'Já completaste a jornada de hoje. Não te esqueças de registar a saída!', 'overtime-alert')
-    }
-  }, [now, records, user])
+    check()
+    const iv = setInterval(check, 60_000)
+    return () => clearInterval(iv)
+  }, [user, records])
 
   // ── Quarter-hour reminder ─────────────────────────────────────────────────────
   // Because reports/holerites round each day to the nearest 15-min mark, the cleanest
@@ -393,24 +402,9 @@ export default function PontoPage() {
   // before the next quarter mark when the next expected punch is entrada (state =
   // absent, after the employee's expected_start / 08:00 fallback) or saída (state =
   // working, after expected_end / workday completed). Almoço and pausa-café are out.
+  // Runs on its own 60s interval — no need to re-run on every clock tick.
   useEffect(() => {
-    if (!user) return
-    if (typeof window === 'undefined' || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-    if (!now) return
-
-    const myRecs = records.filter(r => r.employee_id === user.id)
-    const { state: ws } = getWorkState(myRecs)
-    if (ws !== 'working' && ws !== 'absent') return // skip lunch/coffee/out
-
-    const nowMin = now.getHours() * 60 + now.getMinutes()
-    const minsUntilQuarter = (15 - (nowMin % 15)) % 15
-    if (minsUntilQuarter > 2 || minsUntilQuarter === 0) return // only fire 1–2 min before
-
-    const targetMin = nowMin + minsUntilQuarter
-    const hh = String(Math.floor(targetMin / 60) % 24).padStart(2, '0')
-    const mm = String(targetMin % 60).padStart(2, '0')
-    const targetLabel = `${hh}:${mm}`
-    const today = businessDate()
+    if (typeof window === 'undefined' || typeof Notification === 'undefined') return
 
     const parseHM = (s: string | null | undefined): number | null => {
       if (!s) return null
@@ -425,36 +419,58 @@ export default function PontoPage() {
         .catch(() => {})
     }
 
-    if (ws === 'absent') {
-      // Fallback: no expected_start configured → start nudging from 08:00 local.
-      const startMin = parseHM(user.expected_start) ?? 8 * 60
-      if (nowMin < startMin) return
-      const key = `pg.notif.q.entry.${today}.${targetLabel}`
+    const check = () => {
+      if (!user) return
+      if (Notification.permission !== 'granted') return
+
+      const now = new Date()
+      const myRecs = records.filter(r => r.employee_id === user.id)
+      const { state: ws } = getWorkState(myRecs)
+      if (ws !== 'working' && ws !== 'absent') return // skip lunch/coffee/out
+
+      const nowMin = now.getHours() * 60 + now.getMinutes()
+      const minsUntilQuarter = (15 - (nowMin % 15)) % 15
+      if (minsUntilQuarter > 2 || minsUntilQuarter === 0) return // only fire 1–2 min before
+
+      const targetMin = nowMin + minsUntilQuarter
+      const hh = String(Math.floor(targetMin / 60) % 24).padStart(2, '0')
+      const mm = String(targetMin % 60).padStart(2, '0')
+      const targetLabel = `${hh}:${mm}`
+      const today = businessDate()
+
+      if (ws === 'absent') {
+        const startMin = parseHM(user.expected_start) ?? 8 * 60
+        if (nowMin < startMin) return
+        const key = `pg.notif.q.entry.${today}.${targetLabel}`
+        if (localStorage.getItem(key)) return
+        localStorage.setItem(key, '1')
+        notify(
+          t('ponto.notif.entry.title'),
+          t('ponto.notif.entry.body').replace('{time}', targetLabel),
+          `quarter-entry-${targetLabel}`,
+        )
+        return
+      }
+
+      // ws === 'working'
+      const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
+      const endMin = parseHM(user.expected_end)
+      const workdayMin = user.workday_hours * 60
+      const eligible = endMin != null ? nowMin >= endMin : liveMin >= workdayMin
+      if (!eligible) return
+      const key = `pg.notif.q.exit.${today}.${targetLabel}`
       if (localStorage.getItem(key)) return
       localStorage.setItem(key, '1')
       notify(
-        t('ponto.notif.entry.title'),
-        t('ponto.notif.entry.body').replace('{time}', targetLabel),
-        `quarter-entry-${targetLabel}`,
+        t('ponto.notif.exit.title'),
+        t('ponto.notif.exit.body').replace('{time}', targetLabel),
+        `quarter-exit-${targetLabel}`,
       )
-      return
     }
 
-    // ws === 'working'
-    const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
-    const endMin = parseHM(user.expected_end)
-    const workdayMin = user.workday_hours * 60
-    const eligible = endMin != null ? nowMin >= endMin : liveMin >= workdayMin
-    if (!eligible) return
-    const key = `pg.notif.q.exit.${today}.${targetLabel}`
-    if (localStorage.getItem(key)) return
-    localStorage.setItem(key, '1')
-    notify(
-      t('ponto.notif.exit.title'),
-      t('ponto.notif.exit.body').replace('{time}', targetLabel),
-      `quarter-exit-${targetLabel}`,
-    )
-  }, [now, records, user, t])
+    const iv = setInterval(check, 60_000)
+    return () => clearInterval(iv)
+  }, [user, records, t])
   useEffect(() => {
     const saved = localStorage.getItem('pg.theme') as 'dark' | 'light' | null
     if (saved) setTheme(saved)

@@ -92,7 +92,7 @@ export default function KioskPage() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
-    const i = setInterval(load, 30_000)
+    const i = setInterval(() => { if (document.visibilityState === 'visible') load() }, 30_000)
     return () => clearInterval(i)
   }, [load])
 
