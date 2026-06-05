@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Employee, PunchRecord, DayException } from '@/lib/types'
 import { fmtMinutes, businessDate } from '@/lib/utils'
 import { empColor, getWorkState, calcLiveMin, fmtMin, getWorkingDays } from '../../_lib/helpers'
@@ -80,18 +80,25 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
   // Per-employee data — split into "today" (for live worked minutes / progress) and
   // "all recent" (month window, for state determination so an unclosed entrada from
   // yesterday still shows the employee as working today).
-  const todayByEmp = new Map<string, PunchRecord[]>()
-  todayRecs.forEach(r => {
-    if (!todayByEmp.has(r.employee_id)) todayByEmp.set(r.employee_id, [])
-    todayByEmp.get(r.employee_id)!.push(r)
-  })
-  const recentByEmp = new Map<string, PunchRecord[]>()
-  monthRecs.forEach(r => {
-    if (!recentByEmp.has(r.employee_id)) recentByEmp.set(r.employee_id, [])
-    recentByEmp.get(r.employee_id)!.push(r)
-  })
+  const todayByEmp = useMemo(() => {
+    const m = new Map<string, PunchRecord[]>()
+    todayRecs.forEach(r => {
+      if (!m.has(r.employee_id)) m.set(r.employee_id, [])
+      m.get(r.employee_id)!.push(r)
+    })
+    return m
+  }, [todayRecs])
 
-  const empData = employees.map(emp => {
+  const recentByEmp = useMemo(() => {
+    const m = new Map<string, PunchRecord[]>()
+    monthRecs.forEach(r => {
+      if (!m.has(r.employee_id)) m.set(r.employee_id, [])
+      m.get(r.employee_id)!.push(r)
+    })
+    return m
+  }, [monthRecs])
+
+  const empData = useMemo(() => employees.map(emp => {
     const todayRecsEmp = todayByEmp.get(emp.id) ?? []
     const recentRecsEmp = recentByEmp.get(emp.id) ?? []
     // state from the broader window so unclosed prior-day entries register as working
@@ -106,79 +113,106 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     const earnings = emp.hourly_rate ? (liveMin / 60) * emp.hourly_rate : null
     // Use todayRecsEmp for `recs` so downstream displays (count, history) still reflect today.
     return { emp, recs: todayRecsEmp, state, since, liveMin, targetMin, earnings, stateFromPriorDay, latestRec }
-  })
+  }), [employees, todayByEmp, recentByEmp, todayStr])
 
   // KPI values
-  const working = empData.filter(e => e.state === 'working').length
-  const onBreak = empData.filter(e => e.state === 'lunch' || e.state === 'coffee').length
-  const absent  = empData.filter(e => e.recs.length === 0).length
-  const totalMinToday = empData.reduce((acc, e) => acc + e.liveMin, 0)
-  const totalEarnings = empData.reduce((acc, e) => acc + (e.earnings ?? 0), 0)
-  const bankValues = Array.from(bankBalances.values())
-  const totalBank  = bankValues.reduce((a, b) => a + b, 0)
-  const positiveBank = bankValues.filter(v => v > 0).length
-  const negativeBank = bankValues.filter(v => v < 0).length
+  const { working, onBreak, absent, totalMinToday, totalEarnings } = useMemo(() => ({
+    working:       empData.filter(e => e.state === 'working').length,
+    onBreak:       empData.filter(e => e.state === 'lunch' || e.state === 'coffee').length,
+    absent:        empData.filter(e => e.recs.length === 0).length,
+    totalMinToday: empData.reduce((acc, e) => acc + e.liveMin, 0),
+    totalEarnings: empData.reduce((acc, e) => acc + (e.earnings ?? 0), 0),
+  }), [empData])
+
+  const { totalBank, positiveBank, negativeBank } = useMemo(() => {
+    const vals = Array.from(bankBalances.values())
+    return {
+      totalBank:    vals.reduce((a, b) => a + b, 0),
+      positiveBank: vals.filter(v => v > 0).length,
+      negativeBank: vals.filter(v => v < 0).length,
+    }
+  }, [bankBalances])
 
   // Chart: last 14 working days (going back from today, regardless of month boundary)
-  const workingDays = getWorkingDays(chartFromStr, todayStr)
-  const chartDays = workingDays.slice(-14)
-  const byDateEmp = new Map<string, Map<string, PunchRecord[]>>()
-  monthRecs.forEach(r => {
-    if (!byDateEmp.has(r.date)) byDateEmp.set(r.date, new Map())
-    const em = byDateEmp.get(r.date)!
-    if (!em.has(r.employee_id)) em.set(r.employee_id, [])
-    em.get(r.employee_id)!.push(r)
-  })
-  const chartData = chartDays.map(date => {
-    const empMap = byDateEmp.get(date)
-    if (!empMap) return { date, min: 0 }
-    let tot = 0
-    empMap.forEach((recs, eid) => {
-      const e = employees.find(x => x.id === eid)
-      tot += calcLiveMin(recs, e?.lunch_break_minutes ?? 60)
+  const { chartDays, chartData, chartMax, chartValues, avgMin } = useMemo(() => {
+    const workingDays = getWorkingDays(chartFromStr, todayStr)
+    const chartDays = workingDays.slice(-14)
+    const byDateEmp = new Map<string, Map<string, PunchRecord[]>>()
+    monthRecs.forEach(r => {
+      if (!byDateEmp.has(r.date)) byDateEmp.set(r.date, new Map())
+      const em = byDateEmp.get(r.date)!
+      if (!em.has(r.employee_id)) em.set(r.employee_id, [])
+      em.get(r.employee_id)!.push(r)
     })
-    return { date, min: tot }
-  })
-  const chartMax = Math.max(...chartData.map(d => d.min), 1)
-  const chartValues = chartData.map(d => d.min)
-  const avgMin = chartValues.length ? Math.round(chartValues.reduce((a, b) => a + b, 0) / chartValues.length) : 0
+    const chartData = chartDays.map(date => {
+      const empMap = byDateEmp.get(date)
+      if (!empMap) return { date, min: 0 }
+      let tot = 0
+      empMap.forEach((recs, eid) => {
+        const e = employees.find(x => x.id === eid)
+        tot += calcLiveMin(recs, e?.lunch_break_minutes ?? 60)
+      })
+      return { date, min: tot }
+    })
+    const chartMax = Math.max(...chartData.map(d => d.min), 1)
+    const chartValues = chartData.map(d => d.min)
+    const avgMin = chartValues.length ? Math.round(chartValues.reduce((a, b) => a + b, 0) / chartValues.length) : 0
+    return { chartDays, chartData, chartMax, chartValues, avgMin }
+  }, [monthRecs, employees, chartFromStr, todayStr])
+
   const todayVsAvg = totalMinToday - avgMin
 
   // Upcoming exceptions (future, not today)
-  const upcoming = exceptions
+  const upcoming = useMemo(() => exceptions
     .filter(e => e.date > todayStr)
     .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 4)
+    .slice(0, 4),
+  [exceptions, todayStr])
 
   // Alerts: absent employees + late arrivals
   // "Truly absent" = no records today AND no open session from a prior day
   // (MissingExitBanner already flags the unclosed prior-day sessions separately).
-  const absentEmps = empData.filter(e => e.recs.length === 0 && !e.stateFromPriorDay).slice(0, 4)
-  const lateArrivals = empData
-    .map(({ emp, recs }) => {
-      if (!emp.expected_start || recs.length === 0) return null
-      const firstEntrada = recs
-        .filter(r => r.type === 'entrada')
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0]
-      if (!firstEntrada) return null
-      const arrived = new Date(firstEntrada.timestamp)
-      const [eh, em] = emp.expected_start.split(':').map(Number)
-      const expectedToday = new Date(arrived)
-      expectedToday.setHours(eh, em, 0, 0)
-      const lateMin = Math.round((arrived.getTime() - expectedToday.getTime()) / 60_000)
-      if (lateMin <= 5) return null // ignore on-time arrivals (up to 5min grace)
-      const arrivedAt = arrived.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
-      return { emp, lateMin, arrivedAt, expectedAt: emp.expected_start }
-    })
-    .filter((x): x is { emp: Employee; lateMin: number; arrivedAt: string; expectedAt: string } => x !== null)
-    .sort((a, b) => b.lateMin - a.lateMin)
-    .slice(0, 3)
+  const { absentEmps, lateArrivals } = useMemo(() => {
+    const absentEmps = empData.filter(e => e.recs.length === 0 && !e.stateFromPriorDay).slice(0, 4)
+    const lateArrivals = empData
+      .map(({ emp, recs }) => {
+        if (!emp.expected_start || recs.length === 0) return null
+        const firstEntrada = recs
+          .filter(r => r.type === 'entrada')
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0]
+        if (!firstEntrada) return null
+        const arrived = new Date(firstEntrada.timestamp)
+        const [eh, em] = emp.expected_start.split(':').map(Number)
+        const expectedToday = new Date(arrived)
+        expectedToday.setHours(eh, em, 0, 0)
+        const lateMin = Math.round((arrived.getTime() - expectedToday.getTime()) / 60_000)
+        if (lateMin <= 5) return null // ignore on-time arrivals (up to 5min grace)
+        const arrivedAt = arrived.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+        return { emp, lateMin, arrivedAt, expectedAt: emp.expected_start }
+      })
+      .filter((x): x is { emp: Employee; lateMin: number; arrivedAt: string; expectedAt: string } => x !== null)
+      .sort((a, b) => b.lateMin - a.lateMin)
+      .slice(0, 3)
+    return { absentEmps, lateArrivals }
+  }, [empData])
   const alertsCount = absentEmps.length + lateArrivals.length
 
   // Recent punches feed
-  const recentPunches = [...todayRecs]
+  const recentPunches = useMemo(() => [...todayRecs]
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 8)
+    .slice(0, 8),
+  [todayRecs])
+
+  // Activity table sorted by state (working first, then break, then out/absent)
+  const sortedEmpData = useMemo(() => [...empData].sort((a, b) => {
+    const order: Record<string, number> = { working: 0, lunch: 1, coffee: 1, off: 2 }
+    const ao = order[a.state] ?? 3
+    const bo = order[b.state] ?? 3
+    if (ao !== bo) return ao - bo
+    if (a.recs.length === 0 && b.recs.length > 0) return 1
+    if (b.recs.length === 0 && a.recs.length > 0) return -1
+    return 0
+  }), [empData])
 
   const PUNCH_LABEL: Record<string, string> = {
     entrada: 'Entrada', 'saída': 'Saída',
@@ -298,16 +332,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
             </div>
           </div>
           <div className="card-body flush">
-            {empData
-              .sort((a, b) => {
-                const order: Record<string, number> = { working: 0, lunch: 1, coffee: 1, off: 2 }
-                const ao = order[a.state] ?? 3
-                const bo = order[b.state] ?? 3
-                if (ao !== bo) return ao - bo
-                if (a.recs.length === 0 && b.recs.length > 0) return 1
-                if (b.recs.length === 0 && a.recs.length > 0) return -1
-                return 0
-              })
+            {sortedEmpData
               .slice(0, 8)
               .map(({ emp, recs, state, since, liveMin, targetMin, earnings, stateFromPriorDay }) => {
                 const pct = Math.min(100, targetMin > 0 ? (liveMin / targetMin) * 100 : 0)

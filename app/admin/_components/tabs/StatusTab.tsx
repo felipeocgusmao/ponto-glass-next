@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { avatarInitials, fmtMinutes, calcNetMinutes, calcTimeBreakdown, calcOvertimePeriod, WORKING_TYPES, EXPLICIT_BREAK_TYPES, businessDate } from '@/lib/utils'
 import { empColor } from '../../_lib/helpers'
@@ -9,6 +9,19 @@ import { IconRefresh } from '../icons'
 
 type StatusFilter = 'all' | 'working' | 'break' | 'out' | 'absent'
 type ViewMode = 'list' | 'grid'
+
+function FilterPill({ id, label, count, tone, active, onClick }: {
+  id: StatusFilter; label: string; count: number; tone?: string
+  active: boolean; onClick: (id: StatusFilter) => void
+}) {
+  return (
+    <button className={`filter-pill${active ? ' active' : ''}`} onClick={() => onClick(id)}>
+      {tone && <span className="dot" style={{ background: tone === 'success' ? 'var(--success)' : tone === 'warn' ? 'var(--warning)' : 'var(--fg-dim)', width: 6, height: 6, borderRadius: '50%', display: 'inline-block' }} />}
+      <span className="val">{label}</span>
+      <span className="key tnum">{count}</span>
+    </button>
+  )
+}
 
 export function StatusTab({ employees, currentUserId }: { employees: Employee[]; currentUserId: string }) {
   const { t } = useLang()
@@ -86,24 +99,32 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
 
   // `records` now spans yesterday + today, so we can detect open sessions from yesterday.
   // Today-only is what counts toward "horas hoje" and the daily progress bar.
-  const recordsAllByEmp = new Map<string, PunchRecord[]>()
-  const recordsTodayByEmp = new Map<string, PunchRecord[]>()
-  records.forEach(r => {
-    if (!recordsAllByEmp.has(r.employee_id)) recordsAllByEmp.set(r.employee_id, [])
-    recordsAllByEmp.get(r.employee_id)!.push(r)
-    if (r.date === today) {
-      if (!recordsTodayByEmp.has(r.employee_id)) recordsTodayByEmp.set(r.employee_id, [])
-      recordsTodayByEmp.get(r.employee_id)!.push(r)
-    }
-  })
-  const weekByEmp = new Map<string, PunchRecord[]>()
-  weekRecords.forEach(r => {
-    if (!weekByEmp.has(r.employee_id)) weekByEmp.set(r.employee_id, [])
-    weekByEmp.get(r.employee_id)!.push(r)
-  })
+  const { recordsAllByEmp, recordsTodayByEmp } = useMemo(() => {
+    const recordsAllByEmp = new Map<string, PunchRecord[]>()
+    const recordsTodayByEmp = new Map<string, PunchRecord[]>()
+    records.forEach(r => {
+      if (!recordsAllByEmp.has(r.employee_id)) recordsAllByEmp.set(r.employee_id, [])
+      recordsAllByEmp.get(r.employee_id)!.push(r)
+      if (r.date === today) {
+        if (!recordsTodayByEmp.has(r.employee_id)) recordsTodayByEmp.set(r.employee_id, [])
+        recordsTodayByEmp.get(r.employee_id)!.push(r)
+      }
+    })
+    return { recordsAllByEmp, recordsTodayByEmp }
+  }, [records, today])
 
-  const workers = employees.filter(e => e.id !== currentUserId)
-  const statuses = workers.map(emp => {
+  const weekByEmp = useMemo(() => {
+    const m = new Map<string, PunchRecord[]>()
+    weekRecords.forEach(r => {
+      if (!m.has(r.employee_id)) m.set(r.employee_id, [])
+      m.get(r.employee_id)!.push(r)
+    })
+    return m
+  }, [weekRecords])
+
+  const workers = useMemo(() => employees.filter(e => e.id !== currentUserId), [employees, currentUserId])
+
+  const statuses = useMemo(() => workers.map(emp => {
     const empAll   = recordsAllByEmp.get(emp.id) ?? []
     const empToday = recordsTodayByEmp.get(emp.id) ?? []
     // State is determined by the latest record across the loaded window so an unclosed
@@ -142,32 +163,23 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
     const pastWeekMin = pastWeekRecs.length > 0 ? (calcOvertimePeriod(pastWeekRecs, 0, emp.lunch_break_minutes) ?? 0) : 0
     const weekTotal = Math.round(pastWeekMin + liveNetMin)
     return { emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal, lastRecord, stateFromPriorDay }
-  })
+  }), [workers, recordsAllByEmp, recordsTodayByEmp, weekByEmp, today, liveMs])
 
-  const onlineCount   = statuses.filter(s => s.isIn).length
-  const breakCount    = statuses.filter(s => s.isOnLunch || s.isOnCafe).length
-  const outCount      = statuses.filter(s => !s.isIn && recordsTodayByEmp.has(s.emp.id)).length
-  const absentCount   = statuses.filter(s => !recordsTodayByEmp.has(s.emp.id)).length
-  const totalMinToday = statuses.reduce((sum, s) => sum + s.liveNetMin, 0)
+  const { onlineCount, breakCount, outCount, absentCount, totalMinToday } = useMemo(() => ({
+    onlineCount:   statuses.filter(s => s.isIn).length,
+    breakCount:    statuses.filter(s => s.isOnLunch || s.isOnCafe).length,
+    outCount:      statuses.filter(s => !s.isIn && recordsTodayByEmp.has(s.emp.id)).length,
+    absentCount:   statuses.filter(s => !recordsTodayByEmp.has(s.emp.id)).length,
+    totalMinToday: statuses.reduce((sum, s) => sum + s.liveNetMin, 0),
+  }), [statuses, recordsTodayByEmp])
 
-  const filteredStatuses = statuses.filter(s => {
+  const filteredStatuses = useMemo(() => statuses.filter(s => {
     if (filter === 'working') return s.isWorking
     if (filter === 'break')   return s.isOnLunch || s.isOnCafe
     if (filter === 'out')     return !s.isIn && recordsTodayByEmp.has(s.emp.id)
     if (filter === 'absent')  return !recordsTodayByEmp.has(s.emp.id)
     return true
-  })
-
-  const FilterPill = ({ id, label, count, tone }: { id: StatusFilter; label: string; count: number; tone?: string }) => (
-    <button
-      className={`filter-pill${filter === id ? ' active' : ''}`}
-      onClick={() => setFilter(id)}
-    >
-      {tone && <span className="dot" style={{ background: tone === 'success' ? 'var(--success)' : tone === 'warn' ? 'var(--warning)' : 'var(--fg-dim)', width: 6, height: 6, borderRadius: '50%', display: 'inline-block' }} />}
-      <span className="val">{label}</span>
-      <span className="key tnum">{count}</span>
-    </button>
-  )
+  }), [statuses, filter, recordsTodayByEmp])
 
   return (
     <>
@@ -205,11 +217,11 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
 
       {/* Filter pills */}
       <div className="filter-bar">
-        <FilterPill id="all"     label="Todos"        count={statuses.length} />
-        <FilterPill id="working" label="Trabalhando"  count={onlineCount - breakCount} tone="success" />
-        <FilterPill id="break"   label="Em pausa"     count={breakCount}   tone="warn" />
-        <FilterPill id="out"     label="Encerraram"   count={outCount} />
-        <FilterPill id="absent"  label="Sem registro" count={absentCount} />
+        <FilterPill id="all"     label="Todos"        count={statuses.length}         active={filter === 'all'}     onClick={setFilter} />
+        <FilterPill id="working" label="Trabalhando"  count={onlineCount - breakCount} active={filter === 'working'} onClick={setFilter} tone="success" />
+        <FilterPill id="break"   label="Em pausa"     count={breakCount}               active={filter === 'break'}   onClick={setFilter} tone="warn" />
+        <FilterPill id="out"     label="Encerraram"   count={outCount}                 active={filter === 'out'}     onClick={setFilter} />
+        <FilterPill id="absent"  label="Sem registro" count={absentCount}              active={filter === 'absent'}  onClick={setFilter} />
       </div>
 
       {/* Employee grid (Cards view) */}
