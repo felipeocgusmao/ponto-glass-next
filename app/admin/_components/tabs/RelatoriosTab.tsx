@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { exportCSV, exportPDF, fmtCentesimal, fmtCentesimalSigned, roundToQuarter, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, calcTimeBreakdown, businessDate, isIncompleteDay, avatarInitials } from '@/lib/utils'
+import { exportCSV, exportPDF, fmtCentesimal, fmtCentesimalSigned, fmtEur, roundToQuarter, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, calcTimeBreakdown, businessDate, isIncompleteDay, avatarInitials } from '@/lib/utils'
 import { empColor, getWorkingDays, openPayslip } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import { IconDownload, IconRefresh } from '../icons'
@@ -11,7 +11,6 @@ type RangePreset = 'this_month' | 'last_month' | '30d' | 'quarter' | 'custom'
 
 function pad(n: number) { return String(n).padStart(2, '0') }
 function ymd(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
-function fmtEur(v: number) { return v.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' }) }
 
 function presetRange(p: RangePreset, today: string): { from: string; to: string } | null {
   const t = new Date(today + 'T12:00:00')

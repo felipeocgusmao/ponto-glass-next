@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
 import { CalendarView } from './_components/CalendarView'
-import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, fmtCentesimal, fmtCentesimalSigned, roundToQuarter, openPayslip, businessDate } from '@/lib/utils'
+import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, fmtCentesimal, fmtCentesimalSigned, fmtEur, roundToQuarter, openPayslip, businessDate, empColor, avatarInitials } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
 import SettingsModal from '@/app/admin/_components/SettingsModal'
+import { SunIcon, MoonIcon } from '@/app/admin/_components/icons'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
@@ -50,18 +51,6 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
 }
 
-function fmtEur(v: number) {
-  return v.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
-}
-
-function initials(name: string) {
-  return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
-}
-
-function empColor(id: string): number {
-  return (id.charCodeAt(0) % 8) + 1
-}
-
 function getGeo(): Promise<{ lat: number; lng: number } | null> {
   return new Promise(resolve => {
     if (!navigator.geolocation) return resolve(null)
@@ -97,8 +86,6 @@ function ProgressRing({ pct, overtime, label }: { pct: number; overtime: boolean
   )
 }
 
-function SunIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> }
-function MoonIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> }
 function PlayIcon({ size = 16 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> }
 function StopIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg> }
 function UtensilsIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><line x1="7" y1="2" x2="7" y2="22"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg> }
@@ -694,7 +681,7 @@ export default function PontoPage() {
             <div className="emp-user-name">{user.name.split(' ').slice(0, 2).join(' ')}</div>
             <div className="emp-user-role">@{user.username}</div>
           </div>
-          <div className={`avatar size-30 av-c${empColor(user.id)}`}>{initials(user.name)}</div>
+          <div className={`avatar size-30 av-c${empColor(user.id)}`}>{avatarInitials(user.name)}</div>
         </button>
       </header>
 

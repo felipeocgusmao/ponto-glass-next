@@ -1,11 +1,8 @@
 'use client'
 
 import type { PunchRecord } from '@/lib/types'
-import { WORKING_TYPES, calcTimeBreakdown, calcNetMinutes, fmtMinutes, openPayslip } from '@/lib/utils'
-export { openPayslip }
-import { EXPLICIT_BREAK_TYPES } from './types'
-
-export function empColor(id: string): number { return (id.charCodeAt(0) % 8) + 1 }
+import { WORKING_TYPES, EXPLICIT_BREAK_TYPES, calcTimeBreakdown, calcNetMinutes, openPayslip, empColor } from '@/lib/utils'
+export { openPayslip, empColor }
 
 export function SL({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (

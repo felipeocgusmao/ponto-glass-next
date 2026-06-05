@@ -2,7 +2,7 @@ import type { PunchRecord } from './types'
 
 export const WORKDAY_MINUTES = 8 * 60
 
-const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
+export const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 export const WORKING_TYPES  = ['entrada', 'fim_almoco', 'retorno_cafe']
 
 // The timezone the business operates in. A work "day" is the local calendar day
@@ -228,6 +228,12 @@ export function calcEarnings(
 ): string {
   const min = calcNetMinutes(records, lunchBreakMinutes)
   return ((min / 60) * hourlyRate).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
+}
+
+export function empColor(id: string): number { return (id.charCodeAt(0) % 8) + 1 }
+
+export function fmtEur(v: number): string {
+  return v.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
 }
 
 export function avatarInitials(name: string): string {

@@ -26,9 +26,6 @@ export const MANAGER_TABS: { id: Tab; label: string }[] = [
   { id: 'relatorios',   label: 'Relatório'  },
 ]
 
-export const WORKING_TYPES = ['entrada', 'fim_almoco', 'retorno_cafe']
-
-export const EXPLICIT_BREAK_TYPES = ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 
 export const AUDIT_LABELS: Record<string, string> = {
   employee_login:               '🔑 Login efetuado',

@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { avatarInitials, fmtMinutes, calcNetMinutes, calcTimeBreakdown, calcOvertimePeriod, WORKING_TYPES, businessDate } from '@/lib/utils'
+import { avatarInitials, fmtMinutes, calcNetMinutes, calcTimeBreakdown, calcOvertimePeriod, WORKING_TYPES, EXPLICIT_BREAK_TYPES, businessDate } from '@/lib/utils'
 import { empColor } from '../../_lib/helpers'
-import { EXPLICIT_BREAK_TYPES } from '../../_lib/types'
 import { useLang } from '@/lib/LangContext'
 import { IconRefresh } from '../icons'
 

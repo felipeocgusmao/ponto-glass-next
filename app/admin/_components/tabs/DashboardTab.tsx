@@ -9,7 +9,6 @@ import { avatarInitials } from '@/lib/utils'
 import {
   IconRefresh, IconArrowUp, IconArrowDown,
   IconPulse, IconEuro, IconClock, IconBank, IconCalendar,
-  IconAlertTriangle, IconArrowRight,
 } from '../icons'
 
 function fmtCost(n: number): string {

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { WORKING_TYPES, calcTimeBreakdown, calcNetMinutes, fmtMinutes } from '@/lib/utils'
+import { WORKING_TYPES, calcTimeBreakdown, calcNetMinutes, fmtMinutes, empColor, avatarInitials } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 
 type WorkState = 'working' | 'pause' | 'out' | 'absent'
@@ -25,13 +25,7 @@ function calcDayMin(recs: PunchRecord[], lunchMin: number): number {
   return Math.max(0, calcNetMinutes(recs, lunchMin))
 }
 
-function initials(name: string) {
-  return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
-}
 
-function empColor(id: string): number {
-  return (id.charCodeAt(0) % 8) + 1
-}
 
 const PUNCH_OPTIONS: { type: PunchType; tone: string; labelKey: string }[] = [
   { type: 'entrada',       tone: 'success', labelKey: 'punch.entrada'       },
@@ -234,7 +228,7 @@ export default function KioskPage() {
                     onTouchEnd={e => (e.currentTarget.style.background = 'var(--surface)')}
                   >
                     <div style={{ position: 'relative' }}>
-                      <div className={`avatar size-56 av-c${empColor(emp.id)}`} style={{ fontSize: 17 }}>{initials(emp.name)}</div>
+                      <div className={`avatar size-56 av-c${empColor(emp.id)}`} style={{ fontSize: 17 }}>{avatarInitials(emp.name)}</div>
                       <span style={{
                         position: 'absolute', bottom: 1, right: 1,
                         width: 13, height: 13, borderRadius: '50%',
@@ -283,7 +277,7 @@ export default function KioskPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
               <div className={`avatar size-44 av-c${empColor(selected.id)}`} style={{ fontSize: 15 }}>
-                {initials(selected.name)}
+                {avatarInitials(selected.name)}
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--fg)' }}>{selected.name}</div>
