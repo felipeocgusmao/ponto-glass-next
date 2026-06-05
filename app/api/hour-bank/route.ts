@@ -15,8 +15,54 @@ export async function GET(request: NextRequest) {
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
   const { searchParams } = new URL(request.url)
-  const empId = searchParams.get('employeeId') ?? user.id
   const isPrivileged = ['admin', 'manager'].includes(user.role)
+
+  // Bulk mode: returns { [employeeId]: balanceMin } for all employees in 3 queries.
+  if (searchParams.get('all') === 'true') {
+    if (!isPrivileged) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const today = businessDate()
+
+    const [{ data: emps }, { data: records }, { data: adjustments }] = await Promise.all([
+      supabase.from('employees').select('id, workday_hours, lunch_break_minutes').eq('active', true),
+      supabase.from('records').select('*').lt('date', today).order('timestamp', { ascending: true }),
+      supabase.from('hour_bank_adjustments').select('employee_id, minutes'),
+    ])
+
+    const empMap = new Map((emps ?? []).map(e => [e.id, e]))
+
+    // Group records by employee → date
+    const byEmpDay = new Map<string, Map<string, PunchRecord[]>>()
+    for (const r of (records ?? []) as PunchRecord[]) {
+      if (!byEmpDay.has(r.employee_id)) byEmpDay.set(r.employee_id, new Map())
+      const dm = byEmpDay.get(r.employee_id)!
+      if (!dm.has(r.date)) dm.set(r.date, [])
+      dm.get(r.date)!.push(r)
+    }
+
+    // Sum adjustments per employee
+    const adjByEmp = new Map<string, number>()
+    for (const a of (adjustments ?? []) as { employee_id: string; minutes: number }[]) {
+      adjByEmp.set(a.employee_id, (adjByEmp.get(a.employee_id) ?? 0) + a.minutes)
+    }
+
+    const balances: Record<string, number> = {}
+    empMap.forEach((emp, empId) => {
+      const workdayMin = emp.workday_hours * 60
+      const lunchMin = emp.lunch_break_minutes
+      let raw = 0
+      byEmpDay.get(empId)?.forEach(dayRecs => {
+        if (!dayRecs.some(r => r.type === 'saída')) return
+        raw += calcDayRounded(dayRecs, lunchMin) - workdayMin
+      })
+      balances[empId] = Math.round(raw + (adjByEmp.get(empId) ?? 0))
+    })
+
+    return NextResponse.json(balances)
+  }
+
+  // Single-employee mode (original behaviour)
+  const empId = searchParams.get('employeeId') ?? user.id
 
   if (empId !== user.id && !isPrivileged)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

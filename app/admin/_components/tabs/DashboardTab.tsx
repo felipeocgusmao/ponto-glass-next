@@ -66,14 +66,13 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
   useEffect(() => {
     if (employees.length === 0) return
     const fetchAll = async () => {
-      const map = new Map<string, number>()
-      await Promise.all(employees.map(async emp => {
-        try {
-          const res = await fetch(`/api/hour-bank?employeeId=${emp.id}`)
-          if (res.ok) { const d = await res.json(); map.set(emp.id, d.balanceMin) }
-        } catch { /* silent */ }
-      }))
-      setBankBalances(new Map(map))
+      try {
+        const res = await fetch('/api/hour-bank?all=true')
+        if (res.ok) {
+          const data: Record<string, number> = await res.json()
+          setBankBalances(new Map(Object.entries(data)))
+        }
+      } catch { /* silent */ }
     }
     fetchAll()
   }, [employees])
