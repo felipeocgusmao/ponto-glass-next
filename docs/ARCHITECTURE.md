@@ -24,7 +24,8 @@ flowchart LR
 - **Edge middleware** — valida apenas a assinatura do JWT (sem DB), redireciona não-autenticados para `/login`, encaminha por role (`admin`/`manager` → `/admin`, `employee` → `/ponto`).
 - **API routes** — verificação completa via `verifyApiAuth` (sig + utilizador ativo + `sessions_valid_from` ≥ `iat` do token).
 - **Supabase** — única fonte de verdade. As routes correm com a `service_role` key, RLS desativada por simplicidade (proteção é feita por role via middleware + apiAuth).
-- **Vercel Cron** — endpoints `/api/cron/*` protegidos por `Bearer ${CRON_SECRET}`.
+- **Vercel Cron** — endpoints `/api/cron/absence-check` e `/api/cron/missing-exit` protegidos por `Bearer ${CRON_SECRET}`.
+- **GitHub Actions Cron** — `/api/cron/entry-reminder` chamado a cada 5 min em dias úteis (Vercel Hobby não suporta cron sub-diário; ver `.github/workflows/entry-reminder.yml`).
 
 ---
 
@@ -42,7 +43,10 @@ app/
 ├─ ponto/
 │  ├─ page.tsx                 shell funcionário (fullscreen, 5 tabs)
 │  └─ _components/CalendarView calendário mensal do histórico
-├─ kiosk/page.tsx              modo quiosque (tablet partilhado, sem login individual)
+├─ kiosk/
+│  ├─ page.tsx                 modo quiosque (tablet partilhado, sem login individual)
+│  └─ glass/page.tsx           variante smart-glasses (640×400, alto contraste, D-pad + voz)
+├─ demo/page.tsx               página pública de credenciais demo (noindex)
 └─ api/                        ver lista abaixo
 
 lib/
@@ -54,11 +58,18 @@ lib/
 ├─ email.ts                    Microsoft Graph (preferido) + SMTP fallback
 ├─ i18n.ts + LangContext       4 idiomas (PT-PT, PT-BR, EN, ES)
 ├─ types.ts                    Employee, PunchRecord, CorrectionRequest, AuditLog, etc.
-└─ utils.ts                    calcHours / calcNetMinutes / fmtMinutes / exportCSV / exportPDF
+├─ punchValidation.ts          validateGeofence / isDuplicatePunch / isValidPunchType
+├─ punchQueue.ts               fila offline (localStorage + flush ao reconectar)
+├─ voice.ts                    parseVoiceCommand / getSpeechRecognition / speak (TTS)
+├─ entryReminder.ts            seleciona quem precisa de lembrete (chamado pelo cron server-side)
+└─ utils.ts                    calcHours / calcNetMinutes / fmtCentesimal / roundToQuarter / exportCSV / exportPDF
 
 middleware.ts                  edge: signature-only auth + role-based redirects
-public/sw.js                   service worker (cache + web push)
+public/sw.js                   service worker (cache + web push + Background Sync da fila offline)
 vercel.json                    cron jobs (absence-check 09:00 + missing-exit 17:00 UTC)
+.github/workflows/
+├─ ci.yml                      lint + test + build
+└─ entry-reminder.yml          cron */5 * * * 1-5 → POST /api/cron/entry-reminder
 supabase/
 ├─ schema.sql                  schema completo + migrações v1→v10 comentadas
 └─ migrations/                 migrações datadas (geofencing, RLS, backfill, etc.)
@@ -169,6 +180,103 @@ flowchart TD
 - `calcLiveMin(recs, lunchAuto)` — para display em tempo real durante a jornada. Quando o trabalhador está em serviço, não pré-deduz `lunch_break_minutes` (mostra tempo bruto). Após `saída`, deduz como fallback para quem não regista pausas explícitas.
 - `calcWorkedMinutesPeriod` / `calcOvertimePeriod` — para relatórios e payslip; calcula líquido com lunch deduzido quando o dia está fechado.
 
+### Validação extraída (lib/punchValidation.ts)
+
+Para tornar a validação testável sem mockar Supabase/cookies/JWT, três helpers puros vivem fora do route handler:
+
+- `validateGeofence({ geoMode, latitude, longitude, workplaceLat, workplaceLng, maxDistanceMeters })` — devolve `{ ok: true }` ou `{ ok: false; status; error }`.
+- `isDuplicatePunch(lastType, lastTs, newType, now, windowMs=60_000)` — bloqueia duplo-tap mantendo trocas legítimas (`entrada` → `saída`).
+- `isValidPunchType(t)` — type guard para a union dos 6 tipos aceites.
+
+O route `/api/punch` chama-os antes de inserir; ver `__tests__/punchValidation.test.ts` para a tabela de casos.
+
+---
+
+## Camada de display centesimal
+
+As batidas no banco continuam intactas (timestamps em UTC, precisão de milissegundos). A apresentação "centesimal" é uma camada de *read-time*:
+
+```mermaid
+flowchart LR
+  R[records] --> CD[calcDayRounded<br/>por dia]
+  CD --> RQ[roundToQuarter<br/>para múltiplo de 15min mais próximo]
+  RQ --> FC[fmtCentesimal<br/>7h45 → '7,75']
+  FC --> UI[Relatórios / Banco / Payslip / CSV / PDF]
+  R --> CR[calcLiveMin<br/>cronómetro ao vivo]
+  CR --> RAW[mm:ss exato no /ponto]
+```
+
+- **Arredondamento por dia**, não pelo total do mês — o somatório das linhas bate sempre com o total.
+- **Live continua exato** — o cronómetro no `/ponto` mostra `mm:ss` em tempo real para não confundir o trabalhador.
+- Usado em: `RelatoriosTab`, `BancoHorasTab`, `MeuPontoTab`, holerite, exportCSV, exportPDF, email mensal.
+
+---
+
+## Modo Glass + voz (kiosk/glass)
+
+Variante do quiosque otimizada para óculos Android (ex: Vuzix Blade). Resolução 640×400, alto contraste, navegação por D-pad/teclado, batida com contagem regressiva de 3s cancelável.
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant G as /kiosk/glass
+  participant V as Web Speech API
+  participant A as POST /api/punch
+  U->>G: tecla M (ou clique 🎙)
+  G->>V: SpeechRecognition.start()
+  U->>V: "Maria entrada"
+  V-->>G: transcript
+  G->>G: parseVoiceCommand → { kind: 'select-and-punch', employeeId, type }
+  G->>A: POST { type, employeeId }
+  A-->>G: 200 OK
+  G->>V: SpeechSynthesisUtterance "Entrada registada para Maria."
+```
+
+- Reconhece nomes parciais e sem acentos (`"joao"` ≈ `"João"`), sinónimos (`"almoço"`, `"voltei do almoço"`, `"pausa"`), e o comando `"cancelar"`.
+- Fallback gracioso — se a Web Speech API não existe (Firefox), o botão 🎙 não é renderizado e o fluxo D-pad continua a funcionar.
+
+---
+
+## Fila offline (lib/punchQueue.ts + sw.js)
+
+Quando o dispositivo perde rede, a batida fica em `localStorage` em vez de erro:
+
+```mermaid
+flowchart TD
+  Click[Click bater ponto] --> Online{navigator.onLine?}
+  Online -- sim --> POST[POST /api/punch]
+  POST -- ok --> Done[Render confirmação]
+  POST -- fail --> Enqueue
+  Online -- não --> Enqueue[enqueue → localStorage<br/>+ navigator.serviceWorker<br/>  .sync.register punch-queue]
+  Enqueue --> Indicator[Indicador 'pendentes' no UI]
+  SW[Service Worker] -- sync event --> Flush[flushQueue<br/>POST cada item]
+  Flush -- ok --> Clear[dequeue + 'queue synced' toast]
+```
+
+- A subscrição de `sync` é feita em `public/sw.js` (tag `punch-queue`).
+- Cada item: `{ id, type, latitude?, longitude?, timestamp }`. O servidor aceita timestamps históricos (útil para batidas atrasadas pelo offline).
+
+---
+
+## Lembrete de entrada (server-side cron)
+
+Cron de 5 minutos hospedado em GitHub Actions (`.github/workflows/entry-reminder.yml`) porque Vercel Hobby não permite agendamentos sub-diários. Em dias úteis chama `POST /api/cron/entry-reminder` com `Bearer ${CRON_SECRET}`.
+
+```mermaid
+sequenceDiagram
+  participant GA as GitHub Actions
+  participant API as /api/cron/entry-reminder
+  participant DB as Supabase
+  participant WP as Web Push (VAPID)
+  GA->>API: Bearer CRON_SECRET
+  API->>DB: SELECT employees onde expected_start está nos próximos 60min<br/>AND não bateu 'entrada' hoje
+  API->>WP: enviar push para cada subscription
+  API-->>GA: { notified: N, due: M }
+```
+
+- `lib/entryReminder.ts` tem a lógica pura (selecionar quem precisa) — testada em `__tests__/entryReminder.test.ts`.
+- O workflow degrada para *skip with warning* quando `APP_URL`/`CRON_SECRET` não estão configurados (não falha o repo).
+
 ---
 
 ## API surface
@@ -213,7 +321,9 @@ flowchart TD
 
 /api/cron/
   ├─ absence-check    GET   09:00 UTC dias úteis (Vercel cron, Bearer CRON_SECRET)
-  └─ missing-exit     GET   17:00 UTC dias úteis (Vercel cron, Bearer CRON_SECRET)
+  ├─ missing-exit     GET   17:00 UTC dias úteis (Vercel cron, Bearer CRON_SECRET)
+  ├─ entry-reminder   POST  */5 * * * 1-5 (GitHub Actions, Bearer CRON_SECRET)
+  └─ monthly-report   POST  1º dia do mês (Vercel cron, Bearer CRON_SECRET)
 ```
 
 ---
@@ -292,3 +402,7 @@ A escolha inicial é detectada via `navigator.language` na primeira visita.
 | Lunch deduction só após saída | Display ao vivo mostra tempo bruto (não confunde o trabalhador) |
 | Soft delete de funcionários | Preserva histórico de records e audit logs |
 | `.maybeSingle()` + fallback nas queries | Tolerância a migrações pendentes em produção |
+| Centesimal aplicado em read-time | Records intactos; só a apresentação muda — sem migração de dados |
+| Validação de punch extraída para `lib/punchValidation.ts` | Permite testes unitários sem mockar Supabase/cookies/JWT |
+| Cron de entry-reminder em GitHub Actions | Vercel Hobby não suporta cron sub-diário; GHA dá 5min sem custos |
+| Fila offline em `localStorage` + Background Sync | Sobrevive a refresh; flush automático ao reconectar — sem perder batidas |
