@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
 import type { Employee, EmployeeProfile } from '@/lib/types'
 import { Tab, ALL_TABS, MANAGER_TABS } from './_lib/types'
@@ -10,17 +11,32 @@ import TopBar from './_components/TopBar'
 import CommandPalette from './_components/CommandPalette'
 import SettingsModal from './_components/SettingsModal'
 import MissingExitBanner from './_components/MissingExitBanner'
+// Eagerly loaded — these are the default landing tabs for admin and manager roles.
 import { MeuPontoTab } from './_components/tabs/MeuPontoTab'
 import { DashboardTab } from './_components/tabs/DashboardTab'
-import { StatusTab } from './_components/tabs/StatusTab'
-import { RegistrosTab } from './_components/tabs/RegistrosTab'
-import { FuncionariosTab } from './_components/tabs/FuncionariosTab'
-import { BancoHorasTab } from './_components/tabs/BancoHorasTab'
-import { FeriadosTab } from './_components/tabs/FeriadosTab'
-import { RelatoriosTab } from './_components/tabs/RelatoriosTab'
-import { AuditoriaTab } from './_components/tabs/AuditoriaTab'
-import { CorrecoesTab } from './_components/tabs/CorrecoesTab'
 import { useNotifications } from './_lib/useNotifications'
+
+function TabSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 0' }}>
+      <div className="skeleton" style={{ height: 32, width: '40%' }} />
+      <div className="skeleton" style={{ height: 120, borderRadius: 'var(--r-md)' }} />
+      <div className="skeleton" style={{ height: 200, borderRadius: 'var(--r-md)' }} />
+    </div>
+  )
+}
+
+// Lazily loaded — code is only fetched when the tab is first opened.
+// RelatoriosTab bundles jspdf + jspdf-autotable (~300 KB) and RegistrosTab bundles
+// xlsx (~200 KB); deferring them eliminates ~500 KB from the initial JS payload.
+const StatusTab     = dynamic(() => import('./_components/tabs/StatusTab').then(m => ({ default: m.StatusTab })), { loading: TabSkeleton })
+const RegistrosTab  = dynamic(() => import('./_components/tabs/RegistrosTab').then(m => ({ default: m.RegistrosTab })), { loading: TabSkeleton })
+const FuncionariosTab = dynamic(() => import('./_components/tabs/FuncionariosTab').then(m => ({ default: m.FuncionariosTab })), { loading: TabSkeleton })
+const BancoHorasTab = dynamic(() => import('./_components/tabs/BancoHorasTab').then(m => ({ default: m.BancoHorasTab })), { loading: TabSkeleton })
+const FeriadosTab   = dynamic(() => import('./_components/tabs/FeriadosTab').then(m => ({ default: m.FeriadosTab })), { loading: TabSkeleton })
+const RelatoriosTab = dynamic(() => import('./_components/tabs/RelatoriosTab').then(m => ({ default: m.RelatoriosTab })), { loading: TabSkeleton })
+const AuditoriaTab  = dynamic(() => import('./_components/tabs/AuditoriaTab').then(m => ({ default: m.AuditoriaTab })), { loading: TabSkeleton })
+const CorrecoesTab  = dynamic(() => import('./_components/tabs/CorrecoesTab').then(m => ({ default: m.CorrecoesTab })), { loading: TabSkeleton })
 
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
