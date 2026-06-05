@@ -85,14 +85,8 @@ export function ProgressRing({ pct, overtime, label }: { pct: number; overtime: 
 }
 
 export async function getGeo(): Promise<{ lat: number; lng: number } | null> {
-  return new Promise(res => {
-    if (!navigator.geolocation) { res(null); return }
-    navigator.geolocation.getCurrentPosition(
-      p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => res(null),
-      { timeout: 8000 }
-    )
-  })
+  const { getPosition } = await import('@/lib/native')
+  return getPosition(8000)
 }
 
 export function getWorkingDays(from: string, to: string): string[] {

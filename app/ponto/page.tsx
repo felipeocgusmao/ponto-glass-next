@@ -51,15 +51,9 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
 }
 
-function getGeo(): Promise<{ lat: number; lng: number } | null> {
-  return new Promise(resolve => {
-    if (!navigator.geolocation) return resolve(null)
-    navigator.geolocation.getCurrentPosition(
-      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 5000, maximumAge: 60000 },
-    )
-  })
+async function getGeo(): Promise<{ lat: number; lng: number } | null> {
+  const { getPosition } = await import('@/lib/native')
+  return getPosition(8000)
 }
 
 function ProgressRing({ pct, overtime, label }: { pct: number; overtime: boolean; label: string }) {
@@ -314,32 +308,24 @@ export default function PontoPage() {
     setCorrTime(`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`)
   }, [])
 
-  // Register service worker and subscribe to push notifications
+  // Register for push notifications (native via Capacitor or web via Service Worker)
   useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     if (!vapidKey) return
-
-    navigator.serviceWorker.register('/sw.js').then(async reg => {
-      if (typeof Notification === 'undefined') return
-      if (Notification.permission === 'denied') return
-      if (Notification.permission === 'default') {
-        const perm = await Notification.requestPermission()
-        if (perm !== 'granted') return
-      }
+    ;(async () => {
       try {
-        const existing = await reg.pushManager.getSubscription()
-        const sub = existing ?? await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: vapidKey,
-        })
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator)
+          await navigator.serviceWorker.register('/sw.js').catch(() => {})
+        const { registerPush } = await import('@/lib/native')
+        const result = await registerPush(vapidKey)
+        if (!result) return
         await fetch('/api/push-subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sub.toJSON()),
+          body: JSON.stringify(result),
         })
       } catch { /* push not critical */ }
-    }).catch(() => { /* sw registration failed */ })
+    })()
   }, [])
   useEffect(() => {
     setNow(new Date())

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PontoGlass</string>
+    <string name="title_activity_main">PontoGlass</string>
+    <string name="package_name">app.pontoglass.ponto</string>
+    <string name="custom_url_scheme">app.pontoglass.ponto</string>
+</resources>

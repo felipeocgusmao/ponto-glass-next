@@ -39,24 +39,25 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
   }, [])
   useEffect(() => { setReminderDismissed(false) }, [records])
 
-  // Register SW + subscribe to push (so admin gets server-sent pushes too)
+  // Register for push notifications (native via Capacitor or web via Service Worker)
   useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     if (!vapidKey) return
-    navigator.serviceWorker.register('/sw.js').then(async reg => {
-      if (typeof Notification === 'undefined') return
-      if (Notification.permission === 'denied') return
-      if (Notification.permission === 'default') {
-        const perm = await Notification.requestPermission()
-        if (perm !== 'granted') return
-      }
+    ;(async () => {
       try {
-        const existing = await reg.pushManager.getSubscription()
-        const sub = existing ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey })
-        await fetch('/api/push-subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub.toJSON()) })
+        // On web, ensure the service worker is registered before registerPush() runs.
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator)
+          await navigator.serviceWorker.register('/sw.js').catch(() => {})
+        const { registerPush } = await import('@/lib/native')
+        const result = await registerPush(vapidKey)
+        if (!result) return
+        await fetch('/api/push-subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(result),
+        })
       } catch { /* non-critical */ }
-    }).catch(() => {})
+    })()
   }, [])
 
   // Local notification: 15-min warning + overtime
