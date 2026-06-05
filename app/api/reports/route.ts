@@ -56,7 +56,9 @@ export async function GET(request: NextRequest) {
   const truncated = data.length > MAX_ROWS
   const records = truncated ? data.slice(0, MAX_ROWS) : data
 
-  const res = NextResponse.json(records)
+  const res = NextResponse.json(records, {
+    headers: { 'Cache-Control': 'no-store' },
+  })
   if (truncated) res.headers.set('X-Truncated', 'true')
   return res
 }

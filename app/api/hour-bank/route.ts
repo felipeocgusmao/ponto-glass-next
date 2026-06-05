@@ -58,7 +58,9 @@ export async function GET(request: NextRequest) {
       balances[empId] = Math.round(raw + (adjByEmp.get(empId) ?? 0))
     })
 
-    return NextResponse.json(balances)
+    return NextResponse.json(balances, {
+      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+    })
   }
 
   // Single-employee mode (original behaviour)
@@ -111,6 +113,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     balanceMin: Math.round(rawBalanceMin + adjustmentsTotal),
     adjustments: isPrivileged ? (adjustments ?? []) : [],
+  }, {
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
   })
 }
 
