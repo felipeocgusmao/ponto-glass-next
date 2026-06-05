@@ -233,150 +233,149 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
         <FilterPill id="absent"  label="Sem registro" count={absentCount}              active={filter === 'absent'}  onClick={setFilter} />
       </div>
 
-      {/* Employee grid (Cards view) */}
-      {view === 'grid' && workers.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-          {filteredStatuses.length === 0 ? (
-            <div className="card" style={{ gridColumn: '1 / -1' }}>
-              <div className="empty">
-                <div className="title">Nenhum funcionário neste estado</div>
-                <div className="desc">Ajuste o filtro acima.</div>
+      {/* Exactly one view is rendered — ternary guarantees mutual exclusion. */}
+      {view === 'grid' ? (
+        workers.length === 0 ? null : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+            {filteredStatuses.length === 0 ? (
+              <div className="card" style={{ gridColumn: '1 / -1' }}>
+                <div className="empty">
+                  <div className="title">Nenhum funcionário neste estado</div>
+                  <div className="desc">Ajuste o filtro acima.</div>
+                </div>
               </div>
-            </div>
-          ) : filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, stateFromPriorDay, lastRecord }) => {
+            ) : filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, stateFromPriorDay, lastRecord }) => {
+              const targetMin = emp.workday_hours * 60
+              const pct = Math.min(100, targetMin > 0 ? (liveNetMin / targetMin) * 100 : 0)
+              return (
+                <div key={emp.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ position: 'relative' }}>
+                        <div className={`avatar size-36 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
+                        <span style={{
+                          position: 'absolute', bottom: 0, right: 0,
+                          width: 10, height: 10, borderRadius: '50%',
+                          background: isWorking ? 'var(--success-fg)' : (isOnLunch || isOnCafe) ? 'var(--warning-fg)' : 'var(--fg-dim)',
+                          border: '2px solid var(--surface)',
+                        }} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 550, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.name}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
+                          {emp.role === 'manager' ? t('auth.role.manager') : t('auth.role.employee')} · {emp.workday_hours}h/dia
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      {isWorking && <span className="chip success"><span className="dot"/>{t('status.on_duty')}</span>}
+                      {isOnLunch && <span className="chip warn"><span className="dot"/>{t('status.at_lunch')}</span>}
+                      {isOnCafe  && <span className="chip warn"><span className="dot"/>{t('status.coffee_break')}</span>}
+                      {!isIn && recordsTodayByEmp.has(emp.id) && <span className="chip outline">{t('status.no_records')}</span>}
+                      {!isIn && !recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--fg-muted)', marginBottom: 6 }}>
+                        <span>Jornada</span>
+                        <span className="tnum">{fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h</span>
+                      </div>
+                      <div className="bar"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
+                    </div>
+                    {liveEarnings && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--fg-muted)' }}>
+                        <span>Ganhos hoje</span>
+                        <span className="tnum" style={{ color: 'var(--success-fg)', fontWeight: 550 }}>{liveEarnings}</span>
+                      </div>
+                    )}
+                    {msg?.id === emp.id && (
+                      <div style={{ fontSize: 12, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                    <button
+                      onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
+                      disabled={punching === emp.id}
+                      className={isIn ? 'btn danger sm' : 'btn primary sm'}
+                      style={{ flex: 1, justifyContent: 'center' }}
+                    >
+                      {punching === emp.id ? '…' : isIn ? t('status.clock_out') : t('status.clock_in')}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      ) : (
+        <div className="card">
+          {workers.length === 0 && (
+            <div style={{ padding: '16px 20px' }}><div className="alert-inline info">{t('status.none_emp')}</div></div>
+          )}
+          {filteredStatuses.length === 0 && workers.length > 0 && (
+            <div className="empty"><div className="desc">Nenhum funcionário neste estado.</div></div>
+          )}
+          {filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal, stateFromPriorDay, lastRecord }) => {
             const targetMin = emp.workday_hours * 60
             const pct = Math.min(100, targetMin > 0 ? (liveNetMin / targetMin) * 100 : 0)
             return (
-              <div key={emp.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ position: 'relative' }}>
-                      <div className={`avatar size-36 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
-                      <span style={{
-                        position: 'absolute', bottom: 0, right: 0,
-                        width: 10, height: 10, borderRadius: '50%',
-                        background: isWorking ? 'var(--success-fg)' : (isOnLunch || isOnCafe) ? 'var(--warning-fg)' : 'var(--fg-dim)',
-                        border: '2px solid var(--surface)',
-                      }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 550, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.name}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
-                        {emp.role === 'manager' ? t('auth.role.manager') : t('auth.role.employee')} · {emp.workday_hours}h/dia
-                      </div>
-                    </div>
+              <div key={emp.id} className="status-row">
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div className={`avatar size-28 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
+                  <span style={{
+                    position: 'absolute', bottom: 0, right: 0,
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: isWorking ? 'var(--success-fg)' : (isOnLunch || isOnCafe) ? 'var(--warning-fg)' : 'var(--fg-dim)',
+                    border: '2px solid var(--bg)',
+                  }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{emp.name}</div>
+                  <div style={{ fontSize: 12, marginTop: 2, color: 'var(--fg-muted)' }}>
+                    {isWorking
+                      ? <span style={{ color: 'var(--success-fg)' }}>
+                          {t('status.on_duty')} · {stateFromPriorDay && lastRecord
+                            ? <span style={{ color: 'var(--warning-fg)' }}>desde {new Date(lastRecord.timestamp).toLocaleString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · sem saída</span>
+                            : liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}
+                        </span>
+                      : isOnLunch ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.at_lunch')}{stateFromPriorDay && ' (desde ontem)'}</span>
+                      : isOnCafe  ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.coffee_break')}{stateFromPriorDay && ' (desde ontem)'}</span>
+                      : <span>{liveNetMin > 0 ? `${fmtMinutes(Math.round(liveNetMin))} ${t('common.today')}` : t('status.no_records')}</span>
+                    }
                   </div>
-                  <div>
-                    {isWorking && <span className="chip success"><span className="dot"/>{t('status.on_duty')}</span>}
-                    {isOnLunch && <span className="chip warn"><span className="dot"/>{t('status.at_lunch')}</span>}
-                    {isOnCafe  && <span className="chip warn"><span className="dot"/>{t('status.coffee_break')}</span>}
-                    {!isIn && recordsTodayByEmp.has(emp.id) && <span className="chip outline">{t('status.no_records')}</span>}
-                    {!isIn && !recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
+                  {liveEarnings && <div style={{ fontSize: 11, color: 'var(--success-fg)', marginTop: 2, opacity: 0.75 }}>{liveEarnings} {t('common.today')}</div>}
+                  <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <span className="tnum">{fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h hoje</span>
+                    {weekTotal > 0 && <span>· <span className="tnum">{fmtMinutes(weekTotal)}</span> {t('status.this_week')}</span>}
+                    {emp.hourly_rate != null && <span>· {Number(emp.hourly_rate).toFixed(2).replace('.', ',')} €/h</span>}
                   </div>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--fg-muted)', marginBottom: 6 }}>
-                      <span>Jornada</span>
-                      <span className="tnum">{fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h</span>
-                    </div>
-                    <div className="bar"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
-                  </div>
-                  {liveEarnings && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--fg-muted)' }}>
-                      <span>Ganhos hoje</span>
-                      <span className="tnum" style={{ color: 'var(--success-fg)', fontWeight: 550 }}>{liveEarnings}</span>
-                    </div>
-                  )}
                   {msg?.id === emp.id && (
-                    <div style={{ fontSize: 12, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
+                    <div style={{ fontSize: 12, marginTop: 4, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 6, padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-                  <button
-                    onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
-                    disabled={punching === emp.id}
-                    className={isIn ? 'btn danger sm' : 'btn primary sm'}
-                    style={{ flex: 1, justifyContent: 'center' }}
-                  >
-                    {punching === emp.id ? '…' : isIn ? t('status.clock_out') : t('status.clock_in')}
-                  </button>
+                <div data-col="bar" style={{ width: 80, flexShrink: 0 }}>
+                  <div className="bar"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 3, textAlign: 'right' }} className="tnum">
+                    {fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h
+                  </div>
                 </div>
+                <div data-col="chip" style={{ width: 90, flexShrink: 0 }}>
+                  {isWorking    && <span className="chip success">Trabalhando</span>}
+                  {isOnLunch    && <span className="chip warn">Almoço</span>}
+                  {isOnCafe     && <span className="chip warn">Pausa</span>}
+                  {!isIn && recordsTodayByEmp.has(emp.id) && <span className="chip outline">Saiu</span>}
+                  {!isIn && !recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
+                </div>
+                <button
+                  onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
+                  disabled={punching === emp.id}
+                  className={isIn ? 'btn danger sm' : 'btn primary sm'}
+                >
+                  {punching === emp.id ? '…' : isIn ? t('status.clock_out') : t('status.clock_in')}
+                </button>
               </div>
             )
           })}
         </div>
-      )}
-
-      {/* Employee list (List view) */}
-      {view === 'list' && (
-      <div className="card">
-        {workers.length === 0 && (
-          <div style={{ padding: '16px 20px' }}><div className="alert-inline info">{t('status.none_emp')}</div></div>
-        )}
-        {filteredStatuses.length === 0 && workers.length > 0 && (
-          <div className="empty"><div className="desc">Nenhum funcionário neste estado.</div></div>
-        )}
-        {filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal, stateFromPriorDay, lastRecord }) => {
-          const targetMin = emp.workday_hours * 60
-          const pct = Math.min(100, targetMin > 0 ? (liveNetMin / targetMin) * 100 : 0)
-          return (
-            <div key={emp.id} className="status-row">
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <div className={`avatar size-28 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
-                <span style={{
-                  position: 'absolute', bottom: 0, right: 0,
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: isWorking ? 'var(--success-fg)' : (isOnLunch || isOnCafe) ? 'var(--warning-fg)' : 'var(--fg-dim)',
-                  border: '2px solid var(--bg)',
-                }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{emp.name}</div>
-                <div style={{ fontSize: 12, marginTop: 2, color: 'var(--fg-muted)' }}>
-                  {isWorking
-                    ? <span style={{ color: 'var(--success-fg)' }}>
-                        {t('status.on_duty')} · {stateFromPriorDay && lastRecord
-                          ? <span style={{ color: 'var(--warning-fg)' }}>desde {new Date(lastRecord.timestamp).toLocaleString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · sem saída</span>
-                          : liveNetMin > 0 ? fmtMinutes(Math.round(liveNetMin)) : '< 1min'}
-                      </span>
-                    : isOnLunch ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.at_lunch')}{stateFromPriorDay && ' (desde ontem)'}</span>
-                    : isOnCafe  ? <span style={{ color: 'var(--warning-fg)' }}>{t('status.coffee_break')}{stateFromPriorDay && ' (desde ontem)'}</span>
-                    : <span>{liveNetMin > 0 ? `${fmtMinutes(Math.round(liveNetMin))} ${t('common.today')}` : t('status.no_records')}</span>
-                  }
-                </div>
-                {liveEarnings && <div style={{ fontSize: 11, color: 'var(--success-fg)', marginTop: 2, opacity: 0.75 }}>{liveEarnings} {t('common.today')}</div>}
-                <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  <span className="tnum">{fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h hoje</span>
-                  {weekTotal > 0 && <span>· <span className="tnum">{fmtMinutes(weekTotal)}</span> {t('status.this_week')}</span>}
-                  {emp.hourly_rate != null && <span>· {Number(emp.hourly_rate).toFixed(2).replace('.', ',')} €/h</span>}
-                </div>
-                {msg?.id === emp.id && (
-                  <div style={{ fontSize: 12, marginTop: 4, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
-                )}
-              </div>
-              <div data-col="bar" style={{ width: 80, flexShrink: 0 }}>
-                <div className="bar"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
-                <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 3, textAlign: 'right' }} className="tnum">
-                  {fmtMinutes(Math.round(liveNetMin))} / {emp.workday_hours}h
-                </div>
-              </div>
-              <div data-col="chip" style={{ width: 90, flexShrink: 0 }}>
-                {isWorking    && <span className="chip success">Trabalhando</span>}
-                {isOnLunch    && <span className="chip warn">Almoço</span>}
-                {isOnCafe     && <span className="chip warn">Pausa</span>}
-                {!isIn && recordsTodayByEmp.has(emp.id) && <span className="chip outline">Saiu</span>}
-                {!isIn && !recordsTodayByEmp.has(emp.id) && <span className="chip outline">—</span>}
-              </div>
-              <button
-                onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
-                disabled={punching === emp.id}
-                className={isIn ? 'btn danger sm' : 'btn primary sm'}
-              >
-                {punching === emp.id ? '…' : isIn ? t('status.clock_out') : t('status.clock_in')}
-              </button>
-            </div>
-          )
-        })}
-      </div>
       )}
     </>
   )
