@@ -150,155 +150,169 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
   const sorted = [...records].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
   return (
-    <div className="card" style={{ maxWidth: 480 }}>
-      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {toast && <div className={`alert-inline ${toast.kind}`}>{toast.text}</div>}
-
-        {/* Overtime reminder banner */}
-        {state === 'working' && overtime > 15 && !reminderDismissed && (
-          <div style={{
-            background: 'var(--warning-soft, rgba(234,179,8,0.12))',
-            border: '1px solid var(--warning, #ca8a04)',
-            borderRadius: 'var(--r-md)',
-            padding: '10px 14px',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <span style={{ fontSize: 16 }}>⏰</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{t('ponto.reminder')}</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-                {t('ponto.reminder.body').replace('{n}', String(Math.round(overtime)))}
-              </div>
-            </div>
-            <button onClick={() => setReminderDismissed(true)} className="btn ghost sm" style={{ flexShrink: 0, fontSize: 11 }}>
-              {t('ponto.reminder.dismiss')}
-            </button>
-          </div>
-        )}
-
-        {/* Greeting + date */}
+    <>
+      {/* Page header */}
+      <div className="page-head">
         <div>
-          <div style={{ fontSize: 15, color: 'var(--fg-muted)', fontWeight: 400 }}>
-            {greeting}, <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{user.name.split(' ')[0]}</span>
+          <div className="page-title">{t('tab.meu_ponto')}</div>
+          <div className="page-sub" style={{ textTransform: 'capitalize' }}>
+            {now ? now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : ''}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--fg-subtle)', marginTop: 2, textTransform: 'capitalize' }}>
-            {now ? now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' }) : ''}
-          </div>
-        </div>
-
-        {/* Clock + status */}
-        <div style={{ textAlign: 'center' }}>
-          <div className="tnum mono" style={{ fontSize: 42, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1 }}>
-            {hh}:{mm}<span style={{ fontSize: 24, color: 'var(--fg-muted)' }}>:{ss}</span>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            {state === 'working' && since && (
-              <span className="chip success"><span className="dot" style={{ marginRight: 4 }}/>{t('ponto.status.working')} {since}</span>
-            )}
-            {state === 'lunch' && since && (
-              <span className="chip warn"><span className="dot" style={{ marginRight: 4 }}/>{t('ponto.status.lunch')} {since}</span>
-            )}
-            {state === 'coffee' && since && (
-              <span className="chip warn"><span className="dot" style={{ marginRight: 4 }}/>{t('ponto.status.coffee')} {since}</span>
-            )}
-            {isOut && since && (
-              <span className="chip">{t('ponto.status.out')} {since}</span>
-            )}
-            {state === 'off' && !isOut && (
-              <span className="chip">{t('ponto.status.absent')}</span>
-            )}
-          </div>
-        </div>
-
-        {/* Progress ring + stats */}
-        <div className="emp-progress">
-          <ProgressRing pct={pct} overtime={isOvertime} label={t('ponto.journey')} />
-          <div className="emp-stats">
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('ponto.worked')}</div>
-              <div className="tnum" style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em', marginTop: 2 }}>{liveMin > 0 ? fmtMin(Math.round(liveMin)) : '0m'}</div>
-            </div>
-            <div style={isOvertime ? { color: 'var(--warning-fg)' } : {}}>
-              <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {isOvertime ? t('ponto.overtime') : t('ponto.remaining')}
-              </div>
-              <div className="tnum" style={{ fontSize: 14, fontWeight: 500, marginTop: 2 }}>
-                {isOvertime ? `+${fmtMin(Math.round(overtime))}` : fmtMin(Math.round(remaining))}
-              </div>
-            </div>
-            {earnings != null && (
-              <div style={{ color: 'var(--success-fg)' }}>
-                <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('ponto.daily_earnings')}</div>
-                <div className="tnum" style={{ fontSize: 14, fontWeight: 500, marginTop: 2 }}>
-                  {earnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="emp-actions">
-          {state === 'off' && !isOut && (
-            <button onClick={() => punch('entrada')} disabled={punching} className="btn-emp primary-big">
-              <PlayIcon /> {punching ? t('ponto.registering') : t('ponto.punch_in')}
-            </button>
-          )}
-          {state === 'working' && (
-            <>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => punch('inicio_almoco')} disabled={punching} className="btn-emp warn" style={{ flex: 1 }}><UtensilsIcon /> {t('ponto.lunch_start')}</button>
-                <button onClick={() => punch('pausa_cafe')} disabled={punching} className="btn-emp warn" style={{ flex: 1 }}><CoffeeIcon /> {t('ponto.coffee_start')}</button>
-              </div>
-              <button onClick={() => punch('saída')} disabled={punching} className="btn-emp danger-big">
-                <StopIcon /> {punching ? t('ponto.registering') : t('ponto.punch_out')}
-              </button>
-            </>
-          )}
-          {state === 'lunch' && (
-            <button onClick={() => punch('fim_almoco')} disabled={punching} className="btn-emp primary-big">
-              <PlayIcon /> {punching ? t('ponto.registering') : t('ponto.lunch_end')}
-            </button>
-          )}
-          {state === 'coffee' && (
-            <button onClick={() => punch('retorno_cafe')} disabled={punching} className="btn-emp primary-big">
-              <PlayIcon /> {punching ? t('ponto.registering') : t('ponto.coffee_end')}
-            </button>
-          )}
-          {isOut && (
-            <button onClick={() => punch('entrada')} disabled={punching} className="btn-emp">
-              <RefreshIcon /> {t('ponto.punch_again')}
-            </button>
-          )}
-        </div>
-
-        {/* Today's history */}
-        <div className="emp-history">
-          <div className="emp-history-head">
-            <span>{t('ponto.today_history')}</span>
-            <span className="tnum" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
-              {sorted.length} {sorted.length === 1 ? t('ponto.punch') : t('ponto.punches')}
-            </span>
-          </div>
-          {sorted.length === 0
-            ? <div className="emp-history-empty">{t('ponto.no_punches')}</div>
-            : (
-              <div className="emp-history-list">
-                {sorted.map(r => (
-                  <div key={r.id} className="emp-history-item">
-                    <span className={`chip ${PUNCH_TONE[r.type] ?? ''} outline`} style={{ fontSize: 11 }}>
-                      {tagLabel(r.type)}
-                    </span>
-                    <span className="tnum" style={{ fontSize: 13, color: 'var(--fg-muted)', marginLeft: 'auto' }}>
-                      {new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )
-          }
         </div>
       </div>
-    </div>
+
+      <div className="meu-ponto-grid">
+        {/* Main: greeting + clock + actions + ring/stats */}
+        <div className="card">
+          <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {toast && <div className={`alert-inline ${toast.kind}`}>{toast.text}</div>}
+
+            {/* Overtime reminder banner */}
+            {state === 'working' && overtime > 15 && !reminderDismissed && (
+              <div style={{
+                background: 'var(--warning-soft, rgba(234,179,8,0.12))',
+                border: '1px solid var(--warning, #ca8a04)',
+                borderRadius: 'var(--r-md)',
+                padding: '10px 14px',
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <span style={{ fontSize: 16 }}>⏰</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{t('ponto.reminder')}</div>
+                  <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
+                    {t('ponto.reminder.body').replace('{n}', String(Math.round(overtime)))}
+                  </div>
+                </div>
+                <button onClick={() => setReminderDismissed(true)} className="btn ghost sm" style={{ flexShrink: 0, fontSize: 11 }}>
+                  {t('ponto.reminder.dismiss')}
+                </button>
+              </div>
+            )}
+
+            {/* Greeting */}
+            <div style={{ fontSize: 15, color: 'var(--fg-muted)', fontWeight: 400 }}>
+              {greeting}, <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{user.name.split(' ')[0]}</span>
+            </div>
+
+            {/* Clock + status */}
+            <div style={{ textAlign: 'center' }}>
+              <div className="tnum mono" style={{ fontSize: 42, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                {hh}:{mm}<span style={{ fontSize: 24, color: 'var(--fg-muted)' }}>:{ss}</span>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                {state === 'working' && since && (
+                  <span className="chip success"><span className="dot" style={{ marginRight: 4 }}/>{t('ponto.status.working')} {since}</span>
+                )}
+                {state === 'lunch' && since && (
+                  <span className="chip warn"><span className="dot" style={{ marginRight: 4 }}/>{t('ponto.status.lunch')} {since}</span>
+                )}
+                {state === 'coffee' && since && (
+                  <span className="chip warn"><span className="dot" style={{ marginRight: 4 }}/>{t('ponto.status.coffee')} {since}</span>
+                )}
+                {isOut && since && (
+                  <span className="chip">{t('ponto.status.out')} {since}</span>
+                )}
+                {state === 'off' && !isOut && (
+                  <span className="chip">{t('ponto.status.absent')}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Progress ring + stats */}
+            <div className="emp-progress">
+              <ProgressRing pct={pct} overtime={isOvertime} label={t('ponto.journey')} />
+              <div className="emp-stats">
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('ponto.worked')}</div>
+                  <div className="tnum" style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em', marginTop: 2 }}>{liveMin > 0 ? fmtMin(Math.round(liveMin)) : '0m'}</div>
+                </div>
+                <div style={isOvertime ? { color: 'var(--warning-fg)' } : {}}>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {isOvertime ? t('ponto.overtime') : t('ponto.remaining')}
+                  </div>
+                  <div className="tnum" style={{ fontSize: 14, fontWeight: 500, marginTop: 2 }}>
+                    {isOvertime ? `+${fmtMin(Math.round(overtime))}` : fmtMin(Math.round(remaining))}
+                  </div>
+                </div>
+                {earnings != null && (
+                  <div style={{ color: 'var(--success-fg)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('ponto.daily_earnings')}</div>
+                    <div className="tnum" style={{ fontSize: 14, fontWeight: 500, marginTop: 2 }}>
+                      {earnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="emp-actions">
+              {state === 'off' && !isOut && (
+                <button onClick={() => punch('entrada')} disabled={punching} className="btn-emp primary-big">
+                  <PlayIcon /> {punching ? t('ponto.registering') : t('ponto.punch_in')}
+                </button>
+              )}
+              {state === 'working' && (
+                <>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={() => punch('inicio_almoco')} disabled={punching} className="btn-emp warn" style={{ flex: 1 }}><UtensilsIcon /> {t('ponto.lunch_start')}</button>
+                    <button onClick={() => punch('pausa_cafe')} disabled={punching} className="btn-emp warn" style={{ flex: 1 }}><CoffeeIcon /> {t('ponto.coffee_start')}</button>
+                  </div>
+                  <button onClick={() => punch('saída')} disabled={punching} className="btn-emp danger-big">
+                    <StopIcon /> {punching ? t('ponto.registering') : t('ponto.punch_out')}
+                  </button>
+                </>
+              )}
+              {state === 'lunch' && (
+                <button onClick={() => punch('fim_almoco')} disabled={punching} className="btn-emp primary-big">
+                  <PlayIcon /> {punching ? t('ponto.registering') : t('ponto.lunch_end')}
+                </button>
+              )}
+              {state === 'coffee' && (
+                <button onClick={() => punch('retorno_cafe')} disabled={punching} className="btn-emp primary-big">
+                  <PlayIcon /> {punching ? t('ponto.registering') : t('ponto.coffee_end')}
+                </button>
+              )}
+              {isOut && (
+                <button onClick={() => punch('entrada')} disabled={punching} className="btn-emp">
+                  <RefreshIcon /> {t('ponto.punch_again')}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Side: today's history */}
+        <div className="card">
+          <div style={{ padding: 24 }}>
+            <div className="emp-history">
+              <div className="emp-history-head">
+                <span>{t('ponto.today_history')}</span>
+                <span className="tnum" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
+                  {sorted.length} {sorted.length === 1 ? t('ponto.punch') : t('ponto.punches')}
+                </span>
+              </div>
+              {sorted.length === 0
+                ? <div className="emp-history-empty">{t('ponto.no_punches')}</div>
+                : (
+                  <div className="emp-history-list">
+                    {sorted.map(r => (
+                      <div key={r.id} className="emp-history-item">
+                        <span className={`chip ${PUNCH_TONE[r.type] ?? ''} outline`} style={{ fontSize: 11 }}>
+                          {tagLabel(r.type)}
+                        </span>
+                        <span className="tnum" style={{ fontSize: 13, color: 'var(--fg-muted)', marginLeft: 'auto' }}>
+                          {new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   )
 }
