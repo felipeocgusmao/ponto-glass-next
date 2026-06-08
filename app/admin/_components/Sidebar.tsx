@@ -69,7 +69,7 @@ export default function Sidebar({
   return (
     <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
       <div className="sb-head">
-        <div className="sb-logo">P</div>
+        <div className="sb-logo" role="img" aria-label="PontoGlass" />
         <span className="sb-brand">PontoGlass</span>
         <button
           className="sb-collapse"

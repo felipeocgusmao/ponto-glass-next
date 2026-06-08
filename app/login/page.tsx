@@ -63,7 +63,7 @@ function BrandPanel() {
       <div className="login-brand-grid" />
       <div className="login-brand-top">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="sb-logo" style={{ width: 30, height: 30, borderRadius: 8 }}>P</div>
+          <div className="sb-logo" style={{ width: 30, height: 30, borderRadius: 8 }} role="img" aria-label="PontoGlass" />
           <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', color: 'rgba(255,255,255,0.95)' }}>PontoGlass</span>
         </div>
       </div>
@@ -181,7 +181,7 @@ export default function LoginPage() {
       <div className="login-form-side">
         <div className="login-form-card">
           <div className="login-mobile-brand">
-            <div className="sb-logo" style={{ width: 28, height: 28, borderRadius: 7 }}>P</div>
+            <div className="sb-logo" style={{ width: 28, height: 28, borderRadius: 7 }} role="img" aria-label="PontoGlass" />
             <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>PontoGlass</span>
           </div>
 

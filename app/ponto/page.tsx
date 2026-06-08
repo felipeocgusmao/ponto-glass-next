@@ -670,7 +670,7 @@ export default function PontoPage() {
 
       <header className="emp-topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="sb-logo" style={{ width: 26, height: 26, borderRadius: 6, fontSize: 13 }}>P</div>
+          <div className="sb-logo" style={{ width: 26, height: 26, borderRadius: 6 }} role="img" aria-label="PontoGlass" />
           <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: '-0.01em' }}>PontoGlass</div>
         </div>
         <button
