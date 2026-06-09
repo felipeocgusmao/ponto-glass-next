@@ -15,7 +15,9 @@ if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && proce
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`)
+  // Refuse outright when the secret is unset — otherwise the template literal
+  // would accept the literal header "Bearer undefined".
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const today = businessDate()

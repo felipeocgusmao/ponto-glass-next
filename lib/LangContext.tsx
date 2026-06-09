@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, createContext, useContext, useEffect, useState } from 'react'
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { type Lang, type TranslationKey, translate, detectLang, LANG_LABELS } from './i18n'
 export type { Lang }
 export { LANG_LABELS }
@@ -18,14 +18,18 @@ export function LangProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { setLangState(detectLang()) }, [])
 
-  const setLang = (l: Lang) => {
+  const setLang = useCallback((l: Lang) => {
     setLangState(l)
     if (typeof window !== 'undefined') localStorage.setItem('pg.lang', l)
-  }
+  }, [])
 
-  const t = (key: TranslationKey) => translate(lang, key)
+  // Stable identity (changes only with lang) so consumers can safely list `t`
+  // in effect dependencies without re-running on every provider render.
+  const t = useCallback((key: TranslationKey) => translate(lang, key), [lang])
 
-  return <Ctx.Provider value={{ lang, setLang, t }}>{children}</Ctx.Provider>
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t])
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 export function useLang() { return useContext(Ctx) }

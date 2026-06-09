@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLang } from '@/lib/LangContext'
+import { BUSINESS_TZ } from '@/lib/utils'
 
 function EyeOffIcon({ size = 14 }: { size?: number }) {
   return (
@@ -57,6 +58,12 @@ function BrandPanel() {
   const ss = String(now.getSeconds()).padStart(2, '0')
   const secProgress = now.getSeconds() / 60
 
+  // Label the configured business timezone instead of hardcoding a city, so the
+  // brand panel stays truthful across deployments and DST changes.
+  const tzCity = (BUSINESS_TZ.split('/').pop() ?? BUSINESS_TZ).replace(/_/g, ' ')
+  const tzOffset = new Intl.DateTimeFormat('en', { timeZone: BUSINESS_TZ, timeZoneName: 'shortOffset' })
+    .formatToParts(now).find(p => p.type === 'timeZoneName')?.value.replace('GMT', 'UTC') ?? ''
+
   return (
     <div className="login-brand-side">
       <div className="login-brand-bg" />
@@ -105,7 +112,7 @@ function BrandPanel() {
             {now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
           </span>
           <span className="dot-sep">·</span>
-          <span>Lisboa · UTC+1</span>
+          <span>{tzCity}{tzOffset ? ` · ${tzOffset}` : ''}</span>
         </div>
       </div>
 

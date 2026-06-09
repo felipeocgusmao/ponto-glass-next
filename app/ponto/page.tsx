@@ -286,6 +286,8 @@ export default function PontoPage() {
         showToast(t('ponto.queue_synced').replace('{n}', String(result.synced)))
         loadRecords()
       }
+      if (result.dropped > 0)
+        showToast(t('ponto.queue_dropped').replace('{n}', String(result.dropped)))
     }
     const handleOffline = () => setIsOnline(false)
     window.addEventListener('online', handleOnline)
@@ -299,7 +301,10 @@ export default function PontoPage() {
       window.removeEventListener('offline', handleOffline)
       navigator.serviceWorker?.removeEventListener('message', handleSwMessage)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // showToast is intentionally omitted: it only touches stable setState/refs,
+    // so a stale identity is harmless and listing it would re-register the
+    // listeners on every render.
+  }, [t, loadRecords]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (user) setProfileEmail(user.email ?? '') }, [user])
   useEffect(() => {
