@@ -82,6 +82,25 @@ export function isDuplicatePunch(
   return now.getTime() - last < windowMs
 }
 
+/**
+ * Resolve the instant a punch should be filed under. Offline punches send the
+ * wall-clock of when they were queued (`queuedAt`); honour it only when it is
+ * plausible — parseable, strictly in the past, and at most `maxAgeMs` old.
+ * Anything else (absent, malformed, in the future, too old) falls back to `now`.
+ */
+export function resolvePunchTimestamp(
+  queuedAt: unknown,
+  now: Date = new Date(),
+  maxAgeMs: number = 24 * 60 * 60 * 1000,
+): Date {
+  if (typeof queuedAt !== 'string') return now
+  const q = new Date(queuedAt)
+  if (Number.isNaN(q.getTime())) return now
+  const age = now.getTime() - q.getTime()
+  if (age <= 0 || age > maxAgeMs) return now
+  return q
+}
+
 const VALID_TYPES = new Set([
   'entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe',
 ])

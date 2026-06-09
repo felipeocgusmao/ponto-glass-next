@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcWorkDate } from '@/lib/utils'
 import { rateLimit } from '@/lib/rateLimit'
-import { validateGeofence, isDuplicatePunch, isValidPunchType } from '@/lib/punchValidation'
+import { validateGeofence, isDuplicatePunch, isValidPunchType, resolvePunchTimestamp } from '@/lib/punchValidation'
 
 export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
-  const { type, employeeId: targetId, latitude, longitude } = await request.json()
+  const { type, employeeId: targetId, latitude, longitude, queuedAt } = await request.json()
   if (!isValidPunchType(type))
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
 
@@ -79,20 +79,24 @@ export async function POST(request: NextRequest) {
   if (!(await rateLimit(`punch:${empId}`, 10, 60_000)))
     return NextResponse.json({ error: 'Muitos registos seguidos. Aguarde um momento.' }, { status: 429 })
 
+  // Offline punches flushed by the queue carry the original wall-clock in
+  // queuedAt; file them under that instant (never for punches on behalf).
+  const now = new Date()
+  const punchTime = onBehalf ? now : resolvePunchTimestamp(queuedAt, now)
+
   const { data: lastRec } = await supabase
     .from('records').select('type, timestamp')
     .eq('employee_id', empId).order('timestamp', { ascending: false }).limit(1).maybeSingle()
-  if (isDuplicatePunch(lastRec?.type, lastRec?.timestamp, type))
+  if (isDuplicatePunch(lastRec?.type, lastRec?.timestamp, type, punchTime))
     return NextResponse.json({ error: 'Registo duplicado. Aguarde um momento.' }, { status: 409 })
 
-  const now = new Date()
-  const workDate = calcWorkDate(now, empShiftStart)
+  const workDate = calcWorkDate(punchTime, empShiftStart)
   const geoFields = (typeof latitude === 'number' && typeof longitude === 'number')
     ? { latitude, longitude } : {}
 
   const { data, error } = await supabase
     .from('records')
-    .insert({ employee_id: empId, employee_name: empName, type, timestamp: now.toISOString(), date: workDate, ...geoFields })
+    .insert({ employee_id: empId, employee_name: empName, type, timestamp: punchTime.toISOString(), date: workDate, ...geoFields })
     .select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

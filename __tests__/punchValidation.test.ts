@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateGeofence, isDuplicatePunch, isValidPunchType } from '../lib/punchValidation'
+import { validateGeofence, isDuplicatePunch, isValidPunchType, resolvePunchTimestamp } from '../lib/punchValidation'
 
 describe('validateGeofence', () => {
   it('passes when geo_mode is disabled regardless of inputs', () => {
@@ -91,6 +91,44 @@ describe('isDuplicatePunch', () => {
 
   it('returns false when the timestamp is unparseable', () => {
     expect(isDuplicatePunch('entrada', 'not-a-date', 'entrada', NOW)).toBe(false)
+  })
+})
+
+describe('resolvePunchTimestamp', () => {
+  const NOW = new Date('2026-05-26T14:00:00Z')
+
+  it('honours a plausible queuedAt from an offline punch', () => {
+    const queued = '2026-05-26T09:00:00.000Z' // 5h before NOW, within 24h
+    expect(resolvePunchTimestamp(queued, NOW).toISOString()).toBe(queued)
+  })
+
+  it('falls back to now when queuedAt is absent or not a string', () => {
+    expect(resolvePunchTimestamp(undefined, NOW)).toBe(NOW)
+    expect(resolvePunchTimestamp(null, NOW)).toBe(NOW)
+    expect(resolvePunchTimestamp(1748246400000, NOW)).toBe(NOW)
+  })
+
+  it('falls back to now when queuedAt is unparseable', () => {
+    expect(resolvePunchTimestamp('not-a-date', NOW)).toBe(NOW)
+  })
+
+  it('rejects timestamps in the future', () => {
+    expect(resolvePunchTimestamp('2026-05-26T14:00:01Z', NOW)).toBe(NOW)
+  })
+
+  it('rejects timestamps older than the max age', () => {
+    expect(resolvePunchTimestamp('2026-05-25T13:59:59Z', NOW)).toBe(NOW) // 24h + 1s
+  })
+
+  it('accepts a timestamp right at the edge of the window', () => {
+    const edge = '2026-05-25T14:00:00.000Z' // exactly 24h before NOW
+    expect(resolvePunchTimestamp(edge, NOW).toISOString()).toBe(edge)
+  })
+
+  it('honours a custom max age', () => {
+    const queued = '2026-05-26T13:30:00.000Z' // 30 min ago
+    expect(resolvePunchTimestamp(queued, NOW, 60 * 60 * 1000).toISOString()).toBe(queued)
+    expect(resolvePunchTimestamp('2026-05-26T12:00:00Z', NOW, 60 * 60 * 1000)).toBe(NOW) // 2h ago, 1h window
   })
 })
 
