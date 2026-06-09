@@ -205,3 +205,41 @@ CREATE INDEX IF NOT EXISTS idx_day_exceptions_tenant_date  ON day_exceptions(ten
 CREATE INDEX IF NOT EXISTS idx_push_tenant                 ON push_subscriptions(tenant_id);
 
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+
+-- v12 → v13: phase 3 of multi-tenancy — defence-in-depth RLS lockdown.
+-- The app uses the service-role key (which bypasses RLS), so tenant isolation
+-- comes from the API filters added in phase 2. These policies exist solely to
+-- refuse anything that ever hits the database with the anon key — every read
+-- AND write on every per-tenant table.
+
+ALTER TABLE employees             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE records               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE correction_requests   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE day_exceptions        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hour_bank_adjustments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_subscriptions    ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "block_anon_read_employees"    ON employees;
+DROP POLICY IF EXISTS "block_anon_read_records"      ON records;
+DROP POLICY IF EXISTS "block_anon_read_corrections"  ON correction_requests;
+DROP POLICY IF EXISTS "block_anon_read_audit"        ON audit_logs;
+DROP POLICY IF EXISTS "block_anon_read_tenants"      ON tenants;
+
+DROP POLICY IF EXISTS "block_anon_employees"           ON employees;
+DROP POLICY IF EXISTS "block_anon_records"             ON records;
+DROP POLICY IF EXISTS "block_anon_corrections"         ON correction_requests;
+DROP POLICY IF EXISTS "block_anon_audit"               ON audit_logs;
+DROP POLICY IF EXISTS "block_anon_day_exceptions"      ON day_exceptions;
+DROP POLICY IF EXISTS "block_anon_hour_bank"           ON hour_bank_adjustments;
+DROP POLICY IF EXISTS "block_anon_push_subscriptions"  ON push_subscriptions;
+DROP POLICY IF EXISTS "block_anon_tenants"             ON tenants;
+
+CREATE POLICY "block_anon_employees"          ON employees             AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
+CREATE POLICY "block_anon_records"            ON records               AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
+CREATE POLICY "block_anon_corrections"        ON correction_requests   AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
+CREATE POLICY "block_anon_audit"              ON audit_logs            AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
+CREATE POLICY "block_anon_day_exceptions"     ON day_exceptions        AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
+CREATE POLICY "block_anon_hour_bank"          ON hour_bank_adjustments AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
+CREATE POLICY "block_anon_push_subscriptions" ON push_subscriptions    AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
+CREATE POLICY "block_anon_tenants"            ON tenants               AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);

@@ -119,6 +119,27 @@ Validação por funcionário (`employees.workplace_lat`, `workplace_lng`, `max_d
 
 ---
 
+## Row-Level Security (RLS)
+
+A app fala com o Postgres via **service-role key**, que ignora RLS. O isolamento *entre tenants* vem da camada API (cada query carrega `.eq('tenant_id', user.tenant_id)` desde a fase 2 de multi-tenancy). RLS aqui é **defesa em profundidade** para o caso em que o database seja acessado de outra forma:
+
+- Todas as tabelas tenant-scoped têm `ROW LEVEL SECURITY` habilitado.
+- Para o role `anon` (chave pública do Supabase), políticas **restritivas** recusam `SELECT`, `INSERT`, `UPDATE` e `DELETE`. Mesmo que alguém troque a env var por engano ou aponte um cliente público para a base, nenhuma operação passa.
+- Quando o app eventualmente migrar para Supabase Auth, as políticas comentadas no fim de `supabase/migrations/20260609_rls_phase3.sql` viram a isolation real, usando `auth.jwt() ->> 'tenant_id'`.
+
+| Tabela                  | RLS habilitada | Política anon |
+|-------------------------|---------------|---------------|
+| `tenants`               | sim           | `block_anon_tenants`           |
+| `employees`             | sim           | `block_anon_employees`         |
+| `records`               | sim           | `block_anon_records`           |
+| `correction_requests`   | sim           | `block_anon_corrections`       |
+| `audit_logs`            | sim           | `block_anon_audit`             |
+| `day_exceptions`        | sim           | `block_anon_day_exceptions`    |
+| `hour_bank_adjustments` | sim           | `block_anon_hour_bank`         |
+| `push_subscriptions`    | sim           | `block_anon_push_subscriptions`|
+
+---
+
 ## Validação de input
 
 - **`zod`** *não* é usado; a validação é manual em cada API route (mais simples para um projeto deste tamanho).
