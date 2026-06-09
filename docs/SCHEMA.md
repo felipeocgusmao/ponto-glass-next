@@ -192,11 +192,20 @@ See [`supabase/migrations/20260522_push_subscriptions.sql`](../supabase/migratio
 
 ## Row-Level Security (RLS)
 
-RLS is enabled on `employees` and `records`. The application uses the
-**service-role key** server-side (which bypasses RLS), and the API enforces
-authorization via JWT claims (`role`) before issuing queries. So the RLS
-policies are a defense-in-depth net — not the primary access control. See
-[`supabase/migrations/20260528_rls_policies.sql`](../supabase/migrations/20260528_rls_policies.sql).
+RLS is enabled on **every per-tenant table** (`tenants`, `employees`, `records`,
+`correction_requests`, `audit_logs`, `day_exceptions`, `hour_bank_adjustments`,
+`push_subscriptions`). The application uses the **service-role key** server-side
+(which bypasses RLS), and the API enforces authorization via JWT claims (`role`,
+`tenant_id`) plus explicit `.eq('tenant_id', user.tenant_id)` filters on every
+query (phase 2 of multi-tenancy).
+
+The RLS policies are therefore a **defence-in-depth net**: every policy is
+`RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false)`, so any access
+via the anon key is refused outright. See
+[`supabase/migrations/20260528_rls_policies.sql`](../supabase/migrations/20260528_rls_policies.sql)
+(initial SELECT block) and
+[`supabase/migrations/20260609_rls_phase3.sql`](../supabase/migrations/20260609_rls_phase3.sql)
+(phase 3 lockdown across all operations and remaining tables).
 
 ---
 
