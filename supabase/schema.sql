@@ -163,3 +163,45 @@ ALTER TABLE employees  ADD COLUMN IF NOT EXISTS shift_start    TIME NOT NULL DEF
 -- revogado — só logout/troca de senha avançam o sessions_valid_from e revogam de facto.
 ALTER TABLE employees
   ADD COLUMN IF NOT EXISTS sessions_valid_from TIMESTAMPTZ NOT NULL DEFAULT to_timestamp(0);
+
+-- v11 → v12: multi-tenancy foundation (issue #6, phase 1 / 5)
+-- Adds tenants table and a tenant_id column on every per-company entity.
+-- DEFAULT points at a deterministic "default" tenant so legacy INSERTs (that
+-- don't yet supply tenant_id) keep working until phase 2 wires the JWT through.
+CREATE TABLE IF NOT EXISTS tenants (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT        NOT NULL,
+  slug       TEXT        NOT NULL UNIQUE
+                         CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(slug) BETWEEN 2 AND 40),
+  domain     TEXT        UNIQUE,
+  plan       TEXT        NOT NULL DEFAULT 'standard',
+  active     BOOLEAN     NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO tenants (id, name, slug, plan)
+VALUES ('00000000-0000-0000-0000-000000000001', 'Default', 'default', 'standard')
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE employees             ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE records               ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE hour_bank_adjustments ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE audit_logs            ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE day_exceptions        ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE correction_requests   ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES tenants(id) ON DELETE RESTRICT;
+ALTER TABLE push_subscriptions    ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES tenants(id) ON DELETE RESTRICT;
+
+ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_username_key;
+ALTER TABLE employees
+  ADD CONSTRAINT employees_tenant_username_key UNIQUE (tenant_id, username);
+
+CREATE INDEX IF NOT EXISTS idx_employees_tenant            ON employees(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_records_tenant_date         ON records(tenant_id, date);
+CREATE INDEX IF NOT EXISTS idx_records_tenant_emp_date     ON records(tenant_id, employee_id, date);
+CREATE INDEX IF NOT EXISTS idx_audit_tenant_created        ON audit_logs(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_corrections_tenant_status   ON correction_requests(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_bank_tenant_employee        ON hour_bank_adjustments(tenant_id, employee_id);
+CREATE INDEX IF NOT EXISTS idx_day_exceptions_tenant_date  ON day_exceptions(tenant_id, date);
+CREATE INDEX IF NOT EXISTS idx_push_tenant                 ON push_subscriptions(tenant_id);
+
+ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
