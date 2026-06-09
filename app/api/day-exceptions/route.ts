@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 
@@ -16,7 +17,7 @@ async function requirePrivileged() {
 export async function GET(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
 
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('day_exceptions')
     .select('*')
+    .eq('tenant_id', user.tenant_id)
     .order('date', { ascending: false })
     .limit(200)
 
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from('day_exceptions')
     .insert({
+      tenant_id: actor.tenant_id,
       date,
       type,
       description: trimmedDesc,

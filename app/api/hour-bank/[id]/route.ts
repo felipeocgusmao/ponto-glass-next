@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 
@@ -11,7 +12,7 @@ export async function DELETE(
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -21,6 +22,7 @@ export async function DELETE(
   const { data: adj } = await supabase
     .from('hour_bank_adjustments')
     .select('employee_id, minutes, reason')
+    .eq('tenant_id', user.tenant_id)
     .eq('id', params.id)
     .single()
 
@@ -29,10 +31,12 @@ export async function DELETE(
   const { data: emp } = await supabase
     .from('employees')
     .select('name')
+    .eq('tenant_id', user.tenant_id)
     .eq('id', adj.employee_id)
     .single()
 
-  const { error } = await supabase.from('hour_bank_adjustments').delete().eq('id', params.id)
+  const { error } = await supabase.from('hour_bank_adjustments').delete()
+    .eq('tenant_id', user.tenant_id).eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await logAudit(user, 'hour_bank_adjustment_delete',

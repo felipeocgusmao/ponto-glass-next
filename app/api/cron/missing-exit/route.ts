@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { businessDate } from '@/lib/utils'
+import { DEFAULT_TENANT_ID } from '@/lib/tenant'
 import webpush from 'web-push'
 
 if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -18,13 +19,19 @@ export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // TODO(phase-5): once super-admin can provision tenants, replace this with a
+  // loop over `SELECT id FROM tenants WHERE active = true`. Phase 2 always
+  // targets the default tenant — every employee in production lives there.
+  const tenantId = DEFAULT_TENANT_ID
+
   const today = businessDate()
   const dow = new Date(`${today}T12:00:00Z`).getUTCDay()
   if (dow === 0 || dow === 6)
     return NextResponse.json({ notified: 0, missing: 0, skipped: 'weekend' })
 
   const { data: exceptions } = await supabase
-    .from('day_exceptions').select('employee_id').eq('date', today)
+    .from('day_exceptions').select('employee_id')
+    .eq('tenant_id', tenantId).eq('date', today)
   if ((exceptions ?? []).some(e => !e.employee_id))
     return NextResponse.json({ notified: 0, missing: 0, skipped: 'holiday' })
 
@@ -32,13 +39,13 @@ export async function GET(request: NextRequest) {
 
   const { data: entries } = await supabase
     .from('records').select('employee_id, employee_name')
-    .eq('date', today).eq('type', 'entrada')
+    .eq('tenant_id', tenantId).eq('date', today).eq('type', 'entrada')
   if (!entries?.length) return NextResponse.json({ notified: 0, missing: 0 })
 
   const enteredIds = Array.from(new Set(entries.map(r => r.employee_id)))
   const { data: exits } = await supabase
     .from('records').select('employee_id')
-    .eq('date', today).eq('type', 'saída').in('employee_id', enteredIds)
+    .eq('tenant_id', tenantId).eq('date', today).eq('type', 'saída').in('employee_id', enteredIds)
 
   const exitedIds = new Set((exits ?? []).map(r => r.employee_id))
   const missing = entries
@@ -48,10 +55,11 @@ export async function GET(request: NextRequest) {
   if (!missing.length) return NextResponse.json({ notified: 0, missing: 0 })
 
   const { data: adminIds } = await supabase
-    .from('employees').select('id').in('role', ['admin', 'manager']).eq('active', true)
+    .from('employees').select('id')
+    .eq('tenant_id', tenantId).in('role', ['admin', 'manager']).eq('active', true)
   const { data: subs } = await supabase
     .from('push_subscriptions').select('subscription')
-    .in('employee_id', (adminIds ?? []).map(e => e.id))
+    .eq('tenant_id', tenantId).in('employee_id', (adminIds ?? []).map(e => e.id))
 
   if (!subs?.length) return NextResponse.json({ notified: 0, missing: missing.length })
 

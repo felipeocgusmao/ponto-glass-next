@@ -2,21 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import {
   calcWorkedMinutesPeriod,
   calcOvertimePeriod,
   isIncompleteDay,
 } from '@/lib/utils'
 import { sendMonthlyReportEmployeeEmail, sendMonthlyReportAdminEmail } from '@/lib/email'
+import { DEFAULT_TENANT_ID } from '@/lib/tenant'
 import type { Employee, PunchRecord } from '@/lib/types'
 
-interface ReportParams { year: number; month: number }
+interface ReportParams { year: number; month: number; tenantId: string }
 
-function prevMonthParams(): ReportParams {
+function prevMonthParams(tenantId: string): ReportParams {
   const now = new Date()
   const month = now.getMonth() === 0 ? 12 : now.getMonth()
   const year  = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
-  return { year, month }
+  return { year, month, tenantId }
 }
 
 function buildRange(p: ReportParams): { from: string; to: string; label: string } {
@@ -34,6 +36,7 @@ async function runReport(params: ReportParams) {
   const { data: employees } = await supabase
     .from('employees')
     .select('id, name, email, role, workday_hours, lunch_break_minutes, hourly_rate, active')
+    .eq('tenant_id', params.tenantId)
     .eq('active', true)
 
   if (!employees?.length) return { sent: 0, period: label }
@@ -41,6 +44,7 @@ async function runReport(params: ReportParams) {
   const { data: records } = await supabase
     .from('records')
     .select('*')
+    .eq('tenant_id', params.tenantId)
     .gte('date', from)
     .lte('date', to)
     .order('timestamp', { ascending: true })
@@ -112,7 +116,8 @@ export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const result = await runReport(prevMonthParams())
+  // TODO(phase-5): loop over active tenants. Phase 2 always uses the default.
+  const result = await runReport(prevMonthParams(DEFAULT_TENANT_ID))
   return NextResponse.json(result)
 }
 
@@ -121,7 +126,7 @@ export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -132,9 +137,11 @@ export async function POST(request: NextRequest) {
   const reqYear  = body.year  != null ? Number(body.year)  : NaN
   const reqMonth = body.month != null ? Number(body.month) : NaN
   const hasValid = !isNaN(reqYear) && !isNaN(reqMonth) && reqMonth >= 1 && reqMonth <= 12 && reqYear >= 2020 && reqYear <= 2100
+  // Manual trigger always reports on the actor's tenant — admins of company A
+  // cannot generate company B's monthly report.
   const params: ReportParams = hasValid
-    ? { year: reqYear, month: reqMonth }
-    : prevMonthParams()
+    ? { year: reqYear, month: reqMonth, tenantId: user.tenant_id }
+    : prevMonthParams(user.tenant_id)
 
   const result = await runReport(params)
   return NextResponse.json(result)

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { createPasswordResetToken } from '@/lib/auth'
 import { sendPasswordResetEmail } from '@/lib/email'
+import { resolveLoginTenant } from '@/lib/tenant'
 
 export async function POST(request: NextRequest) {
   const ip = clientIp(request)
@@ -14,10 +15,15 @@ export async function POST(request: NextRequest) {
   if (!username?.trim())
     return NextResponse.json({ error: 'Username obrigatório' }, { status: 400 })
 
+  // Resolve the tenant the same way login does so the username lookup matches
+  // the tenant-scoped uniqueness constraint.
+  const tenantId = await resolveLoginTenant(request)
+
   // Always return success to prevent username enumeration
   const { data: emp } = await supabase
     .from('employees')
     .select('id, name, email, password_hash')
+    .eq('tenant_id', tenantId)
     .eq('username', String(username).trim().toLowerCase())
     .eq('active', true)
     .maybeSingle()

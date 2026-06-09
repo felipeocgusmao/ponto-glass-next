@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcWorkDate } from '@/lib/utils'
@@ -12,7 +13,7 @@ export async function PATCH(
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -29,9 +30,11 @@ export async function PATCH(
     // Re-derive the work date in the business timezone, honouring the employee's shift,
     // so an edited punch stays filed under the day it was actually worked.
     const { data: rec } = await supabase
-      .from('records').select('employee_id').eq('id', params.id).single()
+      .from('records').select('employee_id')
+      .eq('tenant_id', user.tenant_id).eq('id', params.id).single()
     const { data: emp } = rec
-      ? await supabase.from('employees').select('shift_start').eq('id', rec.employee_id).maybeSingle()
+      ? await supabase.from('employees').select('shift_start')
+          .eq('tenant_id', user.tenant_id).eq('id', rec.employee_id).maybeSingle()
       : { data: null }
     updates.timestamp = parsed.toISOString()
     updates.date = calcWorkDate(parsed, emp?.shift_start ?? '00:00')
@@ -47,6 +50,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from('records')
     .update(updates)
+    .eq('tenant_id', user.tenant_id)
     .eq('id', params.id)
     .select()
     .single()
@@ -68,7 +72,7 @@ export async function DELETE(
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -76,9 +80,11 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: rec } = await supabase
-    .from('records').select('employee_id, employee_name, type, date').eq('id', params.id).single()
+    .from('records').select('employee_id, employee_name, type, date')
+    .eq('tenant_id', user.tenant_id).eq('id', params.id).single()
 
-  const { error } = await supabase.from('records').delete().eq('id', params.id)
+  const { error } = await supabase.from('records').delete()
+    .eq('tenant_id', user.tenant_id).eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   if (rec) {

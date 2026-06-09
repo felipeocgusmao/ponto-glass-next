@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 
@@ -12,7 +13,7 @@ export async function PATCH(
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -33,10 +34,12 @@ export async function PATCH(
     if (!['admin', 'manager', 'employee'].includes(role))
       return NextResponse.json({ error: 'Perfil inválido' }, { status: 400 })
     if (role !== 'admin') {
-      const { data: target } = await supabase.from('employees').select('role').eq('id', params.id).single()
+      const { data: target } = await supabase.from('employees').select('role')
+        .eq('tenant_id', user.tenant_id).eq('id', params.id).single()
       if (target?.role === 'admin') {
         const { count } = await supabase
-          .from('employees').select('*', { count: 'exact', head: true }).eq('role', 'admin').eq('active', true)
+          .from('employees').select('*', { count: 'exact', head: true })
+          .eq('tenant_id', user.tenant_id).eq('role', 'admin').eq('active', true)
         if ((count ?? 0) <= 1)
           return NextResponse.json({ error: 'Não é possível rebaixar o último administrador' }, { status: 400 })
       }
@@ -50,8 +53,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Usuário deve ter entre 3 e 50 caracteres' }, { status: 400 })
     if (!/^[a-z0-9._-]+$/.test(trimmed))
       return NextResponse.json({ error: 'Usuário só pode conter letras, números, ponto, hífen e underscore' }, { status: 400 })
+    // Tenant-scoped uniqueness check matches the new constraint.
     const { data: existing } = await supabase
-      .from('employees').select('id').eq('username', trimmed).single()
+      .from('employees').select('id')
+      .eq('tenant_id', user.tenant_id).eq('username', trimmed).single()
     if (existing && existing.id !== params.id)
       return NextResponse.json({ error: 'Usuário já está em uso' }, { status: 400 })
     updates.username = trimmed
@@ -117,9 +122,12 @@ export async function PATCH(
   if (Object.keys(updates).length === 0)
     return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 })
 
+  // Tenant filter on every write protects against cross-tenant IDOR even if
+  // someone supplies an id from another tenant.
   const { data, error } = await supabase
     .from('employees')
     .update(updates)
+    .eq('tenant_id', user.tenant_id)
     .eq('id', params.id)
     .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, lock_profile, expected_start, expected_end, shift_start')
     .single()
@@ -136,6 +144,7 @@ export async function PATCH(
     await supabase
       .from('employees')
       .update({ sessions_valid_from: new Date().toISOString() })
+      .eq('tenant_id', user.tenant_id)
       .eq('id', params.id)
   }
 
@@ -149,7 +158,7 @@ export async function DELETE(
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -159,6 +168,7 @@ export async function DELETE(
   const { data: target } = await supabase
     .from('employees')
     .select('role')
+    .eq('tenant_id', user.tenant_id)
     .eq('id', params.id)
     .single()
 
@@ -168,6 +178,7 @@ export async function DELETE(
     const { count } = await supabase
       .from('employees')
       .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', user.tenant_id)
       .eq('role', 'admin')
       .eq('active', true)
 
@@ -179,11 +190,13 @@ export async function DELETE(
     }
   }
 
-  const { data: emp } = await supabase.from('employees').select('name').eq('id', params.id).single()
+  const { data: emp } = await supabase.from('employees').select('name')
+    .eq('tenant_id', user.tenant_id).eq('id', params.id).single()
 
   const { error } = await supabase
     .from('employees')
     .update({ active: false })
+    .eq('tenant_id', user.tenant_id)
     .eq('id', params.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

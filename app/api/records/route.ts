@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcWorkDate } from '@/lib/utils'
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -21,7 +22,9 @@ export async function GET(request: NextRequest) {
   const employeeId = searchParams.get('employeeId')
   const isPrivileged = user.role === 'admin' || user.role === 'manager'
 
-  let query = supabase.from('records').select('*').order('timestamp', { ascending: true })
+  let query = supabase.from('records').select('*')
+    .eq('tenant_id', user.tenant_id)
+    .order('timestamp', { ascending: true })
 
   // Scope: a non-privileged user only sees themselves; an admin/manager sees a
   // specific employee when employeeId is given (and not 'all'), otherwise everyone.
@@ -37,11 +40,13 @@ export async function GET(request: NextRequest) {
     // Match how /api/punch dates records, or in-progress shifts vanish after midnight.
     if (singleEmpId) {
       const { data: emp } = await supabase
-        .from('employees').select('shift_start').eq('id', singleEmpId).single()
+        .from('employees').select('shift_start')
+        .eq('tenant_id', user.tenant_id).eq('id', singleEmpId).single()
       query = query.eq('date', calcWorkDate(new Date(), emp?.shift_start ?? '00:00'))
     } else {
       const { data: emps } = await supabase
-        .from('employees').select('id, shift_start').eq('active', true)
+        .from('employees').select('id, shift_start')
+        .eq('tenant_id', user.tenant_id).eq('active', true)
       const now = new Date()
       const clauses = (emps ?? []).map(
         e => `and(employee_id.eq.${e.id},date.eq.${calcWorkDate(now, e.shift_start ?? '00:00')})`
@@ -64,7 +69,7 @@ export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -83,15 +88,18 @@ export async function POST(request: NextRequest) {
   if (!employeeId)
     return NextResponse.json({ error: 'Funcionário obrigatório' }, { status: 400 })
 
+  // The target employee must live in the actor's tenant — protects against
+  // an admin in tenant A punching for someone in tenant B.
   const { data: emp } = await supabase
-    .from('employees').select('name, shift_start').eq('id', employeeId).single()
+    .from('employees').select('name, shift_start')
+    .eq('tenant_id', user.tenant_id).eq('id', employeeId).single()
   if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
 
   const date = calcWorkDate(parsed, emp.shift_start ?? '00:00')
 
   const { data, error } = await supabase
     .from('records')
-    .insert({ employee_id: employeeId, employee_name: emp.name, type, timestamp: parsed.toISOString(), date })
+    .insert({ tenant_id: user.tenant_id, employee_id: employeeId, employee_name: emp.name, type, timestamp: parsed.toISOString(), date })
     .select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

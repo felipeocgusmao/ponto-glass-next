@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { BUSINESS_TZ, businessDate } from '@/lib/utils'
 import { businessClockMinutes, dueEntryReminderIds, formatClock, parseTimeToMinutes } from '@/lib/entryReminder'
+import { DEFAULT_TENANT_ID } from '@/lib/tenant'
 import webpush from 'web-push'
 
 const LOOK_AHEAD_MINUTES = 60
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // TODO(phase-5): iterate over active tenants. Phase 2 always uses the default.
+  const tenantId = DEFAULT_TENANT_ID
   const now = new Date()
   const today = businessDate(now)
   const dow = new Date(`${today}T12:00:00Z`).getUTCDay()
@@ -31,6 +34,7 @@ export async function GET(request: NextRequest) {
   const { data: exceptions } = await supabase
     .from('day_exceptions')
     .select('employee_id')
+    .eq('tenant_id', tenantId)
     .eq('date', today)
 
   if ((exceptions ?? []).some(e => !e.employee_id))
@@ -42,6 +46,7 @@ export async function GET(request: NextRequest) {
   const { data: employees } = await supabase
     .from('employees')
     .select('id, name, expected_start')
+    .eq('tenant_id', tenantId)
     .eq('active', true)
     .eq('role', 'employee')
     .not('expected_start', 'is', null)
@@ -54,6 +59,7 @@ export async function GET(request: NextRequest) {
   const { data: entries } = await supabase
     .from('records')
     .select('employee_id')
+    .eq('tenant_id', tenantId)
     .eq('date', today)
     .eq('type', 'entrada')
     .in('employee_id', ids)
@@ -66,6 +72,7 @@ export async function GET(request: NextRequest) {
   const { data: sentLogs } = await supabase
     .from('audit_logs')
     .select('target_id')
+    .eq('tenant_id', tenantId)
     .eq('action', ACTION)
     .contains('details', { date: today })
     .in('target_id', absentIds)
@@ -78,6 +85,7 @@ export async function GET(request: NextRequest) {
   const { data: subs } = await supabase
     .from('push_subscriptions')
     .select('employee_id, subscription')
+    .eq('tenant_id', tenantId)
     .in('employee_id', pendingEmployees.map(employee => employee.id))
 
   if (!subs?.length)
@@ -104,6 +112,7 @@ export async function GET(request: NextRequest) {
         await webpush.sendNotification(subscription as webpush.PushSubscription, payload)
         sent++
         logs.push({
+          tenant_id: tenantId,
           actor_id: null,
           actor_name: 'cron:entry-reminder',
           action: ACTION,
