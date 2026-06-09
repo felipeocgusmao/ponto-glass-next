@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 
 // Accepts both Web Push subscriptions (web) and native device tokens (iOS/Android).
@@ -11,7 +12,7 @@ import { supabase } from '@/lib/supabase'
 export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     const subscription = { native: true, token: body.token, platform: body.platform }
     const { error } = await supabase
       .from('push_subscriptions')
-      .upsert({ employee_id: user.id, subscription }, { onConflict: 'employee_id' })
+      .upsert({ tenant_id: user.tenant_id, employee_id: user.id, subscription }, { onConflict: 'employee_id' })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
   }
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
   if (!body?.endpoint) return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 })
   const { error } = await supabase
     .from('push_subscriptions')
-    .upsert({ employee_id: user.id, subscription: body }, { onConflict: 'employee_id' })
+    .upsert({ tenant_id: user.tenant_id, employee_id: user.id, subscription: body }, { onConflict: 'employee_id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
@@ -41,10 +42,11 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
-  await supabase.from('push_subscriptions').delete().eq('employee_id', user.id)
+  await supabase.from('push_subscriptions').delete()
+    .eq('tenant_id', user.tenant_id).eq('employee_id', user.id)
   return NextResponse.json({ ok: true })
 }

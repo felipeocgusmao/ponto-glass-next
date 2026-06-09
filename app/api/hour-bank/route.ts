@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcDayRounded, businessDate } from '@/lib/utils'
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -24,9 +25,13 @@ export async function GET(request: NextRequest) {
     const today = businessDate()
 
     const [{ data: emps }, { data: records }, { data: adjustments }] = await Promise.all([
-      supabase.from('employees').select('id, workday_hours, lunch_break_minutes').eq('active', true),
-      supabase.from('records').select('*').lt('date', today).order('timestamp', { ascending: true }),
-      supabase.from('hour_bank_adjustments').select('employee_id, minutes'),
+      supabase.from('employees').select('id, workday_hours, lunch_break_minutes')
+        .eq('tenant_id', user.tenant_id).eq('active', true),
+      supabase.from('records').select('*')
+        .eq('tenant_id', user.tenant_id)
+        .lt('date', today).order('timestamp', { ascending: true }),
+      supabase.from('hour_bank_adjustments').select('employee_id, minutes')
+        .eq('tenant_id', user.tenant_id),
     ])
 
     const empMap = new Map((emps ?? []).map(e => [e.id, e]))
@@ -72,6 +77,7 @@ export async function GET(request: NextRequest) {
   const { data: emp } = await supabase
     .from('employees')
     .select('workday_hours, lunch_break_minutes')
+    .eq('tenant_id', user.tenant_id)
     .eq('id', empId)
     .single()
 
@@ -82,6 +88,7 @@ export async function GET(request: NextRequest) {
   const { data: records } = await supabase
     .from('records')
     .select('*')
+    .eq('tenant_id', user.tenant_id)
     .eq('employee_id', empId)
     .lt('date', today)
     .order('timestamp', { ascending: true })
@@ -106,6 +113,7 @@ export async function GET(request: NextRequest) {
   const { data: adjustments } = await supabase
     .from('hour_bank_adjustments')
     .select('*')
+    .eq('tenant_id', user.tenant_id)
     .eq('employee_id', empId)
     .order('date', { ascending: false })
 
@@ -122,7 +130,7 @@ export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -138,12 +146,14 @@ export async function POST(request: NextRequest) {
   if (isNaN(parsedMinutes) || Math.abs(parsedMinutes) > 1440)
     return NextResponse.json({ error: 'Minutos inválidos (máx. ±1440)' }, { status: 400 })
 
-  const { data: emp } = await supabase.from('employees').select('name').eq('id', employeeId).single()
+  const { data: emp } = await supabase.from('employees').select('name')
+    .eq('tenant_id', user.tenant_id).eq('id', employeeId).single()
   if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
 
   const { data, error } = await supabase
     .from('hour_bank_adjustments')
     .insert({
+      tenant_id: user.tenant_id,
       employee_id: employeeId,
       minutes: parsedMinutes,
       reason: String(reason).trim(),

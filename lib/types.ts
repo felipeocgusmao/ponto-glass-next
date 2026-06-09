@@ -47,6 +47,15 @@ export interface JWTUser {
   name: string
   username: string
   role: 'admin' | 'manager' | 'employee'
+  // Optional only for backward compatibility with tokens issued before phase 2.
+  // verifyApiAuth always returns ApiUser, which has tenant_id populated from the DB.
+  tenant_id?: string
+}
+
+// Trusted user identity inside an authenticated API handler: same fields as
+// JWTUser but tenant_id is guaranteed (apiAuth loads it from the database).
+export interface ApiUser extends JWTUser {
+  tenant_id: string
 }
 
 export interface EmployeeProfile extends JWTUser {

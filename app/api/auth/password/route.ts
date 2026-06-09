@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { createJWT } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
@@ -9,7 +10,7 @@ export async function PUT(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Token inválido' }, { status: 401 }) }
 
@@ -24,6 +25,7 @@ export async function PUT(request: NextRequest) {
   const { data: emp } = await supabase
     .from('employees')
     .select('password_hash, lock_profile')
+    .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
     .single()
 
@@ -39,6 +41,7 @@ export async function PUT(request: NextRequest) {
   const { error } = await supabase
     .from('employees')
     .update({ password_hash: hash })
+    .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -49,9 +52,13 @@ export async function PUT(request: NextRequest) {
   await supabase
     .from('employees')
     .update({ sessions_valid_from: new Date(Date.now() - 2000).toISOString() })
+    .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
 
-  const fresh = await createJWT({ id: user.id, name: user.name, username: user.username, role: user.role })
+  const fresh = await createJWT({
+    id: user.id, name: user.name, username: user.username, role: user.role,
+    tenant_id: user.tenant_id,
+  })
   const res = NextResponse.json({ ok: true })
   res.cookies.set('ponto_token', fresh, {
     httpOnly: true,

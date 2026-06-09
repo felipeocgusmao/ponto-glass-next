@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcWorkDate } from '@/lib/utils'
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -26,9 +27,12 @@ export async function POST(request: NextRequest) {
 
   // Try to read the geofencing columns; if the migration hasn't been applied (v11
   // missing in older DBs), fall back to a basic select and skip geofencing checks.
+  // Every read is tenant-scoped so an admin in tenant A cannot resolve someone
+  // in tenant B by guessing their id.
   async function readEmployee(id: string, requireActive: boolean) {
     let q = supabase.from('employees')
       .select('id, name, shift_start, geo_mode, workplace_lat, workplace_lng, max_distance_meters')
+      .eq('tenant_id', user.tenant_id)
       .eq('id', id)
     if (requireActive) q = q.eq('active', true)
     const ext = await q.maybeSingle()
@@ -37,6 +41,7 @@ export async function POST(request: NextRequest) {
       // schema-cache miss or column does not exist → retry without geofencing columns
       let q2 = supabase.from('employees')
         .select('id, name, shift_start, geo_mode')
+        .eq('tenant_id', user.tenant_id)
         .eq('id', id)
       if (requireActive) q2 = q2.eq('active', true)
       const basic = await q2.maybeSingle()
@@ -86,6 +91,7 @@ export async function POST(request: NextRequest) {
 
   const { data: lastRec } = await supabase
     .from('records').select('type, timestamp')
+    .eq('tenant_id', user.tenant_id)
     .eq('employee_id', empId).order('timestamp', { ascending: false }).limit(1).maybeSingle()
   if (isDuplicatePunch(lastRec?.type, lastRec?.timestamp, type, punchTime))
     return NextResponse.json({ error: 'Registo duplicado. Aguarde um momento.' }, { status: 409 })
@@ -96,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('records')
-    .insert({ employee_id: empId, employee_name: empName, type, timestamp: punchTime.toISOString(), date: workDate, ...geoFields })
+    .insert({ tenant_id: user.tenant_id, employee_id: empId, employee_name: empName, type, timestamp: punchTime.toISOString(), date: workDate, ...geoFields })
     .select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

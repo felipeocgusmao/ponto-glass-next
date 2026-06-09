@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 
 export async function GET() {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -17,6 +18,7 @@ export async function GET() {
   const ext = await supabase
     .from('employees')
     .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, lock_profile, theme, expected_start, expected_end, shift_start')
+    .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
     .maybeSingle()
   if (ext.data) return NextResponse.json(ext.data)
@@ -24,6 +26,7 @@ export async function GET() {
   const basic = await supabase
     .from('employees')
     .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email')
+    .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
     .maybeSingle()
   if (!basic.data) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
@@ -34,7 +37,7 @@ export async function PATCH(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -49,6 +52,7 @@ export async function PATCH(request: NextRequest) {
     const { data: emp } = await supabase
       .from('employees')
       .select('lock_profile')
+      .eq('tenant_id', user.tenant_id)
       .eq('id', user.id)
       .single()
     if (emp?.lock_profile === true)
@@ -65,6 +69,7 @@ export async function PATCH(request: NextRequest) {
   const { error } = await supabase
     .from('employees')
     .update(updates)
+    .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

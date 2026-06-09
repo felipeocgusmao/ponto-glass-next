@@ -24,11 +24,13 @@ async function requirePrivileged() {
 }
 
 export async function GET() {
-  if (!await requirePrivileged()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const actor = await requirePrivileged()
+  if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data, error } = await supabase
     .from('employees')
     .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode')
+    .eq('tenant_id', actor.tenant_id)
     .eq('active', true)
     .order('created_at', { ascending: true })
 
@@ -80,8 +82,11 @@ export async function POST(request: NextRequest) {
   if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail))
     return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
 
+  // Username uniqueness is tenant-scoped now (employees_tenant_username_key).
   const { data: existing } = await supabase
-    .from('employees').select('id').eq('username', trimmedUsername).single()
+    .from('employees').select('id')
+    .eq('tenant_id', actor.tenant_id)
+    .eq('username', trimmedUsername).single()
 
   if (existing)
     return NextResponse.json({ error: 'Usuário já existe' }, { status: 400 })
@@ -90,6 +95,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from('employees')
     .insert({
+      tenant_id: actor.tenant_id,
       name: trimmedName, username: trimmedUsername, email: trimmedEmail, password_hash: hash, role,
       workday_hours: parsedWorkday, lunch_break_minutes: parsedLunch, hourly_rate: parsedRate,
     })

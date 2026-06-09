@@ -23,12 +23,14 @@ export async function DELETE(
   const { data: exc } = await supabase
     .from('day_exceptions')
     .select('date, description')
+    .eq('tenant_id', actor.tenant_id)
     .eq('id', params.id)
     .single()
 
   if (!exc) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 })
 
-  const { error } = await supabase.from('day_exceptions').delete().eq('id', params.id)
+  const { error } = await supabase.from('day_exceptions').delete()
+    .eq('tenant_id', actor.tenant_id).eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await logAudit(actor, 'day_exception_delete', null, { date: exc.date, description: exc.description })

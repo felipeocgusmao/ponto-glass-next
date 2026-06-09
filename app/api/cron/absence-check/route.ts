@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { businessDate } from '@/lib/utils'
+import { DEFAULT_TENANT_ID } from '@/lib/tenant'
 import webpush from 'web-push'
 
 // Guard so a deploy without VAPID keys doesn't crash this module at load
@@ -20,6 +21,9 @@ export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // TODO(phase-5): loop over active tenants once super-admin lands. Phase 2
+  // always targets the default tenant.
+  const tenantId = DEFAULT_TENANT_ID
   const today = businessDate()
 
   // Never flag absences on weekends.
@@ -29,6 +33,7 @@ export async function GET(request: NextRequest) {
   const { data: employees } = await supabase
     .from('employees')
     .select('id, name')
+    .eq('tenant_id', tenantId)
     .eq('active', true)
     .eq('role', 'employee')
 
@@ -38,6 +43,7 @@ export async function GET(request: NextRequest) {
   const { data: exceptions } = await supabase
     .from('day_exceptions')
     .select('employee_id')
+    .eq('tenant_id', tenantId)
     .eq('date', today)
   if ((exceptions ?? []).some(e => !e.employee_id))
     return NextResponse.json({ notified: 0, absent: 0, skipped: 'holiday' })
@@ -46,6 +52,7 @@ export async function GET(request: NextRequest) {
   const { data: entries } = await supabase
     .from('records')
     .select('employee_id')
+    .eq('tenant_id', tenantId)
     .eq('date', today)
     .eq('type', 'entrada')
 
@@ -57,7 +64,8 @@ export async function GET(request: NextRequest) {
   const { data: subs } = await supabase
     .from('push_subscriptions')
     .select('subscription, employee_id')
-    .in('employee_id', await getAdminIds())
+    .eq('tenant_id', tenantId)
+    .in('employee_id', await getAdminIds(tenantId))
 
   if (!subs?.length) return NextResponse.json({ notified: 0, absent: absent.length })
 
@@ -84,10 +92,11 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ notified: sent, absent: absent.length })
 }
 
-async function getAdminIds(): Promise<string[]> {
+async function getAdminIds(tenantId: string): Promise<string[]> {
   const { data } = await supabase
     .from('employees')
     .select('id')
+    .eq('tenant_id', tenantId)
     .in('role', ['admin', 'manager'])
     .eq('active', true)
   return (data ?? []).map(e => e.id)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import webpush from 'web-push'
 import { sendCorrectionEmail } from '@/lib/email'
@@ -17,7 +18,7 @@ if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && proce
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -31,6 +32,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const { data: cr } = await supabase
     .from('correction_requests')
     .select('*')
+    .eq('tenant_id', user.tenant_id)
     .eq('id', params.id)
     .single()
 
@@ -48,6 +50,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       reviewer_note: note || null,
       resolved_at: new Date().toISOString(),
     })
+    .eq('tenant_id', user.tenant_id)
     .eq('id', params.id)
     .eq('status', 'pending')
     .select()
@@ -61,11 +64,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { data: emp } = await supabase
       .from('employees')
       .select('shift_start')
+      .eq('tenant_id', user.tenant_id)
       .eq('id', cr.employee_id)
       .maybeSingle()
     const workDate = calcWorkDate(new Date(cr.req_timestamp), emp?.shift_start ?? '00:00')
 
     const { error: recErr } = await supabase.from('records').insert({
+      tenant_id: user.tenant_id,
       employee_id: cr.employee_id,
       employee_name: cr.employee_name,
       type: cr.req_type,
@@ -76,11 +81,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       // Roll the claim back to pending so it can be retried, rather than left approved-without-record.
       await supabase.from('correction_requests')
         .update({ status: 'pending', reviewer_id: null, reviewer_name: null, reviewer_note: null, resolved_at: null })
+        .eq('tenant_id', user.tenant_id)
         .eq('id', params.id)
       return NextResponse.json({ error: recErr.message }, { status: 500 })
     }
 
     await supabase.from('audit_logs').insert({
+      tenant_id: user.tenant_id,
       actor_id: user.id,
       actor_name: user.name,
       action: 'correction_approved',
@@ -90,6 +97,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     })
   } else {
     await supabase.from('audit_logs').insert({
+      tenant_id: user.tenant_id,
       actor_id: user.id,
       actor_name: user.name,
       action: 'correction_rejected',
@@ -105,6 +113,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       const { data: sub } = await supabase
         .from('push_subscriptions')
         .select('subscription')
+        .eq('tenant_id', user.tenant_id)
         .eq('employee_id', cr.employee_id)
         .maybeSingle()
 
@@ -128,6 +137,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const { data: empData } = await supabase
       .from('employees')
       .select('email, name')
+      .eq('tenant_id', user.tenant_id)
       .eq('id', cr.employee_id)
       .maybeSingle()
 

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { timingSafeEqual } from 'crypto'
 import { supabase } from '@/lib/supabase'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
+import { resolveLoginTenant } from '@/lib/tenant'
 
 function secretsMatch(a: string, b: string): boolean {
   const bufA = Buffer.from(a)
@@ -42,9 +43,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Senha deve ter entre 6 e 100 caracteres' }, { status: 400 })
   }
 
+  // Tenant-scoped lookup so the recovery key doesn't span companies.
+  const tenantId = await resolveLoginTenant(request)
   const { data: employee } = await supabase
     .from('employees')
     .select('id, role')
+    .eq('tenant_id', tenantId)
     .eq('username', String(username).trim().toLowerCase())
     .eq('active', true)
     .single()

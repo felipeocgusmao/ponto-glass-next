@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { calcWorkDate } from '@/lib/utils'
 import webpush from 'web-push'
@@ -18,7 +19,7 @@ const VALID_TYPES = ['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_
 export async function GET(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('correction_requests')
     .select('*')
+    .eq('tenant_id', user.tenant_id)
     .order('created_at', { ascending: false })
 
   if (!isPrivileged) query = query.eq('employee_id', user.id)
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  let user
+  let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
@@ -55,10 +57,12 @@ export async function POST(request: NextRequest) {
   if (!timestamp || isNaN(parsed.getTime()))
     return NextResponse.json({ error: 'Timestamp inválido' }, { status: 400 })
 
-  const { data: emp } = await supabase.from('employees').select('name, shift_start').eq('id', user.id).single()
+  const { data: emp } = await supabase.from('employees').select('name, shift_start')
+    .eq('tenant_id', user.tenant_id).eq('id', user.id).single()
   if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
 
   const { data, error } = await supabase.from('correction_requests').insert({
+    tenant_id: user.tenant_id,
     employee_id: user.id,
     employee_name: emp.name,
     req_type: type,
@@ -73,15 +77,19 @@ export async function POST(request: NextRequest) {
   // Notify admins/managers via push
   if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
     try {
+      // Admins/managers in the SAME tenant only — otherwise admins from other
+      // companies would receive the notification.
       const { data: privileged } = await supabase
         .from('employees')
         .select('id')
+        .eq('tenant_id', user.tenant_id)
         .in('role', ['admin', 'manager'])
         .eq('active', true)
       if (privileged?.length) {
         const { data: subs } = await supabase
           .from('push_subscriptions')
           .select('subscription')
+          .eq('tenant_id', user.tenant_id)
           .in('employee_id', privileged.map(e => e.id))
         const payload = JSON.stringify({
           title: '📋 Correção pendente',
