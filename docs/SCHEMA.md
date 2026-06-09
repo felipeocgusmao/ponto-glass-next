@@ -14,6 +14,13 @@ columns relate, and which APIs touch them.
 
 ```mermaid
 erDiagram
+    tenants ||--o{ employees : "owns"
+    tenants ||--o{ records : "scopes"
+    tenants ||--o{ correction_requests : "scopes"
+    tenants ||--o{ day_exceptions : "scopes"
+    tenants ||--o{ audit_logs : "scopes"
+    tenants ||--o{ hour_bank_adjustments : "scopes"
+    tenants ||--o{ push_subscriptions : "scopes"
     employees ||--o{ records : "registers punches"
     employees ||--o{ hour_bank_adjustments : "receives adjustments"
     employees ||--o{ day_exceptions : "per-employee day off/holiday"
@@ -21,6 +28,31 @@ erDiagram
     employees ||--o{ push_subscriptions : "owns subscriptions"
     employees ||--o{ audit_logs : "is actor of"
 ```
+
+> **Multi-tenancy phase 1 (v12):** every entity now carries a `tenant_id` that
+> references a row in `tenants`. During the migration, all existing rows are
+> backfilled into a deterministic *default* tenant (`00000000-0000-0000-0000-000000000001`)
+> and the column has a `DEFAULT` pointing at it, so single-tenant deployments
+> keep working unchanged. Phase 2 (issue #6) wires the JWT and API filters to
+> the value; phase 4 (issue #5) resolves the value from the request host.
+
+---
+
+## `tenants`
+
+A "tenant" is one company using the platform. Phase 1 creates a single default
+tenant and stamps it onto every existing row so the codebase compiles without
+behavioural change.
+
+| Column      | Type          | Notes                                                            |
+|-------------|---------------|------------------------------------------------------------------|
+| `id`        | `uuid`        | Primary key; the well-known default is `…0001`.                  |
+| `name`      | `text`        | Company display name.                                            |
+| `slug`      | `text` UNIQUE | URL-safe handle (`a-z0-9-`, 2-40 chars). Used by `slug.pontoglass.app`. |
+| `domain`    | `text` UNIQUE | Optional custom domain (`ponto.empresa.com`); wired in phase 4.  |
+| `plan`      | `text`        | Billing tier (`standard`, future: `pro`, etc.).                  |
+| `active`    | `boolean`     | Soft-disable a tenant without dropping data.                     |
+| `created_at`| `timestamptz` |                                                                  |
 
 ---
 

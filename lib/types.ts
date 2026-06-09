@@ -1,3 +1,13 @@
+export interface Tenant {
+  id: string
+  name: string
+  slug: string
+  domain: string | null
+  plan: string
+  active: boolean
+  created_at: string
+}
+
 export interface Employee {
   id: string
   name: string
