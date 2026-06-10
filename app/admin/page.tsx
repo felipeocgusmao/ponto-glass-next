@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
 import type { Employee, EmployeeProfile } from '@/lib/types'
-import { Tab, ALL_TABS, MANAGER_TABS } from './_lib/types'
+import { Tab, ALL_TABS, MANAGER_TABS, SUPER_ADMIN_TABS } from './_lib/types'
 import Sidebar from './_components/Sidebar'
 import TopBar from './_components/TopBar'
 import CommandPalette from './_components/CommandPalette'
@@ -37,6 +37,7 @@ const FeriadosTab   = dynamic(() => import('./_components/tabs/FeriadosTab').the
 const RelatoriosTab = dynamic(() => import('./_components/tabs/RelatoriosTab').then(m => ({ default: m.RelatoriosTab })), { loading: TabSkeleton })
 const AuditoriaTab  = dynamic(() => import('./_components/tabs/AuditoriaTab').then(m => ({ default: m.AuditoriaTab })), { loading: TabSkeleton })
 const CorrecoesTab  = dynamic(() => import('./_components/tabs/CorrecoesTab').then(m => ({ default: m.CorrecoesTab })), { loading: TabSkeleton })
+const EmpresasTab   = dynamic(() => import('./_components/tabs/EmpresasTab').then(m => ({ default: m.EmpresasTab })), { loading: TabSkeleton })
 
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
@@ -56,7 +57,10 @@ export default function AdminPage() {
   const { items: notifItems } = useNotifications({ pendingCorrections, employees })
 
   const isManager = user?.role === 'manager'
-  const visibleTabs = isManager ? MANAGER_TABS : ALL_TABS
+  // Super-admins (platform operators) get the extra "Empresas" tab.
+  const visibleTabs = isManager
+    ? MANAGER_TABS
+    : (user?.super_admin ? [...ALL_TABS, ...SUPER_ADMIN_TABS] : ALL_TABS)
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
@@ -224,6 +228,7 @@ export default function AdminPage() {
           {tab === 'relatorios'   && <RelatoriosTab employees={employees} />}
           {tab === 'correcoes'    && <CorrecoesTab onAction={refreshPendingCount} />}
           {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
+          {tab === 'empresas'     && user.super_admin === true && <EmpresasTab />}
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { BUSINESS_TZ, businessDate } from '@/lib/utils'
 import { businessClockMinutes, dueEntryReminderIds, formatClock, parseTimeToMinutes } from '@/lib/entryReminder'
-import { DEFAULT_TENANT_ID } from '@/lib/tenant'
+import { activeTenantIds } from '@/lib/tenant'
 import webpush from 'web-push'
 
 const LOOK_AHEAD_MINUTES = 60
@@ -23,22 +23,33 @@ export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // TODO(phase-5): iterate over active tenants. Phase 2 always uses the default.
-  const tenantId = DEFAULT_TENANT_ID
   const now = new Date()
   const today = businessDate(now)
   const dow = new Date(`${today}T12:00:00Z`).getUTCDay()
   if (dow === 0 || dow === 6)
     return NextResponse.json({ notified: 0, due: 0, skipped: 'weekend' })
 
+  // One pass per active tenant — each company has its own holiday calendar,
+  // employees and subscriptions.
+  let notified = 0
+  let due = 0
+  for (const tenantId of await activeTenantIds()) {
+    const r = await runTenant(tenantId, now, today)
+    notified += r.notified
+    due += r.due
+  }
+
+  return NextResponse.json({ notified, due })
+}
+
+async function runTenant(tenantId: string, now: Date, today: string): Promise<{ notified: number; due: number }> {
   const { data: exceptions } = await supabase
     .from('day_exceptions')
     .select('employee_id')
     .eq('tenant_id', tenantId)
     .eq('date', today)
 
-  if ((exceptions ?? []).some(e => !e.employee_id))
-    return NextResponse.json({ notified: 0, due: 0, skipped: 'holiday' })
+  if ((exceptions ?? []).some(e => !e.employee_id)) return { notified: 0, due: 0 }
 
   const offIds = new Set((exceptions ?? []).map(e => e.employee_id).filter(Boolean))
   const nowMinutes = businessClockMinutes(now, BUSINESS_TZ)
@@ -53,7 +64,7 @@ export async function GET(request: NextRequest) {
 
   const dueIds = dueEntryReminderIds(employees ?? [], nowMinutes, LOOK_AHEAD_MINUTES)
   const dueEmployees = (employees ?? []).filter(employee => dueIds.has(employee.id) && !offIds.has(employee.id))
-  if (!dueEmployees.length) return NextResponse.json({ notified: 0, due: 0 })
+  if (!dueEmployees.length) return { notified: 0, due: 0 }
 
   const ids = dueEmployees.map(employee => employee.id)
   const { data: entries } = await supabase
@@ -66,7 +77,7 @@ export async function GET(request: NextRequest) {
 
   const presentIds = new Set((entries ?? []).map(r => r.employee_id))
   const absentEmployees = dueEmployees.filter(employee => !presentIds.has(employee.id))
-  if (!absentEmployees.length) return NextResponse.json({ notified: 0, due: dueEmployees.length })
+  if (!absentEmployees.length) return { notified: 0, due: dueEmployees.length }
 
   const absentIds = absentEmployees.map(employee => employee.id)
   const { data: sentLogs } = await supabase
@@ -79,8 +90,7 @@ export async function GET(request: NextRequest) {
 
   const alreadySentIds = new Set((sentLogs ?? []).map(log => log.target_id).filter(Boolean))
   const pendingEmployees = absentEmployees.filter(employee => !alreadySentIds.has(employee.id))
-  if (!pendingEmployees.length)
-    return NextResponse.json({ notified: 0, due: dueEmployees.length, already_sent: absentEmployees.length })
+  if (!pendingEmployees.length) return { notified: 0, due: dueEmployees.length }
 
   const { data: subs } = await supabase
     .from('push_subscriptions')
@@ -88,8 +98,7 @@ export async function GET(request: NextRequest) {
     .eq('tenant_id', tenantId)
     .in('employee_id', pendingEmployees.map(employee => employee.id))
 
-  if (!subs?.length)
-    return NextResponse.json({ notified: 0, due: dueEmployees.length, without_subscription: pendingEmployees.length })
+  if (!subs?.length) return { notified: 0, due: dueEmployees.length }
 
   const subByEmployee = new Map(subs.map(sub => [sub.employee_id, sub.subscription]))
   let sent = 0
@@ -126,5 +135,5 @@ export async function GET(request: NextRequest) {
 
   if (logs.length) await supabase.from('audit_logs').insert(logs)
 
-  return NextResponse.json({ notified: sent, due: dueEmployees.length, pending: pendingEmployees.length })
+  return { notified: sent, due: dueEmployees.length }
 }

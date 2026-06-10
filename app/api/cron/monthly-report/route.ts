@@ -9,7 +9,7 @@ import {
   isIncompleteDay,
 } from '@/lib/utils'
 import { sendMonthlyReportEmployeeEmail, sendMonthlyReportAdminEmail } from '@/lib/email'
-import { DEFAULT_TENANT_ID } from '@/lib/tenant'
+import { activeTenantIds } from '@/lib/tenant'
 import type { Employee, PunchRecord } from '@/lib/types'
 
 interface ReportParams { year: number; month: number; tenantId: string }
@@ -116,9 +116,16 @@ export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // TODO(phase-5): loop over active tenants. Phase 2 always uses the default.
-  const result = await runReport(prevMonthParams(DEFAULT_TENANT_ID))
-  return NextResponse.json(result)
+  // One report per active tenant — employees and admins of each company only
+  // ever see their own numbers.
+  let sent = 0
+  let period = ''
+  for (const tenantId of await activeTenantIds()) {
+    const result = await runReport(prevMonthParams(tenantId))
+    sent += result.sent
+    period = result.period
+  }
+  return NextResponse.json({ sent, period })
 }
 
 // ── Manual trigger from admin panel ───────────────────────────────────────────

@@ -17,7 +17,7 @@ export async function GET() {
   // sign in instead of being kicked into a logout loop on every refresh.
   const ext = await supabase
     .from('employees')
-    .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, lock_profile, theme, expected_start, expected_end, shift_start')
+    .select('id, name, username, role, super_admin, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, lock_profile, theme, expected_start, expected_end, shift_start')
     .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
     .maybeSingle()

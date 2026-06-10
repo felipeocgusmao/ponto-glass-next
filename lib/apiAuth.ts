@@ -14,15 +14,25 @@ import type { ApiUser } from './types'
 export async function verifyApiAuth(token: string): Promise<ApiUser> {
   const { user, iat } = await verifyJWTWithMeta(token)
 
-  const { data, error } = await supabase
+  // Newest column set first; retry without super_admin for databases that
+  // haven't run the phase-5 migration yet, so revocation keeps working there.
+  let row = await supabase
     .from('employees')
-    .select('active, sessions_valid_from, tenant_id')
+    .select('active, sessions_valid_from, tenant_id, super_admin')
     .eq('id', user.id)
     .maybeSingle()
+  if (row.error) {
+    row = await supabase
+      .from('employees')
+      .select('active, sessions_valid_from, tenant_id')
+      .eq('id', user.id)
+      .maybeSingle()
+  }
+  const { data, error } = row
 
   // Column missing / transient error: fall back to the JWT-claimed tenant_id, or the
   // well-known default if even that isn't there (pre-phase-2 tokens). Don't lock users out.
-  if (error) return { ...user, tenant_id: user.tenant_id ?? DEFAULT_TENANT_ID }
+  if (error) return { ...user, tenant_id: user.tenant_id ?? DEFAULT_TENANT_ID, super_admin: false }
   if (!data) throw new Error('Unknown user')
   if (data.active === false) throw new Error('Account inactive')
 
@@ -31,9 +41,14 @@ export async function verifyApiAuth(token: string): Promise<ApiUser> {
     : 0
   if (iat < validFrom) throw new Error('Session revoked')
 
-  // The database is the source of truth for tenant membership. If a token were
-  // forged with a different tenant_id (would require leaking JWT_SECRET), the
-  // DB value still wins and limits the blast radius to whatever the actual
-  // employee row allows.
-  return { ...user, tenant_id: (data as { tenant_id?: string }).tenant_id ?? user.tenant_id ?? DEFAULT_TENANT_ID }
+  // The database is the source of truth for tenant membership and platform
+  // scope. If a token were forged with a different tenant_id (would require
+  // leaking JWT_SECRET), the DB value still wins and limits the blast radius
+  // to whatever the actual employee row allows.
+  const fields = data as { tenant_id?: string; super_admin?: boolean }
+  return {
+    ...user,
+    tenant_id: fields.tenant_id ?? user.tenant_id ?? DEFAULT_TENANT_ID,
+    super_admin: fields.super_admin === true,
+  }
 }

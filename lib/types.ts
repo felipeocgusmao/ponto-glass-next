@@ -53,12 +53,15 @@ export interface JWTUser {
 }
 
 // Trusted user identity inside an authenticated API handler: same fields as
-// JWTUser but tenant_id is guaranteed (apiAuth loads it from the database).
+// JWTUser but tenant_id is guaranteed and super_admin is always present —
+// both loaded fresh from the database, never trusted from the token.
 export interface ApiUser extends JWTUser {
   tenant_id: string
+  super_admin: boolean
 }
 
 export interface EmployeeProfile extends JWTUser {
+  super_admin?: boolean
   workday_hours: number
   lunch_break_minutes: number
   hourly_rate: number | null

@@ -1,6 +1,11 @@
 'use client'
 
-export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes'
+export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes' | 'empresas'
+
+// Appended to ALL_TABS only for super-admins (platform operators).
+export const SUPER_ADMIN_TABS: { id: Tab; label: string }[] = [
+  { id: 'empresas', label: 'Empresas' },
+]
 
 export const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'meu_ponto',    label: 'Meu Ponto'  },
@@ -42,4 +47,6 @@ export const AUDIT_LABELS: Record<string, string> = {
   day_exception_delete:         '🗑 Feriado/folga removido',
   correction_approved:          '✅ Correção aprovada',
   correction_rejected:          '✕ Correção rejeitada',
+  tenant_create:                '🏢 Empresa criada',
+  tenant_update:                '✏ Empresa atualizada',
 }

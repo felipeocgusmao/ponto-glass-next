@@ -243,3 +243,15 @@ CREATE POLICY "block_anon_day_exceptions"     ON day_exceptions        AS RESTRI
 CREATE POLICY "block_anon_hour_bank"          ON hour_bank_adjustments AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
 CREATE POLICY "block_anon_push_subscriptions" ON push_subscriptions    AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
 CREATE POLICY "block_anon_tenants"            ON tenants               AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
+
+-- v13 → v14: phase 5 of multi-tenancy — super-admin flag (platform operator).
+-- Active admins of the default tenant are backfilled as super-admins; they
+-- were the de-facto platform owners before multi-tenancy existed.
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS super_admin BOOLEAN NOT NULL DEFAULT false;
+
+UPDATE employees
+SET super_admin = true
+WHERE tenant_id = '00000000-0000-0000-0000-000000000001'
+  AND role = 'admin'
+  AND active = true;
