@@ -1,26 +1,77 @@
 // Multi-tenancy constants and helpers.
 
 import type { NextRequest } from 'next/server'
+import { supabase } from './supabase'
 
 // Deterministic id of the default tenant created by migration 20260609.
 // Every row that pre-dates multi-tenancy belongs here, and every legacy INSERT
 // that omits tenant_id picks it up via the column DEFAULT.
 export const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 
+// Root domain that serves one subdomain per tenant (e.g. 'pontoglass.app' →
+// empresa-a.pontoglass.app). Optional: when unset, subdomain routing is off and
+// every host resolves to the default tenant (single-tenant behaviour).
+const TENANT_ROOT_DOMAIN = (process.env.NEXT_PUBLIC_TENANT_ROOT_DOMAIN ?? '').toLowerCase()
+
+/** Hostname of the request, lowercased, without port. Vercel forwards the
+ * original host in x-forwarded-host; plain `host` covers local dev. */
+export function requestHost(request: NextRequest): string {
+  const raw = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? ''
+  return raw.split(',')[0].trim().split(':')[0].toLowerCase()
+}
+
 /**
- * Decide which tenant a login attempt belongs to.
+ * Decide which tenant a login attempt belongs to, based on the host the user
+ * is visiting (phase 4 of issue #6 / closes issue #5):
  *
- * Phase 2: there is only one tenant in production (the default), so we always
- * return it. Phase 4 will swap this for a host-based lookup so
- * `empresa-a.pontoglass.app` and `empresa-b.pontoglass.app` resolve to
- * different tenant ids before the username is matched.
+ *   1. A registered custom domain (tenants.domain = host) wins.
+ *   2. `<slug>.<TENANT_ROOT_DOMAIN>` resolves by slug. A slug that matches no
+ *      active tenant returns null — the caller should refuse the login rather
+ *      than silently authenticating against the wrong company.
+ *   3. Everything else (apex, www, localhost, *.vercel.app previews, or when
+ *      TENANT_ROOT_DOMAIN is unset) falls back to the default tenant, which
+ *      preserves single-tenant behaviour exactly.
  *
- * Keep the signature stable now so phase 2 callers (login, forgot-password,
- * recover) don't need to change again in phase 4.
+ * Session isolation between subdomains does not depend on this function:
+ * the `ponto_token` cookie is host-only (no Domain attribute), so it never
+ * travels to a sibling subdomain, and every API query filters by the
+ * tenant_id embedded in the JWT at login.
  */
-// The argument will be used in phase 4 to resolve the tenant from the host.
-// Kept in the signature now so callers are already wired correctly.
-export async function resolveLoginTenant(request: NextRequest): Promise<string> {
-  void request
+export async function resolveLoginTenant(request: NextRequest): Promise<string | null> {
+  const host = requestHost(request)
+  if (!host) return DEFAULT_TENANT_ID
+
+  // 1. Custom domain (ponto.empresa.com). Lookup failures (table missing
+  // pre-migration, transient errors) degrade to the default tenant — login
+  // must keep working on single-tenant deployments that never ran phase 1.
+  const { data: byDomain } = await supabase
+    .from('tenants')
+    .select('id')
+    .eq('domain', host)
+    .eq('active', true)
+    .maybeSingle()
+  if (byDomain?.id) return byDomain.id
+
+  // 2. Slug subdomain under the configured root domain.
+  if (TENANT_ROOT_DOMAIN && host.endsWith(`.${TENANT_ROOT_DOMAIN}`)) {
+    const slug = host.slice(0, -(TENANT_ROOT_DOMAIN.length + 1))
+    // The apex and www serve the main (default) app, not a tenant.
+    if (!slug || slug === 'www') return DEFAULT_TENANT_ID
+    // Nested subdomains (a.b.root) are not tenant slugs.
+    if (slug.includes('.')) return DEFAULT_TENANT_ID
+
+    const { data: bySlug } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('slug', slug)
+      .eq('active', true)
+      .maybeSingle()
+    // Unknown slug: refuse instead of falling back — authenticating a user
+    // against the default tenant while the URL claims another company would
+    // be a confusing (and dangerous) mismatch.
+    return bySlug?.id ?? null
+  }
+
+  // 3. Anything else: single-tenant behaviour.
   return DEFAULT_TENANT_ID
 }

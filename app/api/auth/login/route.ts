@@ -21,9 +21,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Usuário e senha são obrigatórios' }, { status: 400 })
   }
 
-  // Which tenant is this login attempt for? Phase 2: always the default tenant.
-  // Phase 4 will resolve it from the request host (empresa-a.pontoglass.app).
+  // Which tenant is this login attempt for? Resolved from the host (custom
+  // domain → slug subdomain → default). Null means the URL names a tenant
+  // subdomain that doesn't exist — refuse instead of guessing.
   const tenantId = await resolveLoginTenant(request)
+  if (!tenantId) {
+    return NextResponse.json(
+      { error: 'Empresa não encontrada para este endereço. Verifique o link com o seu administrador.' },
+      { status: 404 }
+    )
+  }
 
   // First-run bootstrap: create the initial admin ONLY from an explicit env-provided
   // password. Never seed a hardcoded default (e.g. "admin123") — on a public deploy that

@@ -43,8 +43,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Senha deve ter entre 6 e 100 caracteres' }, { status: 400 })
   }
 
-  // Tenant-scoped lookup so the recovery key doesn't span companies.
+  // Tenant-scoped lookup so the recovery key doesn't span companies. Null =
+  // unknown tenant subdomain; answer success without acting (no enumeration).
   const tenantId = await resolveLoginTenant(request)
+  if (!tenantId) return NextResponse.json({ success: true })
   const { data: employee } = await supabase
     .from('employees')
     .select('id, role')
