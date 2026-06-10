@@ -3,6 +3,16 @@ import { verifyJWT } from '@/lib/auth'
 
 const PUBLIC = ['/login', '/reset-password', '/api/auth/login', '/api/auth/logout', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/recover', '/api/cron']
 
+// Force a fresh fetch of every HTML page on every navigation. Without this,
+// iOS Safari (and other browsers) can serve a stale login or admin shell from
+// the HTTP cache for hours after a deploy — exactly the failure mode reported
+// when phase 4 of multi-tenancy went live. API routes set their own headers,
+// _next/static/* assets are hash-versioned and immutable, so neither cares.
+function withHtmlNoStore(response: NextResponse): NextResponse {
+  response.headers.set('Cache-Control', 'no-store, must-revalidate')
+  return response
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -19,7 +29,8 @@ export async function middleware(request: NextRequest) {
         } catch {}
       }
     }
-    return NextResponse.next()
+    // API routes manage their own cache headers; only force-fresh HTML routes.
+    return pathname.startsWith('/api/') ? NextResponse.next() : withHtmlNoStore(NextResponse.next())
   }
 
   const token = request.cookies.get('ponto_token')?.value
@@ -50,7 +61,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/admin', request.url))
   }
 
-  return NextResponse.next()
+  return pathname.startsWith('/api/') ? NextResponse.next() : withHtmlNoStore(NextResponse.next())
 }
 
 export const config = {
