@@ -133,17 +133,88 @@ sequenceDiagram
 
 ## Modelo de permissões (RBAC)
 
-Três roles definidos em `employees.role`:
+Três roles definidos em `employees.role`, mais um flag de plataforma:
 
 | Role     | Áreas | Pode |
 |----------|-------|------|
 | `employee` | `/ponto` | Bater ponto próprio, ver histórico/calendário, solicitar correções, ver banco de horas próprio |
 | `manager`  | `/admin` (tabs OPERAÇÃO + PESSOAS – Funcionários + ANÁLISE – Auditoria) | Monitorizar status ao vivo, registar ponto por qualquer funcionário, aprovar/rejeitar correções, gerir banco de horas, gerir feriados, ver relatórios |
-| `admin`    | `/admin` (todos os tabs) | Tudo do manager + CRUD de funcionários + audit log + reset de senha de outros + lock_profile |
+| `admin`    | `/admin` (todos os tabs do seu tenant) | Tudo do manager + CRUD de funcionários + audit log + reset de senha de outros + lock_profile |
+| `admin + super_admin` | aba **Empresas** extra | Listar/criar/editar/desativar tenants, ver a URL pública de cada um |
 
 Enforcement:
 - **Edge middleware**: redireciona empregados para `/ponto`, admins para `/admin`.
 - **Cada API route**: chama `verifyApiAuth` e valida `user.role` quando relevante (`if (!['admin','manager'].includes(user.role)) return 403`).
+- **`super_admin`** é lido do banco em cada request via `verifyApiAuth` — nunca confiado ao token (revogar o flag tem efeito imediato).
+
+---
+
+## Multi-tenancy
+
+Implementado em 5 fases — uma instância serve N empresas com isolamento completo.
+
+### Resolução do tenant (no login, fluxos de password e cron)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Browser (host=X)
+    participant L as POST /api/auth/login
+    participant T as resolveLoginTenant
+    participant DB as Supabase
+
+    U->>L: { username, password }
+    L->>T: host = X
+    T->>DB: SELECT id FROM tenants WHERE domain = X
+    alt domínio custom registado
+      DB-->>T: tenant_id
+    else <slug>.<NEXT_PUBLIC_TENANT_ROOT_DOMAIN>
+      T->>DB: SELECT id FROM tenants WHERE slug = <slug>
+      alt slug existe
+        DB-->>T: tenant_id
+      else slug desconhecido
+        DB-->>T: null
+        T-->>L: null
+        L-->>U: 404 "Empresa não encontrada"
+      end
+    else apex / www / localhost / preview
+      T-->>L: DEFAULT_TENANT_ID
+    end
+    L->>DB: SELECT * FROM employees WHERE tenant_id=... AND username=... AND active
+    DB-->>L: row | null
+    L-->>U: JWT { ..., tenant_id } | 401
+```
+
+Detalhes em [`docs/TENANTS.md`](./TENANTS.md). Implementação em `lib/tenant.ts`.
+
+### Isolamento entre subdomínios
+
+Não depende do middleware fazer lookup ao banco em cada request:
+
+- O cookie `ponto_token` é **host-only** (sem atributo `Domain`), então o browser nunca o envia para um subdomínio irmão.
+- Toda query da API filtra por `.eq('tenant_id', user.tenant_id)` — `tenant_id` vem do JWT mas é re-carregado do banco por `verifyApiAuth`. Um token forjado com outro `tenant_id` não dá acesso ao tenant alvo: a DB é a fonte de verdade.
+- RLS bloqueia totalmente o role `anon` (defesa em profundidade) — apenas o `service_role` server-side passa.
+
+### Crons multi-tenant
+
+```mermaid
+flowchart LR
+  Trigger[Vercel Cron / GitHub Actions] --> Loop[for tenant in activeTenantIds]
+  Loop --> RunT[runTenant tenantId]
+  RunT --> Filter[Queries com .eq tenant_id]
+  Filter --> Push[Web Push apenas aos admins desse tenant]
+  Filter --> Email[Relatório mensal apenas aos emails desse tenant]
+  Filter --> Audit[(audit_logs com tenant_id correto)]
+```
+
+`activeTenantIds()` (em `lib/tenant.ts`) faz `SELECT id FROM tenants WHERE active = true`, com fallback para `[DEFAULT_TENANT_ID]` em DBs pré-migração — single-tenant continua a funcionar idêntico.
+
+### Decisões notáveis sobre tenancy
+
+- **`tenant_id` com `DEFAULT` + backfill na fase 1** — INSERTs antigos continuam a funcionar sem mudar código, até a fase 2 passar a injectar `tenant_id` explicitamente. Migração reversível por fase.
+- **Slug imutável após criação** — é a URL da empresa; renomear quebraria bookmarks, PWAs instalados e push subscriptions.
+- **Default tenant não pode ser desativado** — os super-admins vivem nele.
+- **Super-admin é um flag, não uma role** — preserva todos os poderes de admin dentro do tenant default mais a aba Empresas; backfill na migração v14 marca os admins ativos do default tenant que já eram, de facto, os operadores da plataforma antes da multi-tenancy.
 
 ---
 

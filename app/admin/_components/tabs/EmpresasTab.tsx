@@ -8,11 +8,31 @@ type TenantRow = Tenant & { employee_count: number }
 
 const inputStyle = { height: 34 } as const
 
+const ROOT_DOMAIN = process.env.NEXT_PUBLIC_TENANT_ROOT_DOMAIN ?? ''
+
+/** Where the admin of this tenant should send their employees to log in. */
+function tenantUrl(t: { slug: string; domain: string | null }): string {
+  if (t.domain) return `https://${t.domain}`
+  if (ROOT_DOMAIN) return `https://${t.slug}.${ROOT_DOMAIN}`
+  // Single-tenant deployment (or root not configured yet): the current origin
+  // is the right answer.
+  if (typeof window !== 'undefined') return window.location.origin
+  return ''
+}
+
+type CreatedTenant = {
+  tenant: TenantRow
+  adminUsername: string
+  url: string
+}
+
 export function EmpresasTab() {
   const [tenants, setTenants] = useState<TenantRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<TenantRow | null>(null)
+  const [created, setCreated] = useState<CreatedTenant | null>(null)
+  const [copied, setCopied] = useState(false)
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
   const [saving, setSaving] = useState(false)
@@ -56,12 +76,23 @@ export function EmpresasTab() {
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error ?? 'Erro ao criar empresa'); return }
+      // Capture the username before clearing the form so the success card
+      // can show "username @ <tenant url>" without a second lookup.
+      const createdUsername = adminUsername.trim().toLowerCase()
       setName(''); setSlug(''); setDomain(''); setAdminName(''); setAdminUsername(''); setAdminPassword('')
       setShowCreate(false)
-      flash(`Empresa "${data.name}" criada — admin "${adminUsername}" pode fazer login.`)
+      setCreated({ tenant: data, adminUsername: createdUsername, url: tenantUrl(data) })
       await load()
     } catch { setErr('Erro de conexão') }
     finally { setSaving(false) }
+  }
+
+  const copyUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch { /* clipboard may be blocked — user can long-press the link */ }
   }
 
   const handleEdit = async (e: React.FormEvent) => {
@@ -110,6 +141,52 @@ export function EmpresasTab() {
 
       {ok && <div className="alert-inline ok" style={{ marginBottom: 12 }}>{ok}</div>}
       {err && <div className="alert-inline err" style={{ marginBottom: 12 }}>{err}</div>}
+
+      {created && (
+        <div className="card" style={{
+          marginBottom: 16,
+          border: '1px solid var(--ok-fg, #2ea043)',
+          background: 'color-mix(in srgb, var(--ok-fg, #2ea043) 6%, transparent)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 16 }}>✓</span>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Empresa &quot;{created.tenant.name}&quot; criada</div>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
+            Envia esta página ao admin para começar:
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+            background: 'var(--bg-subtle, rgba(0,0,0,0.04))',
+            border: '1px solid var(--border)', borderRadius: 6,
+            fontFamily: 'var(--mono, ui-monospace, monospace)', fontSize: 12,
+            wordBreak: 'break-all',
+          }}>
+            <a href={created.url} target="_blank" rel="noopener noreferrer"
+               style={{ color: 'var(--fg)', textDecoration: 'none', flex: 1 }}>
+              {created.url}
+            </a>
+            <button type="button" className="btn ghost sm" onClick={() => copyUrl(created.url)}>
+              {copied ? '✓ Copiado' : 'Copiar'}
+            </button>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--fg-muted)' }}>
+            Login do admin: <code style={{ fontWeight: 700 }}>{created.adminUsername}</code>
+            {' '}— senha que definiste. <strong>Não fica registada</strong>, partilha-a por canal seguro.
+            {!created.tenant.domain && !ROOT_DOMAIN && (
+              <div style={{ marginTop: 6, padding: 8, background: 'var(--warning-bg, rgba(255,180,0,0.1))', borderRadius: 4, fontSize: 11 }}>
+                ⚠ <code>NEXT_PUBLIC_TENANT_ROOT_DOMAIN</code> não está configurado — a URL acima é apenas o domínio atual.
+                Define-o no Vercel + DNS wildcard para activar subdomínios por empresa (ver <code>docs/TENANTS.md</code>).
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+            <button type="button" className="btn ghost sm" onClick={() => setCreated(null)}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
 
       {showCreate && (
         <div className="card" style={{ marginBottom: 16 }}>
@@ -177,7 +254,13 @@ export function EmpresasTab() {
               <tbody>
                 {tenants.map(t => (
                   <tr key={t.id} style={t.active ? undefined : { opacity: 0.55 }}>
-                    <td style={{ fontWeight: 600 }}>{t.name}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      <div>{t.name}</div>
+                      <a href={tenantUrl(t)} target="_blank" rel="noopener noreferrer"
+                         className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)', textDecoration: 'none', wordBreak: 'break-all' }}>
+                        {tenantUrl(t)}
+                      </a>
+                    </td>
                     <td className="mono" style={{ fontSize: 12 }}>{t.slug}</td>
                     <td className="mono" style={{ fontSize: 12 }}>{t.domain ?? '—'}</td>
                     <td>{t.plan}</td>

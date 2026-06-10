@@ -1,9 +1,15 @@
-const CACHE = 'pontoglass-v4'
+const CACHE = 'pontoglass-v5'
 const STATIC = ['/login']
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())
+    // cache: 'reload' bypasses the HTTP cache so the precached /login is
+    // always the freshly-deployed copy, not whatever the browser had from
+    // a previous visit. Without it, an iOS Safari user can stay stuck on
+    // an old login shell for hours after a deploy.
+    caches.open(CACHE)
+      .then(c => c.addAll(STATIC.map(url => new Request(url, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
   )
 })
 
