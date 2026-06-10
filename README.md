@@ -617,8 +617,8 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Acessibilidade — focus rings, aria-labels, skip-link, labels associados
   ✓  SEO — metadata Open Graph, OG image dinâmica, JSON-LD, robots.txt, sitemap.xml
   ✓  CI no GitHub Actions (lint + test + build) com badge
-  ☐  Domínio personalizado por empresa                     → issue #5
-  ◐  Multi-empresa (tenancy) — fase 3/5: RLS lockdown    → issue #6
+  ✓  Domínio personalizado por empresa (custom domain + slug subdomain)
+  ◐  Multi-empresa (tenancy) — fase 4/5: host → tenant   → issue #6
   ✓  Relatório mensal automático por e-mail (cron + disparo manual)
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
@@ -632,6 +632,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — diagrama Mermaid + fluxo de auth + ciclo de ponto + API surface + schema
 - [`docs/SCHEMA.md`](docs/SCHEMA.md) — referência humana das tabelas (colunas, tipos, FKs, índices)
 - [`docs/SECURITY.md`](docs/SECURITY.md) — JWT + cookies + bcrypt + rate limit + revogação + geofencing
+- [`docs/TENANTS.md`](docs/TENANTS.md) — multi-tenancy: subdomínio por slug, domínio custom, DNS e fases
 - [`supabase/schema.sql`](supabase/schema.sql) — schema completo + migrações v1→v13 (multi-tenancy fases 1 + 3)
 - [`.env.example`](.env.example) — todas as variáveis com comentários e instruções
 

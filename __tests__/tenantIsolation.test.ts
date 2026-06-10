@@ -1,17 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { DEFAULT_TENANT_ID, resolveLoginTenant } from '../lib/tenant'
 
-describe('multi-tenancy — tenant resolution', () => {
-  it('exposes a deterministic default tenant id', () => {
+// lib/tenant (and everything that imports it) pulls lib/supabase, whose client
+// is created at module load from env vars — so every import here is dynamic,
+// behind a vi.doMock of the supabase module.
+const SUPABASE_NOOP = {
+  supabase: { from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) }) },
+}
+
+describe('multi-tenancy — tenant constants', () => {
+  beforeEach(() => { vi.resetModules() })
+
+  it('exposes a deterministic default tenant id', async () => {
     // The schema migration hard-codes this same value; if either side moves,
     // every existing row stops resolving and the prod app breaks. Treat the
     // constant as load-bearing.
+    vi.doMock('../lib/supabase', () => SUPABASE_NOOP)
+    const { DEFAULT_TENANT_ID } = await import('../lib/tenant')
     expect(DEFAULT_TENANT_ID).toBe('00000000-0000-0000-0000-000000000001')
   })
 
-  it('resolveLoginTenant always returns the default in phase 2', async () => {
-    // Phase 4 will swap this for a host-based lookup; until then any login
-    // attempt resolves to the same single tenant — by design.
+  it('resolveLoginTenant returns the default when the request has no host', async () => {
+    vi.doMock('../lib/supabase', () => SUPABASE_NOOP)
+    const { DEFAULT_TENANT_ID, resolveLoginTenant } = await import('../lib/tenant')
     const req = { headers: new Headers() } as never
     expect(await resolveLoginTenant(req)).toBe(DEFAULT_TENANT_ID)
   })
@@ -49,6 +59,7 @@ describe('multi-tenancy — logAudit', () => {
       supabase: { from: () => ({ insert }) },
     }))
     const { logAudit } = await import('../lib/audit')
+    const { DEFAULT_TENANT_ID } = await import('../lib/tenant')
 
     // Legacy callers (cron bootstrap, scripts) may not know their tenant; the
     // default is the safest landing zone — it's the only tenant that exists
@@ -101,6 +112,7 @@ describe('multi-tenancy — verifyApiAuth', () => {
       }),
     }))
     const { verifyApiAuth } = await import('../lib/apiAuth')
+    const { DEFAULT_TENANT_ID } = await import('../lib/tenant')
 
     const user = await verifyApiAuth('any-token')
     expect(user.tenant_id).toBe(DEFAULT_TENANT_ID)
