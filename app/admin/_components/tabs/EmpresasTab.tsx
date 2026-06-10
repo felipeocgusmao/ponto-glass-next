@@ -1,0 +1,234 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import type { Tenant } from '@/lib/types'
+import { IconBuilding, IconUserPlus, IconX } from '../icons'
+
+type TenantRow = Tenant & { employee_count: number }
+
+const inputStyle = { height: 34 } as const
+
+export function EmpresasTab() {
+  const [tenants, setTenants] = useState<TenantRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<TenantRow | null>(null)
+  const [err, setErr] = useState('')
+  const [ok, setOk] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  // Create form
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [domain, setDomain] = useState('')
+  const [adminName, setAdminName] = useState('')
+  const [adminUsername, setAdminUsername] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+
+  // Edit form
+  const [editName, setEditName] = useState('')
+  const [editDomain, setEditDomain] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/tenants')
+      if (res.ok) setTenants(await res.json())
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const flash = (msg: string) => { setOk(msg); setTimeout(() => setOk(''), 3000) }
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true); setErr('')
+    try {
+      const res = await fetch('/api/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name, slug: slug.trim().toLowerCase(), domain: domain.trim() || null,
+          admin_name: adminName, admin_username: adminUsername, admin_password: adminPassword,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setErr(data.error ?? 'Erro ao criar empresa'); return }
+      setName(''); setSlug(''); setDomain(''); setAdminName(''); setAdminUsername(''); setAdminPassword('')
+      setShowCreate(false)
+      flash(`Empresa "${data.name}" criada — admin "${adminUsername}" pode fazer login.`)
+      await load()
+    } catch { setErr('Erro de conexão') }
+    finally { setSaving(false) }
+  }
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editing) return
+    setSaving(true); setErr('')
+    try {
+      const res = await fetch(`/api/tenants/${editing.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName, domain: editDomain.trim() || null }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setErr(data.error ?? 'Erro ao atualizar'); return }
+      setEditing(null)
+      flash('Empresa atualizada.')
+      await load()
+    } catch { setErr('Erro de conexão') }
+    finally { setSaving(false) }
+  }
+
+  const toggleActive = async (t: TenantRow) => {
+    setErr('')
+    const res = await fetch(`/api/tenants/${t.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: !t.active }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setErr(data.error ?? 'Erro ao atualizar'); return }
+    flash(t.active ? `Empresa "${t.name}" desativada.` : `Empresa "${t.name}" reativada.`)
+    await load()
+  }
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <div className="page-title">Empresas</div>
+          <div className="page-sub">{tenants.length} empresa(s) na plataforma · visível apenas para super-admins</div>
+        </div>
+        <button className="btn primary" onClick={() => { setShowCreate(v => !v); setErr('') }}>
+          {showCreate ? <><IconX size={13} /> Cancelar</> : <><IconUserPlus size={13} /> Nova empresa</>}
+        </button>
+      </div>
+
+      {ok && <div className="alert-inline ok" style={{ marginBottom: 12 }}>{ok}</div>}
+      {err && <div className="alert-inline err" style={{ marginBottom: 12 }}>{err}</div>}
+
+      {showCreate && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <form onSubmit={handleCreate}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <IconBuilding size={14} /> Nova empresa
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              <div className="field">
+                <label htmlFor="t-name">Nome</label>
+                <input id="t-name" className="input" style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Empresa A" required />
+              </div>
+              <div className="field">
+                <label htmlFor="t-slug">Slug (subdomínio)</label>
+                <input id="t-slug" className="input" style={inputStyle} value={slug} onChange={e => setSlug(e.target.value)} placeholder="empresa-a" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required />
+              </div>
+              <div className="field">
+                <label htmlFor="t-domain">Domínio custom (opcional)</label>
+                <input id="t-domain" className="input" style={inputStyle} value={domain} onChange={e => setDomain(e.target.value)} placeholder="ponto.empresa.com" />
+              </div>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, margin: '12px 0 8px', color: 'var(--fg-muted)' }}>
+              Admin inicial da empresa
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              <div className="field">
+                <label htmlFor="t-admin-name">Nome do admin</label>
+                <input id="t-admin-name" className="input" style={inputStyle} value={adminName} onChange={e => setAdminName(e.target.value)} placeholder="Maria Silva" required />
+              </div>
+              <div className="field">
+                <label htmlFor="t-admin-user">Usuário</label>
+                <input id="t-admin-user" className="input" style={inputStyle} value={adminUsername} onChange={e => setAdminUsername(e.target.value)} placeholder="maria.silva" autoCapitalize="none" required />
+              </div>
+              <div className="field">
+                <label htmlFor="t-admin-pwd">Senha (mín. 6)</label>
+                <input id="t-admin-pwd" className="input" style={inputStyle} type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} minLength={6} required />
+              </div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <button type="submit" className="btn primary" disabled={saving}>
+                {saving ? 'A criar…' : 'Criar empresa'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {loading ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-muted)', fontSize: 13 }}>A carregar…</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Slug</th>
+                  <th>Domínio custom</th>
+                  <th>Plano</th>
+                  <th style={{ textAlign: 'right' }}>Funcionários</th>
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {tenants.map(t => (
+                  <tr key={t.id} style={t.active ? undefined : { opacity: 0.55 }}>
+                    <td style={{ fontWeight: 600 }}>{t.name}</td>
+                    <td className="mono" style={{ fontSize: 12 }}>{t.slug}</td>
+                    <td className="mono" style={{ fontSize: 12 }}>{t.domain ?? '—'}</td>
+                    <td>{t.plan}</td>
+                    <td className="tnum" style={{ textAlign: 'right' }}>{t.employee_count}</td>
+                    <td>
+                      <span className={`badge ${t.active ? 'ok' : ''}`} style={t.active ? undefined : { background: 'var(--bg-subtle)', color: 'var(--fg-muted)' }}>
+                        {t.active ? 'Ativa' : 'Inativa'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button className="btn ghost sm" onClick={() => { setEditing(t); setEditName(t.name); setEditDomain(t.domain ?? ''); setErr('') }}>
+                        Editar
+                      </button>
+                      <button className="btn ghost sm" onClick={() => toggleActive(t)} style={{ marginLeft: 6 }}>
+                        {t.active ? 'Desativar' : 'Reativar'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {tenants.length === 0 && (
+                  <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--fg-muted)', padding: 24 }}>Nenhuma empresa.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {editing && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <form onSubmit={handleEdit}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+              Editar &quot;{editing.name}&quot; <span className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>({editing.slug} — slug não pode ser alterado)</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+              <div className="field">
+                <label htmlFor="e-name">Nome</label>
+                <input id="e-name" className="input" style={inputStyle} value={editName} onChange={e => setEditName(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="e-domain">Domínio custom (vazio = remover)</label>
+                <input id="e-domain" className="input" style={inputStyle} value={editDomain} onChange={e => setEditDomain(e.target.value)} placeholder="ponto.empresa.com" />
+              </div>
+            </div>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <button type="submit" className="btn primary" disabled={saving}>{saving ? 'A guardar…' : 'Guardar'}</button>
+              <button type="button" className="btn ghost" onClick={() => setEditing(null)}>Cancelar</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
+  )
+}

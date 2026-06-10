@@ -39,10 +39,13 @@ subdomínios vem do próprio cookie: `ponto_token` é host-only (sem atributo
    instruções da Vercel, e `CNAME` de `*` para `cname.vercel-dns.com`.
 3. **Env**: `NEXT_PUBLIC_TENANT_ROOT_DOMAIN=pontoglass.app` em
    Production (Settings → Environment Variables) e redeploy.
-4. Criar o tenant com o slug desejado (fase 5 trará UI; até lá, SQL):
+4. Criar o tenant na aba **Empresas** do admin (super-admin) — o formulário
+   pede nome, slug e o admin inicial da empresa. Por SQL também funciona:
    ```sql
    INSERT INTO tenants (name, slug) VALUES ('Empresa A', 'empresa-a');
    ```
+   (Por SQL é preciso criar o primeiro admin do tenant manualmente; a UI já
+   faz as duas coisas na mesma operação.)
 5. Aceder a `https://empresa-a.pontoglass.app/login`.
 
 Regras de slug (constraint no schema): minúsculas, `a-z0-9` com hífens
@@ -54,10 +57,8 @@ internos, 2–40 caracteres. `www` e o apex nunca são slugs.
 
 1. **Vercel** → Project → Settings → Domains → adicionar `ponto.empresa.com`.
 2. **DNS da empresa**: `CNAME ponto → cname.vercel-dns.com`.
-3. Registrar o domínio no tenant:
-   ```sql
-   UPDATE tenants SET domain = 'ponto.empresa.com' WHERE slug = 'empresa-a';
-   ```
+3. Registrar o domínio no tenant — aba **Empresas** → Editar → Domínio custom
+   (ou por SQL: `UPDATE tenants SET domain = 'ponto.empresa.com' WHERE slug = 'empresa-a';`).
 4. O domínio custom tem precedência sobre a resolução por slug.
 
 `tenants.domain` é `UNIQUE` — um domínio só pode apontar para uma empresa.
@@ -74,6 +75,24 @@ atual servem apenas o tenant default.
 
 ---
 
+## Super-admin
+
+O flag `employees.super_admin` (migração v14) marca operadores da plataforma:
+
+- Veem a aba **Empresas** no admin: listar, criar (com admin inicial), editar
+  nome/domínio e ativar/desativar tenants. O tenant default não pode ser
+  desativado (os operadores vivem nele).
+- A API correspondente é `/api/tenants` (GET/POST) e `/api/tenants/[id]`
+  (PATCH) — exige `role=admin` **e** `super_admin=true`, sempre lidos do
+  banco, nunca do token.
+- O slug é imutável depois de criado (é a URL da empresa).
+- Backfill da migração: admins ativos do tenant default viram super-admins.
+- Os crons (entry-reminder, absence-check, missing-exit, monthly-report)
+  iteram sobre todos os tenants ativos — cada empresa recebe os seus próprios
+  lembretes e relatórios.
+
+---
+
 ## Estado por fase
 
 | Fase | Entrega | Status |
@@ -82,4 +101,4 @@ atual servem apenas o tenant default.
 | 2 | JWT com `tenant_id` + filtros em todas as rotas da API | ✅ |
 | 3 | RLS lockdown (deny-anon em todas as operações) | ✅ |
 | 4 | Resolução por host: domínio custom + slug subdomain | ✅ |
-| 5 | Super-admin: provisionar tenants via UI, crons multi-tenant | ☐ |
+| 5 | Super-admin: aba Empresas, seed de admin, crons multi-tenant | ✅ |

@@ -20,6 +20,7 @@ const t = {
     'tab.feriados':     'Feriados',
     'tab.relatorios':   'Relatório',
     'tab.auditoria':    'Auditoria',
+    'tab.empresas':     'Empresas',
 
     // ── Common ───────────────────────────────────────────────────────────
     'common.save':      'Guardar',
@@ -416,6 +417,7 @@ const t = {
     'tab.feriados':     'Feriados',
     'tab.relatorios':   'Relatório',
     'tab.auditoria':    'Auditoria',
+    'tab.empresas':     'Empresas',
 
     'common.save':      'Salvar',
     'common.cancel':    'Cancelar',
@@ -794,6 +796,7 @@ const t = {
     'tab.feriados':     'Holidays',
     'tab.relatorios':   'Reports',
     'tab.auditoria':    'Audit',
+    'tab.empresas':     'Companies',
 
     'common.save':      'Save',
     'common.cancel':    'Cancel',
@@ -1172,6 +1175,7 @@ const t = {
     'tab.feriados':     'Festivos',
     'tab.relatorios':   'Informes',
     'tab.auditoria':    'Auditoría',
+    'tab.empresas':     'Empresas',
 
     'common.save':      'Guardar',
     'common.cancel':    'Cancelar',

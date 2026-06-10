@@ -13,6 +13,27 @@ export const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 // every host resolves to the default tenant (single-tenant behaviour).
 const TENANT_ROOT_DOMAIN = (process.env.NEXT_PUBLIC_TENANT_ROOT_DOMAIN ?? '').toLowerCase()
 
+/** Same rule as the DB CHECK constraint on tenants.slug: lowercase a-z0-9
+ * with internal hyphens, 2-40 chars. 'www' is reserved (the apex alias). */
+export function isValidTenantSlug(slug: unknown): slug is string {
+  return typeof slug === 'string'
+    && slug.length >= 2 && slug.length <= 40
+    && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)
+    && slug !== 'www'
+}
+
+/** Ids of every active tenant — what the cron jobs iterate over. Falls back
+ * to the default tenant when the table is missing (pre-phase-1 databases) or
+ * the lookup fails, preserving single-tenant behaviour. */
+export async function activeTenantIds(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id')
+    .eq('active', true)
+  if (error || !data?.length) return [DEFAULT_TENANT_ID]
+  return data.map(t => t.id)
+}
+
 /** Hostname of the request, lowercased, without port. Vercel forwards the
  * original host in x-forwarded-host; plain `host` covers local dev. */
 export function requestHost(request: NextRequest): string {

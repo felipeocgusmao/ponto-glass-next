@@ -618,7 +618,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  SEO — metadata Open Graph, OG image dinâmica, JSON-LD, robots.txt, sitemap.xml
   ✓  CI no GitHub Actions (lint + test + build) com badge
   ✓  Domínio personalizado por empresa (custom domain + slug subdomain)
-  ◐  Multi-empresa (tenancy) — fase 4/5: host → tenant   → issue #6
+  ✓  Multi-empresa (tenancy) — 5 fases: schema, API, RLS, host routing, super-admin
   ✓  Relatório mensal automático por e-mail (cron + disparo manual)
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```

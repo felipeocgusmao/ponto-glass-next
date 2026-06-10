@@ -20,6 +20,7 @@ const PAGE_TITLES: Record<Tab, string> = {
   feriados:     'tab.feriados',
   relatorios:   'tab.relatorios',
   auditoria:    'tab.auditoria',
+  empresas:     'tab.empresas',
 } as const
 
 export default function TopBar({
