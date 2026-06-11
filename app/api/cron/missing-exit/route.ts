@@ -27,13 +27,17 @@ export async function GET(request: NextRequest) {
   // One pass per active tenant; holidays and notifications are per-company.
   let notified = 0
   let missingTotal = 0
+  let failures = 0
   for (const tenantId of await activeTenantIds()) {
-    const r = await runTenant(tenantId, today)
-    notified += r.notified
-    missingTotal += r.missing
+    // One tenant erroring must not starve the remaining tenants.
+    try {
+      const r = await runTenant(tenantId, today)
+      notified += r.notified
+      missingTotal += r.missing
+    } catch { failures++ }
   }
 
-  return NextResponse.json({ notified, missing: missingTotal })
+  return NextResponse.json({ notified, missing: missingTotal, failures })
 }
 
 async function runTenant(tenantId: string, today: string): Promise<{ notified: number; missing: number }> {

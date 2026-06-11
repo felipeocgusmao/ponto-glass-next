@@ -76,8 +76,12 @@ ALTER TABLE push_subscriptions
 -- exist in two different tenants (different people, different companies), so
 -- the constraint becomes (tenant_id, username).
 ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_username_key;
-ALTER TABLE employees
-  ADD CONSTRAINT employees_tenant_username_key UNIQUE (tenant_id, username);
+-- ADD CONSTRAINT não suporta IF NOT EXISTS; o DO-block mantém a migração re-executável.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employees_tenant_username_key') THEN
+    ALTER TABLE employees ADD CONSTRAINT employees_tenant_username_key UNIQUE (tenant_id, username);
+  END IF;
+END $$;
 
 -- push_subscriptions had UNIQUE (employee_id); employee_id is already
 -- tenant-scoped (one row per employee, per tenant inherently), so nothing

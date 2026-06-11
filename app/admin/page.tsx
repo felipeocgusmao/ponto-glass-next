@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
@@ -54,7 +54,11 @@ export default function AdminPage() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const router = useRouter()
 
-  const { items: notifItems } = useNotifications({ pendingCorrections, employees })
+  // The shared list now includes deactivated employees (for the Funcionários
+  // trash bin); everything else operates on the active slice.
+  const activeEmployees = useMemo(() => employees.filter(e => e.active !== false), [employees])
+
+  const { items: notifItems } = useNotifications({ pendingCorrections, employees: activeEmployees })
 
   const isManager = user?.role === 'manager'
   // Super-admins (platform operators) get the extra "Empresas" tab.
@@ -91,9 +95,12 @@ export default function AdminPage() {
     } catch { setFetchError(true) }
   }, [endDeadSession])
 
+  // all=true brings deactivated employees too — the Funcionários tab shows
+  // them under the "Inativos" filter with a restore action. Every other
+  // consumer receives the active-only slice below.
   const loadEmployees = useCallback(async () => {
     try {
-      const res = await fetch('/api/employees')
+      const res = await fetch('/api/employees?all=true')
       if (res.ok) setEmployees(await res.json())
     } catch { /* silent */ }
   }, [])
@@ -219,13 +226,13 @@ export default function AdminPage() {
         <div className="page" id="main-content">
           <MissingExitBanner />
           {tab === 'meu_ponto'    && <MeuPontoTab user={user} />}
-          {tab === 'dashboard'    && <DashboardTab employees={employees} />}
-          {tab === 'status'       && <StatusTab employees={employees} currentUserId={user.id} />}
-          {tab === 'registros'    && <RegistrosTab employees={employees} />}
+          {tab === 'dashboard'    && <DashboardTab employees={activeEmployees} />}
+          {tab === 'status'       && <StatusTab employees={activeEmployees} currentUserId={user.id} />}
+          {tab === 'registros'    && <RegistrosTab employees={activeEmployees} />}
           {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
-          {tab === 'banco'        && <BancoHorasTab employees={employees} />}
+          {tab === 'banco'        && <BancoHorasTab employees={activeEmployees} />}
           {tab === 'feriados'     && <FeriadosTab />}
-          {tab === 'relatorios'   && <RelatoriosTab employees={employees} />}
+          {tab === 'relatorios'   && <RelatoriosTab employees={activeEmployees} />}
           {tab === 'correcoes'    && <CorrecoesTab onAction={refreshPendingCount} />}
           {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
           {tab === 'empresas'     && user.super_admin === true && <EmpresasTab />}

@@ -33,13 +33,17 @@ export async function GET(request: NextRequest) {
   // employees and subscriptions.
   let notified = 0
   let due = 0
+  let failures = 0
   for (const tenantId of await activeTenantIds()) {
-    const r = await runTenant(tenantId, now, today)
-    notified += r.notified
-    due += r.due
+    // One tenant erroring must not starve the remaining tenants.
+    try {
+      const r = await runTenant(tenantId, now, today)
+      notified += r.notified
+      due += r.due
+    } catch { failures++ }
   }
 
-  return NextResponse.json({ notified, due })
+  return NextResponse.json({ notified, due, failures })
 }
 
 async function runTenant(tenantId: string, now: Date, today: string): Promise<{ notified: number; due: number }> {

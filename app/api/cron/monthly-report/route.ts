@@ -120,12 +120,16 @@ export async function GET(request: NextRequest) {
   // ever see their own numbers.
   let sent = 0
   let period = ''
+  let failures = 0
   for (const tenantId of await activeTenantIds()) {
-    const result = await runReport(prevMonthParams(tenantId))
-    sent += result.sent
-    period = result.period
+    // One tenant erroring must not block the remaining tenants' reports.
+    try {
+      const result = await runReport(prevMonthParams(tenantId))
+      sent += result.sent
+      period = result.period
+    } catch { failures++ }
   }
-  return NextResponse.json({ sent, period })
+  return NextResponse.json({ sent, period, failures })
 }
 
 // ── Manual trigger from admin panel ───────────────────────────────────────────

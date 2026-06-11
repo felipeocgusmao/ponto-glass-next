@@ -31,13 +31,18 @@ export async function GET(request: NextRequest) {
   // employee list and admin notifications.
   let notified = 0
   let absentTotal = 0
+  let failures = 0
   for (const tenantId of await activeTenantIds()) {
-    const r = await runTenant(tenantId, today)
-    notified += r.notified
-    absentTotal += r.absent
+    // One tenant erroring (DB hiccup, bad subscription payload) must not
+    // starve the remaining tenants of their notifications.
+    try {
+      const r = await runTenant(tenantId, today)
+      notified += r.notified
+      absentTotal += r.absent
+    } catch { failures++ }
   }
 
-  return NextResponse.json({ notified, absent: absentTotal })
+  return NextResponse.json({ notified, absent: absentTotal, failures })
 }
 
 async function runTenant(tenantId: string, today: string): Promise<{ notified: number; absent: number }> {

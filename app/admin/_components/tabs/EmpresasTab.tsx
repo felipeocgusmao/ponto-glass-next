@@ -115,16 +115,21 @@ export function EmpresasTab() {
   }
 
   const toggleActive = async (t: TenantRow) => {
-    setErr('')
-    const res = await fetch(`/api/tenants/${t.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ active: !t.active }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setErr(data.error ?? 'Erro ao atualizar'); return }
-    flash(t.active ? `Empresa "${t.name}" desativada.` : `Empresa "${t.name}" reativada.`)
-    await load()
+    if (saving) return
+    setSaving(true); setErr('')
+    try {
+      const res = await fetch(`/api/tenants/${t.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !t.active }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setErr(data.error ?? 'Erro ao atualizar'); return }
+      // Message reflects the server's final state, not our possibly-stale row.
+      flash(data.active ? `Empresa "${data.name}" reativada.` : `Empresa "${data.name}" desativada.`)
+      await load()
+    } catch { setErr('Erro de conexão') }
+    finally { setSaving(false) }
   }
 
   return (
@@ -274,7 +279,7 @@ export function EmpresasTab() {
                       <button className="btn ghost sm" onClick={() => { setEditing(t); setEditName(t.name); setEditDomain(t.domain ?? ''); setErr('') }}>
                         Editar
                       </button>
-                      <button className="btn ghost sm" onClick={() => toggleActive(t)} style={{ marginLeft: 6 }}>
+                      <button className="btn ghost sm" disabled={saving} onClick={() => toggleActive(t)} style={{ marginLeft: 6 }}>
                         {t.active ? 'Desativar' : 'Reativar'}
                       </button>
                     </td>
