@@ -619,6 +619,9 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  CI no GitHub Actions (lint + test + build) com badge
   ✓  Domínio personalizado por empresa (custom domain + slug subdomain)
   ✓  Multi-empresa (tenancy) — 5 fases: schema, API, RLS, host routing, super-admin
+  ✓  Lixeira de funcionários — desativados ficam visíveis no filtro Inativos com Restaurar
+  ✓  Importação CSV/XLSX de funcionários (preview com validação por linha, modelo para download)
+  ✓  2FA TOTP opt-in (QR no perfil, código no login, reset por admin)
   ✓  Relatório mensal automático por e-mail (cron + disparo manual)
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```

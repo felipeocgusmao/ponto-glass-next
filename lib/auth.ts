@@ -52,6 +52,23 @@ export async function createPasswordResetToken(userId: string, fingerprint?: str
     .sign(getSecret())
 }
 
+// Issued after a correct password when the account has TOTP enabled: proves
+// "first factor done" for the 5-minute window the user has to type the code.
+// It is NOT a session — it cannot be used against any API route.
+export async function createTotpPendingToken(userId: string, tenantId: string): Promise<string> {
+  return new SignJWT({ sub: userId, tid: tenantId, type: 'totp_pending' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('5m')
+    .sign(getSecret())
+}
+
+export async function verifyTotpPendingToken(token: string): Promise<{ sub: string; tid: string }> {
+  const { payload } = await jwtVerify(token, getSecret())
+  if (payload.type !== 'totp_pending' || !payload.sub || !payload.tid) throw new Error('Invalid token')
+  return { sub: payload.sub as string, tid: payload.tid as string }
+}
+
 export async function verifyPasswordResetToken(token: string): Promise<{ sub: string; pwh?: string }> {
   const { payload } = await jwtVerify(token, getSecret())
   if (payload.type !== 'password_reset' || !payload.sub) throw new Error('Invalid token')

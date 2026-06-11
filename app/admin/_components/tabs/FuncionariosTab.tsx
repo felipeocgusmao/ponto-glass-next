@@ -5,7 +5,8 @@ import type { Employee } from '@/lib/types'
 import { avatarInitials } from '@/lib/utils'
 import { empColor } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
-import { IconUserPlus, IconSearch } from '../icons'
+import { IconUserPlus, IconSearch, IconDownload } from '../icons'
+import { ImportEmployeesCard } from './ImportEmployeesCard'
 
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
   const { t } = useLang()
@@ -146,6 +147,23 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
         </button>
         <button onClick={onDone} className="btn ghost">{t('common.cancel')}</button>
       </div>
+      <button
+        onClick={async () => {
+          if (!confirm(`Resetar a verificação em duas etapas de ${emp.name}? A pessoa volta a entrar só com a senha.`)) return
+          const res = await fetch(`/api/employees/${emp.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reset_totp: true }),
+          })
+          if (res.ok) setOk('2FA resetada — login volta a pedir apenas a senha.')
+          else { const d = await res.json(); setErr(d.error ?? 'Erro ao resetar 2FA') }
+        }}
+        className="btn ghost sm"
+        style={{ alignSelf: 'flex-start', color: 'var(--fg-muted)' }}
+        title="Use quando o funcionário perdeu o telefone com o aplicativo autenticador"
+      >
+        Resetar 2FA (telefone perdido)
+      </button>
     </div>
   )
 }
@@ -169,6 +187,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'employee'>('all')
   const [activeFilter, setActiveFilter] = useState<'active' | 'inactive' | 'all'>('active')
+  const [showImport, setShowImport] = useState(false)
 
   const handleToggleLock = async (emp: Employee) => {
     setLockingId(emp.id)
@@ -205,6 +224,17 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
     onRefresh()
   }
 
+  const handleRestore = async (id: string) => {
+    setErr('')
+    const res = await fetch(`/api/employees/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: true }),
+    })
+    if (!res.ok) { const data = await res.json(); setErr(data.error ?? 'Erro ao restaurar'); return }
+    onRefresh()
+  }
+
   const filtered = employees.filter(e => {
     if (activeFilter === 'active' && e.active === false) return false
     if (activeFilter === 'inactive' && e.active !== false) return false
@@ -225,11 +255,16 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
           <div className="page-sub">{activeCount} ativos · {inactiveCount} inativos</div>
         </div>
         <div className="page-actions">
+          <button className="btn ghost" onClick={() => setShowImport(v => !v)}>
+            <IconDownload size={13}/> Importar CSV
+          </button>
           <button className="btn primary" onClick={() => document.getElementById('emp-add-form')?.scrollIntoView({ behavior: 'smooth' })}>
             <IconUserPlus size={13}/> {t('emp.add_btn')}
           </button>
         </div>
       </div>
+
+      {showImport && <ImportEmployeesCard onDone={onRefresh} onClose={() => setShowImport(false)} />}
 
       {/* Filter bar */}
       <div className="card">
@@ -311,18 +346,26 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                        <button
-                          onClick={() => handleToggleLock(emp)}
-                          disabled={lockingId === emp.id}
-                          className={`btn ghost sm icon${emp.lock_profile ? ' danger' : ''}`}
-                          title={emp.lock_profile ? t('emp.unlock_profile') : t('emp.lock_profile')}
-                          style={{ opacity: lockingId === emp.id ? 0.5 : 1 }}
-                        >
-                          {emp.lock_profile ? '🔒' : '🔓'}
-                        </button>
-                        <button onClick={() => setEditingId(editingId === emp.id ? null : emp.id)} className="btn ghost sm icon" title="Configurações">⚙</button>
-                        {emp.role !== 'admin' && (
-                          <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">{t('emp.remove')}</button>
+                        {emp.active === false ? (
+                          <button onClick={() => handleRestore(emp.id)} className="btn ghost sm" title="Reativa o funcionário com todo o histórico preservado">
+                            ↺ Restaurar
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleToggleLock(emp)}
+                              disabled={lockingId === emp.id}
+                              className={`btn ghost sm icon${emp.lock_profile ? ' danger' : ''}`}
+                              title={emp.lock_profile ? t('emp.unlock_profile') : t('emp.lock_profile')}
+                              style={{ opacity: lockingId === emp.id ? 0.5 : 1 }}
+                            >
+                              {emp.lock_profile ? '🔒' : '🔓'}
+                            </button>
+                            <button onClick={() => setEditingId(editingId === emp.id ? null : emp.id)} className="btn ghost sm icon" title="Configurações">⚙</button>
+                            {emp.role !== 'admin' && (
+                              <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">{t('emp.remove')}</button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>

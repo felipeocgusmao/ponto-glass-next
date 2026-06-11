@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { createJWT } from '@/lib/auth'
+import { createJWT, createTotpPendingToken } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { rateLimit, clientIp } from '@/lib/rateLimit'
 import { logAudit } from '@/lib/audit'
@@ -81,6 +81,16 @@ export async function POST(request: NextRequest) {
   const valid = await bcrypt.compare(password, employee.password_hash)
   if (!valid) {
     return NextResponse.json({ error: 'Usuário ou senha incorretos' }, { status: 401 })
+  }
+
+  // Second factor: password alone doesn't open a session when TOTP is on.
+  // The pending token only authorizes POST /api/auth/login/totp for 5 min.
+  if ((employee as { totp_enabled?: boolean }).totp_enabled === true) {
+    const pending = await createTotpPendingToken(
+      employee.id,
+      (employee as { tenant_id?: string }).tenant_id ?? tenantId,
+    )
+    return NextResponse.json({ totp_required: true, pending })
   }
 
   const token = await createJWT({

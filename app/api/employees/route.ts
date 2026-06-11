@@ -23,16 +23,23 @@ async function requirePrivileged() {
   } catch { return null }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const actor = await requirePrivileged()
   if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data, error } = await supabase
+  // ?all=true includes deactivated employees (the Funcionários tab's trash
+  // bin). Default stays active-only so dashboards, pickers and the kiosk
+  // never see inactive people.
+  const includeInactive = new URL(request.url).searchParams.get('all') === 'true'
+
+  let query = supabase
     .from('employees')
     .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode')
     .eq('tenant_id', actor.tenant_id)
-    .eq('active', true)
     .order('created_at', { ascending: true })
+  if (!includeInactive) query = query.eq('active', true)
+
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data, {

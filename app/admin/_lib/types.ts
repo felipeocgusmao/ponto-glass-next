@@ -49,4 +49,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   correction_rejected:          '✕ Correção rejeitada',
   tenant_create:                '🏢 Empresa criada',
   tenant_update:                '✏ Empresa atualizada',
+  employee_import:              '📥 Importação de funcionários',
+  totp_enabled:                 '🛡 2FA ativada',
+  totp_disabled:                '🛡 2FA desativada',
 }

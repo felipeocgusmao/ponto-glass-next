@@ -137,6 +137,9 @@ export default function LoginPage() {
   const [forgotUsername, setForgotUsername] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
   const [forgotDone, setForgotDone] = useState(false)
+  // 2FA second step: set when the password was right but the account has TOTP on.
+  const [totpPending, setTotpPending] = useState('')
+  const [totpCode, setTotpCode] = useState('')
   const pwdRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -178,6 +181,33 @@ export default function LoginPage() {
     if (remember) localStorage.setItem('pg.remembered_user', username.trim())
     else localStorage.removeItem('pg.remembered_user')
 
+    if (data.totp_required) {
+      setTotpPending(data.pending)
+      setLoading(false)
+      return
+    }
+
+    router.push(data.role === 'admin' || data.role === 'manager' ? '/admin' : '/ponto')
+  }
+
+  const handleTotp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true); setError('')
+    const res = await fetch('/api/auth/login/totp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pending: totpPending, code: totpCode }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      setError(data.error ?? t('auth.invalid'))
+      setLoading(false)
+      // Expired pending token → back to the password step.
+      if (res.status === 401 && /expirada|inválida/i.test(data.error ?? '')) {
+        setTotpPending(''); setTotpCode('')
+      }
+      return
+    }
     router.push(data.role === 'admin' || data.role === 'manager' ? '/admin' : '/ponto')
   }
 
@@ -197,7 +227,35 @@ export default function LoginPage() {
             <div className="login-sub">{t('login.subtitle')}</div>
           </div>
 
-          {forgotMode ? (
+          {totpPending ? (
+            <form onSubmit={handleTotp} className="login-form" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg)', marginBottom: 4 }}>Verificação em duas etapas</div>
+                <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Digite o código de 6 dígitos do seu aplicativo autenticador.</div>
+              </div>
+              <div className="field">
+                <label htmlFor="totp-code">Código</label>
+                <input id="totp-code" className="input tnum" value={totpCode}
+                  onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric" autoComplete="one-time-code" placeholder="000000"
+                  autoFocus style={{ height: 42, fontSize: 20, letterSpacing: '0.3em', textAlign: 'center' }} />
+              </div>
+              {error && (
+                <div className="login-alert err">
+                  <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }}/>
+                  {error}
+                </div>
+              )}
+              <button type="submit" className="btn primary lg" disabled={loading || totpCode.length !== 6}
+                style={{ width: '100%', justifyContent: 'center', height: 40 }}>
+                {loading ? <><SpinnerIcon /> A verificar…</> : 'Verificar'}
+              </button>
+              <button type="button" onClick={() => { setTotpPending(''); setTotpCode(''); setError('') }}
+                className="btn ghost" style={{ width: '100%', justifyContent: 'center' }}>
+                ← Voltar ao login
+              </button>
+            </form>
+          ) : forgotMode ? (
             <div className="login-form">
               {forgotDone ? (
                 <>

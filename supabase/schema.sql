@@ -155,6 +155,18 @@ ALTER TABLE employees  ADD COLUMN IF NOT EXISTS shift_start    TIME NOT NULL DEF
 -- '22:00' = night shift starting at 22:00 local — punches before 22:00 local belong to the previous day.
 -- The business timezone is set via NEXT_PUBLIC_BUSINESS_TZ (default Europe/Madrid).
 
+-- v10.5: push subscriptions (Web Push / tokens nativos) — uma por funcionário.
+-- Estava apenas em migrations/20260522_push_subscriptions.sql; precisa existir
+-- aqui também porque os blocos de multi-tenancy abaixo fazem ALTER nela e uma
+-- instalação nova (que corre só este ficheiro) falharia.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id  UUID        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  subscription JSONB       NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (employee_id)
+);
+
 -- v9 → v10: revogação de sessão — logout e troca/reset de senha invalidam tokens
 -- emitidos antes deste instante (a API rejeita tokens com iat < sessions_valid_from).
 -- O default é a época (1970), NÃO now(): ao adicionar a coluna numa base já existente,
@@ -192,8 +204,12 @@ ALTER TABLE correction_requests   ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NU
 ALTER TABLE push_subscriptions    ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES tenants(id) ON DELETE RESTRICT;
 
 ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_username_key;
-ALTER TABLE employees
-  ADD CONSTRAINT employees_tenant_username_key UNIQUE (tenant_id, username);
+-- ADD CONSTRAINT não suporta IF NOT EXISTS; o DO-block mantém o ficheiro re-executável.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employees_tenant_username_key') THEN
+    ALTER TABLE employees ADD CONSTRAINT employees_tenant_username_key UNIQUE (tenant_id, username);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_employees_tenant            ON employees(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_records_tenant_date         ON records(tenant_id, date);
@@ -255,3 +271,9 @@ SET super_admin = true
 WHERE tenant_id = '00000000-0000-0000-0000-000000000001'
   AND role = 'admin'
   AND active = true;
+
+-- v14 → v15: TOTP 2FA opt-in (secret só vira ativo após confirmação de código;
+-- recuperação: admin limpa via PATCH { reset_totp: true }).
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS totp_secret  TEXT,
+  ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT false;
