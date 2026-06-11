@@ -9,6 +9,7 @@ import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
 import SettingsModal from '@/app/admin/_components/SettingsModal'
 import { SunIcon, MoonIcon } from '@/app/admin/_components/icons'
+import { TotpSection } from '@/app/_components/TotpSection'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
@@ -1150,6 +1151,9 @@ export default function PontoPage() {
                 <button className="btn-emp primary-big" onClick={changePassword} disabled={pwdSaving || !pwdCurrent || !pwdNext}>
                   {pwdSaving ? t('pwd.saving') : t('pwd.save')}
                 </button>
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
+                  <TotpSection />
+                </div>
               </div>
             )}
           </div>

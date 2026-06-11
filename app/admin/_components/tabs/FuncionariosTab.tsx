@@ -147,6 +147,23 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
         </button>
         <button onClick={onDone} className="btn ghost">{t('common.cancel')}</button>
       </div>
+      <button
+        onClick={async () => {
+          if (!confirm(`Resetar a verificação em duas etapas de ${emp.name}? A pessoa volta a entrar só com a senha.`)) return
+          const res = await fetch(`/api/employees/${emp.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reset_totp: true }),
+          })
+          if (res.ok) setOk('2FA resetada — login volta a pedir apenas a senha.')
+          else { const d = await res.json(); setErr(d.error ?? 'Erro ao resetar 2FA') }
+        }}
+        className="btn ghost sm"
+        style={{ alignSelf: 'flex-start', color: 'var(--fg-muted)' }}
+        title="Use quando o funcionário perdeu o telefone com o aplicativo autenticador"
+      >
+        Resetar 2FA (telefone perdido)
+      </button>
     </div>
   )
 }

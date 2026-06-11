@@ -64,6 +64,16 @@ Tokens stateless são intrinsecamente difíceis de revogar. Solução híbrida:
 
 **Resiliência**: se a coluna não existir (migração v9 não aplicada), `verifyApiAuth` degrada para signature-only. Não tranca ninguém.
 
+### 2FA (TOTP)
+
+Opt-in por usuário (`employees.totp_secret` + `totp_enabled`, migração v15):
+
+- **Enrolment em dois passos**: `POST /api/auth/totp {action:'setup'}` gera o segredo (ainda inativo) e devolve o URI `otpauth://`; só `{action:'enable', code}` com um código válido liga o flag. Enrolment abandonado nunca tranca a conta.
+- **Login**: senha correta + `totp_enabled` → a API devolve `{ totp_required, pending }` em vez de sessão. O *pending token* (JWT `type: totp_pending`, 5 min) só serve para `POST /api/auth/login/totp` — não autentica nenhuma outra rota. Código validado com `window: 1` (tolera ±30s de drift).
+- **Rate limit**: 10 tentativas de código / 15 min por IP.
+- **Recuperação**: admin limpa via `PATCH /api/employees/[id] { reset_totp: true }` (auditado como `employee_update`). Não há desativação self-service sem código válido.
+- **QR gerado localmente** (`qrcode` no cliente) — o segredo nunca passa por serviços de terceiros.
+
 ### Tokens de reset de senha
 
 - **TTL**: 1 hora.

@@ -2,6 +2,7 @@
 
 import { useLang, LANG_LABELS, type Lang } from '@/lib/LangContext'
 import { SunIcon, MoonIcon, LockSmIcon, IconX, IconLogout } from './icons'
+import { TotpSection } from '@/app/_components/TotpSection'
 
 const LANGS: Lang[] = ['pt-PT', 'pt-BR', 'en', 'es']
 
@@ -80,6 +81,14 @@ export default function SettingsModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Segurança — 2FA */}
+          <div>
+            <div style={{ fontSize: 11.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--fg-subtle)', marginBottom: 10 }}>
+              Segurança
+            </div>
+            <TotpSection />
           </div>
 
           {/* Divider */}

@@ -19,7 +19,7 @@ export async function PATCH(
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { name: new_name, username: new_username, email, role, workday_hours, lunch_break_minutes, hourly_rate, new_password, geo_mode, lock_profile, expected_start, expected_end, shift_start, active } = await request.json()
+  const { name: new_name, username: new_username, email, role, workday_hours, lunch_break_minutes, hourly_rate, new_password, geo_mode, lock_profile, expected_start, expected_end, shift_start, active, reset_totp } = await request.json()
 
   const updates: Record<string, unknown> = {}
 
@@ -112,6 +112,13 @@ export async function PATCH(
 
   if (lock_profile !== undefined) {
     updates.lock_profile = Boolean(lock_profile)
+  }
+
+  // Lost-authenticator recovery: the admin clears 2FA so the user can log in
+  // with password only and re-enrol. Appears in the audit log like any edit.
+  if (reset_totp === true) {
+    updates.totp_secret = null
+    updates.totp_enabled = false
   }
 
   const timeRe = /^([01]\d|2[0-3]):[0-5]\d$/

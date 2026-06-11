@@ -271,3 +271,9 @@ SET super_admin = true
 WHERE tenant_id = '00000000-0000-0000-0000-000000000001'
   AND role = 'admin'
   AND active = true;
+
+-- v14 → v15: TOTP 2FA opt-in (secret só vira ativo após confirmação de código;
+-- recuperação: admin limpa via PATCH { reset_totp: true }).
+ALTER TABLE employees
+  ADD COLUMN IF NOT EXISTS totp_secret  TEXT,
+  ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT false;
