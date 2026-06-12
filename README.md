@@ -95,7 +95,7 @@ Existe **um URL** e **uma senha**.
 │   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
 │   Cron        →   Vercel Cron Jobs  (ausências, saída)  │
 │   Voz         →   Web Speech API  (reconhecimento + TTS)│
-│   Testes      →   Vitest  (79 unit) + Playwright  (E2E) │
+│   Testes      →   Vitest  (147 unit) + Playwright  (E2E) │
 │   Monitor     →   Sentry  (erros cliente + servidor)    │
 │   Geofencing  →   Haversine  (raio por funcionário)     │
 │   Horas       →   Centesimal  (base 100, quarto de hora)│
@@ -117,7 +117,7 @@ Cada peça foi escolhida com intenção:
 | **Microsoft Graph + SMTP** | Graph API como transporte principal (OAuth Client Credentials), SMTP como fallback automático |
 | **jsPDF + AutoTable** | Geração de PDF no cliente, sem dependências de servidor |
 | **Vercel Cron Jobs** | Tarefas agendadas: alerta de ausência (manhã) e alerta de saída não registada (17h) |
-| **Vitest** | 79 testes unitários para cálculo de horas, auth, rate limit, geofencing, de-dup e voz |
+| **Vitest** | 147 testes unitários: horas, auth, rate limit, geofencing, de-dup, voz, tenancy, TOTP e importação |
 | **Playwright** | Testes E2E do fluxo principal (landing, auth, demo, SEO) |
 | **Web Speech API** | Reconhecimento de voz (SpeechRecognition) + síntese de fala (TTS) no `/kiosk/glass` |
 | **Sentry** | Captura de erros e source maps automáticos via `withSentryConfig` |
@@ -308,7 +308,7 @@ ponto_glass_next/
 ├── sentry.server.config.ts    ← inicialização Sentry no servidor
 ├── vitest.config.ts           ← configuração Vitest (jsdom, exclui e2e/)
 ├── playwright.config.ts        ← configuração Playwright (E2E, Chromium)
-├── __tests__/                 ← 79 testes unitários (utils, auth, rateLimit, voice, punchValidation, entryReminder)
+├── __tests__/                 ← 147 testes unitários (utils, auth, tenancy, totp, employeeImport, punchQueue…)
 ├── e2e/                       ← testes E2E (landing, auth, demo, SEO)
 └── supabase/
     ├── schema.sql             ← schema do banco com RLS + migrações comentadas
@@ -605,7 +605,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Comentário em registo (nota livre do admin/gerente, ≤ 500 chars)
   ✓  Aviso de shift_start incomum (alerta amarelo ao configurar turno diurno com horário > 00:00)
   ✓  E-mail via Microsoft Graph API (OAuth Client Credentials) com fallback SMTP automático
-  ✓  Testes Vitest (79 unit: utils, auth, rateLimit, voice, punchValidation, entryReminder) + E2E Playwright
+  ✓  Testes Vitest (147 unit: utils, auth, tenancy, TOTP, importação, fila offline…) + E2E Playwright
   ✓  Monitorização Sentry (cliente + servidor, source maps)
   ✓  Horas centesimais (base 100) com arredondamento ao quarto de hora em relatórios/banco/ganhos
   ✓  Lembrete push de quarto de hora (bater entrada/saída em :00/:15/:30/:45)
