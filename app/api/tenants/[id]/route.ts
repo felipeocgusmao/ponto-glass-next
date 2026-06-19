@@ -75,3 +75,55 @@ export async function PATCH(
   })
   return NextResponse.json(data)
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const actor = await requireSuperAdmin()
+  if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { id } = params
+
+  if (id === DEFAULT_TENANT_ID)
+    return NextResponse.json({ error: 'O tenant default não pode ser eliminado' }, { status: 400 })
+
+  const { data: tenant, error: tErr } = await supabase
+    .from('tenants')
+    .select('id, name, active')
+    .eq('id', id)
+    .single()
+  if (tErr || !tenant)
+    return NextResponse.json({ error: 'Empresa não encontrada' }, { status: 404 })
+  if (tenant.active)
+    return NextResponse.json({ error: 'Desative a empresa antes de eliminar' }, { status: 400 })
+
+  const { count: recordCount } = await supabase
+    .from('records')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', id)
+  if ((recordCount ?? 0) > 0)
+    return NextResponse.json({
+      error: 'A empresa tem registos de ponto — não é possível eliminar. Use "Desativar".',
+    }, { status: 400 })
+
+  // Delete all dependent rows in safe order before removing the tenant.
+  const dependents = [
+    'push_subscriptions',
+    'correction_requests',
+    'hour_bank_adjustments',
+    'day_exceptions',
+    'records',
+    'employees',
+    'audit_logs',
+  ] as const
+  for (const table of dependents)
+    await supabase.from(table).delete().eq('tenant_id', id)
+
+  const { error: delErr } = await supabase.from('tenants').delete().eq('id', id)
+  if (delErr)
+    return NextResponse.json({ error: delErr.message }, { status: 500 })
+
+  await logAudit(actor, 'tenant_delete', { id, name: tenant.name }, { reason: 'permanent_delete' })
+  return NextResponse.json({ id, name: tenant.name })
+}

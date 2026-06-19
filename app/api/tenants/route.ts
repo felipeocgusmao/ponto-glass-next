@@ -23,20 +23,29 @@ export async function GET() {
   const actor = await requireSuperAdmin()
   if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const [{ data: tenants, error }, { data: emps }] = await Promise.all([
+  const [{ data: tenants, error }, { data: emps }, { data: recs }] = await Promise.all([
     supabase.from('tenants')
       .select('id, name, slug, domain, plan, active, created_at')
       .order('created_at', { ascending: true }),
     supabase.from('employees').select('tenant_id').eq('active', true),
+    supabase.from('records').select('tenant_id'),
   ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const counts = new Map<string, number>()
+  const empCounts = new Map<string, number>()
   for (const e of (emps ?? []) as { tenant_id: string }[])
-    counts.set(e.tenant_id, (counts.get(e.tenant_id) ?? 0) + 1)
+    empCounts.set(e.tenant_id, (empCounts.get(e.tenant_id) ?? 0) + 1)
+
+  const recCounts = new Map<string, number>()
+  for (const r of (recs ?? []) as { tenant_id: string }[])
+    recCounts.set(r.tenant_id, (recCounts.get(r.tenant_id) ?? 0) + 1)
 
   return NextResponse.json(
-    (tenants ?? []).map(t => ({ ...t, employee_count: counts.get(t.id) ?? 0 })),
+    (tenants ?? []).map(t => ({
+      ...t,
+      employee_count: empCounts.get(t.id) ?? 0,
+      record_count: recCounts.get(t.id) ?? 0,
+    })),
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }

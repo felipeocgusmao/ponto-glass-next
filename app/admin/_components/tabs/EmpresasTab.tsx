@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Tenant } from '@/lib/types'
 import { IconBuilding, IconUserPlus, IconX } from '../icons'
 
-type TenantRow = Tenant & { employee_count: number }
+type TenantRow = Tenant & { employee_count: number; record_count: number }
 
 const inputStyle = { height: 34 } as const
 
@@ -36,6 +36,10 @@ export function EmpresasTab() {
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showInactive, setShowInactive] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<TenantRow | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   // Create form
   const [name, setName] = useState('')
@@ -60,7 +64,21 @@ export function EmpresasTab() {
 
   useEffect(() => { load() }, [load])
 
-  const flash = (msg: string) => { setOk(msg); setTimeout(() => setOk(''), 3000) }
+  const flash = (msg: string) => { setOk(msg); setTimeout(() => setOk(''), 3500) }
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleteConfirm !== deleteTarget.name) return
+    setDeleting(true); setErr('')
+    try {
+      const res = await fetch(`/api/tenants/${deleteTarget.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) { setErr(data.error ?? 'Erro ao eliminar'); setDeleting(false); return }
+      setDeleteTarget(null); setDeleteConfirm('')
+      flash(`Empresa "${data.name}" eliminada permanentemente.`)
+      await load()
+    } catch { setErr('Erro de conexão') }
+    finally { setDeleting(false) }
+  }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -137,7 +155,11 @@ export function EmpresasTab() {
       <div className="page-head">
         <div>
           <div className="page-title">Empresas</div>
-          <div className="page-sub">{tenants.length} empresa(s) na plataforma · visível apenas para super-admins</div>
+          <div className="page-sub">
+            {tenants.filter(t => t.active).length} ativa(s)
+            {tenants.filter(t => !t.active).length > 0 && ` · ${tenants.filter(t => !t.active).length} inativa(s)`}
+            {' '}· visível apenas para super-admins
+          </div>
         </div>
         <button className="btn primary" onClick={() => { setShowCreate(v => !v); setErr('') }}>
           {showCreate ? <><IconX size={13} /> Cancelar</> : <><IconUserPlus size={13} /> Nova empresa</>}
@@ -239,6 +261,7 @@ export function EmpresasTab() {
         </div>
       )}
 
+      {/* Active tenants */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-muted)', fontSize: 13 }}>A carregar…</div>
@@ -252,13 +275,12 @@ export function EmpresasTab() {
                   <th>Domínio custom</th>
                   <th>Plano</th>
                   <th style={{ textAlign: 'right' }}>Funcionários</th>
-                  <th>Estado</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {tenants.map(t => (
-                  <tr key={t.id} style={t.active ? undefined : { opacity: 0.55 }}>
+                {tenants.filter(t => t.active).map(t => (
+                  <tr key={t.id}>
                     <td style={{ fontWeight: 600 }}>
                       <div>{t.name}</div>
                       <a href={tenantUrl(t)} target="_blank" rel="noopener noreferrer"
@@ -270,29 +292,137 @@ export function EmpresasTab() {
                     <td className="mono" style={{ fontSize: 12 }}>{t.domain ?? '—'}</td>
                     <td>{t.plan}</td>
                     <td className="tnum" style={{ textAlign: 'right' }}>{t.employee_count}</td>
-                    <td>
-                      <span className={`badge ${t.active ? 'ok' : ''}`} style={t.active ? undefined : { background: 'var(--bg-subtle)', color: 'var(--fg-muted)' }}>
-                        {t.active ? 'Ativa' : 'Inativa'}
-                      </span>
-                    </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button className="btn ghost sm" onClick={() => { setEditing(t); setEditName(t.name); setEditDomain(t.domain ?? ''); setErr('') }}>
                         Editar
                       </button>
                       <button className="btn ghost sm" disabled={saving} onClick={() => toggleActive(t)} style={{ marginLeft: 6 }}>
-                        {t.active ? 'Desativar' : 'Reativar'}
+                        Desativar
                       </button>
                     </td>
                   </tr>
                 ))}
-                {tenants.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--fg-muted)', padding: 24 }}>Nenhuma empresa.</td></tr>
+                {tenants.filter(t => t.active).length === 0 && (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--fg-muted)', padding: 24 }}>Nenhuma empresa ativa.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Inactive tenants — collapsible */}
+      {!loading && tenants.filter(t => !t.active).length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <button
+            className="btn ghost sm"
+            onClick={() => setShowInactive(v => !v)}
+            style={{ fontSize: 12, color: 'var(--fg-muted)' }}
+          >
+            {showInactive ? '▲' : '▼'} Inativas ({tenants.filter(t => !t.active).length})
+          </button>
+          {showInactive && (
+            <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 8 }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ width: '100%', opacity: 0.8 }}>
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Slug</th>
+                      <th style={{ textAlign: 'right' }}>Registos</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tenants.filter(t => !t.active).map(t => (
+                      <tr key={t.id}>
+                        <td style={{ fontWeight: 600 }}>
+                          <div>{t.name}</div>
+                          <span className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{t.slug}</span>
+                        </td>
+                        <td className="mono" style={{ fontSize: 12 }}>{t.slug}</td>
+                        <td className="tnum" style={{ textAlign: 'right', fontSize: 12 }}>{t.record_count}</td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <button className="btn ghost sm" onClick={() => { setEditing(t); setEditName(t.name); setEditDomain(t.domain ?? ''); setErr('') }}>
+                            Editar
+                          </button>
+                          <button className="btn ghost sm" disabled={saving} onClick={() => toggleActive(t)} style={{ marginLeft: 6 }}>
+                            Reativar
+                          </button>
+                          {t.record_count === 0 && (
+                            <button
+                              className="btn ghost sm"
+                              disabled={saving}
+                              onClick={() => { setDeleteTarget(t); setDeleteConfirm('') }}
+                              style={{ marginLeft: 6, color: 'var(--err-fg, #c53030)' }}
+                            >
+                              Eliminar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ padding: '8px 16px', fontSize: 11, color: 'var(--fg-muted)', borderTop: '1px solid var(--border)' }}>
+                &ldquo;Eliminar&rdquo; disponível apenas para empresas sem registos de ponto.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Delete confirmation overlay */}
+      {deleteTarget && (
+        <div
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: 24,
+          }}
+          onClick={e => { if (e.target === e.currentTarget) { setDeleteTarget(null); setDeleteConfirm('') } }}
+        >
+          <div className="card" style={{ maxWidth: 420, width: '100%' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--err-fg, #c53030)' }}>
+              ⚠ Eliminar permanentemente
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.55, marginBottom: 14 }}>
+              Esta acção é <strong>irreversível</strong>. Elimina a empresa <strong>{deleteTarget.name}</strong>,
+              o seu admin e todos os dados associados.
+              <br /><br />
+              Escreve o nome exacto para confirmar:
+            </div>
+            <input
+              className="input"
+              style={{ height: 34, marginBottom: 12 }}
+              value={deleteConfirm}
+              onChange={e => setDeleteConfirm(e.target.value)}
+              placeholder={deleteTarget.name}
+              autoFocus
+            />
+            {err && <div className="alert-inline err" style={{ marginBottom: 10 }}>{err}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn sm"
+                disabled={deleteConfirm !== deleteTarget.name || deleting}
+                onClick={handleDelete}
+                style={{
+                  background: deleteConfirm === deleteTarget.name ? 'var(--err-fg, #c53030)' : undefined,
+                  color: deleteConfirm === deleteTarget.name ? '#fff' : undefined,
+                  opacity: deleteConfirm !== deleteTarget.name ? 0.45 : 1,
+                }}
+              >
+                {deleting ? 'A eliminar…' : 'Eliminar permanentemente'}
+              </button>
+              <button className="btn ghost sm" onClick={() => { setDeleteTarget(null); setDeleteConfirm(''); setErr('') }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editing && (
         <div className="card" style={{ marginTop: 16 }}>
