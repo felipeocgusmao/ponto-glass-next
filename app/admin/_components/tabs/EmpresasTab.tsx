@@ -366,7 +366,7 @@ export function EmpresasTab() {
                 </table>
               </div>
               <div style={{ padding: '8px 16px', fontSize: 11, color: 'var(--fg-muted)', borderTop: '1px solid var(--border)' }}>
-                "Eliminar" disponível apenas para empresas sem registos de ponto.
+                &ldquo;Eliminar&rdquo; disponível apenas para empresas sem registos de ponto.
               </div>
             </div>
           )}
