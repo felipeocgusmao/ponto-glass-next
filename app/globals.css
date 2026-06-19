@@ -398,10 +398,15 @@ ul, ol { list-style: none; }
   padding: 16px 16px 14px; border-radius: var(--r-lg);
   background: var(--surface); border: 1px solid var(--border);
   display: flex; flex-direction: column; gap: 6px;
+  /* Allow the card to shrink below its content's intrinsic width so chips
+     wrap inside the grid cell instead of pushing past the card border. */
+  min-width: 0;
 }
 .kpi-label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; color: var(--fg-muted); }
 .kpi-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.kpi-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 500; color: var(--fg-muted); }
+/* flex (not inline-flex) + wrap so multiple chips on a narrow card move to a
+   new row instead of overflowing the card. */
+.kpi-delta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 500; color: var(--fg-muted); }
 .kpi-delta.up { color: var(--success-fg); }
 .kpi-delta.down { color: var(--danger-fg); }
 
@@ -488,6 +493,16 @@ select.input { padding-right: 24px; appearance: none; background-image: url("dat
 .status-row { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
 .status-row:last-child { border-bottom: 0; }
 .status-row:hover { background: var(--hover); }
+/* Phone: the fixed-width columns sum to ~456px which can't fit in a 375px
+   viewport — hide the progress bar (least information), tighten the time and
+   earnings columns, and shrink the gap so everything stays inside the card. */
+@media (max-width: 640px) {
+  .status-row { gap: 8px; padding: 10px 12px; }
+  .status-row [data-col="bar"] { display: none; }
+  .status-row [data-col="time"] { width: 78px; font-size: 11px; }
+  .status-row [data-col="chip"] { width: 64px; }
+  .status-row [data-col="earnings"] { width: 56px; font-size: 11px; }
+}
 
 /* ─── Detail drawer ─── */
 .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.25); z-index: 50; animation: pg-fadeIn 0.15s ease; }
