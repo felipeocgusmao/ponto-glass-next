@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Tenant } from '@/lib/types'
-import { IconBuilding, IconUserPlus, IconX } from '../icons'
+import { IconBuilding, IconUserPlus } from '../icons'
+import { Modal } from '../Modal'
 
 type TenantRow = Tenant & { employee_count: number; record_count: number }
 
@@ -14,8 +15,6 @@ const ROOT_DOMAIN = process.env.NEXT_PUBLIC_TENANT_ROOT_DOMAIN ?? ''
 function tenantUrl(t: { slug: string; domain: string | null }): string {
   if (t.domain) return `https://${t.domain}`
   if (ROOT_DOMAIN) return `https://${t.slug}.${ROOT_DOMAIN}`
-  // Single-tenant deployment (or root not configured yet): the current origin
-  // is the right answer.
   if (typeof window !== 'undefined') return window.location.origin
   return ''
 }
@@ -94,8 +93,6 @@ export function EmpresasTab() {
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error ?? 'Erro ao criar empresa'); return }
-      // Capture the username before clearing the form so the success card
-      // can show "username @ <tenant url>" without a second lookup.
       const createdUsername = adminUsername.trim().toLowerCase()
       setName(''); setSlug(''); setDomain(''); setAdminName(''); setAdminUsername(''); setAdminPassword('')
       setShowCreate(false)
@@ -110,7 +107,7 @@ export function EmpresasTab() {
       await navigator.clipboard.writeText(url)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
-    } catch { /* clipboard may be blocked — user can long-press the link */ }
+    } catch { /* clipboard may be blocked */ }
   }
 
   const handleEdit = async (e: React.FormEvent) => {
@@ -143,11 +140,14 @@ export function EmpresasTab() {
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error ?? 'Erro ao atualizar'); return }
-      // Message reflects the server's final state, not our possibly-stale row.
       flash(data.active ? `Empresa "${data.name}" reativada.` : `Empresa "${data.name}" desativada.`)
       await load()
     } catch { setErr('Erro de conexão') }
     finally { setSaving(false) }
+  }
+
+  const openEdit = (t: TenantRow) => {
+    setEditing(t); setEditName(t.name); setEditDomain(t.domain ?? ''); setErr('')
   }
 
   return (
@@ -161,13 +161,12 @@ export function EmpresasTab() {
             {' '}· visível apenas para super-admins
           </div>
         </div>
-        <button className="btn primary" onClick={() => { setShowCreate(v => !v); setErr('') }}>
-          {showCreate ? <><IconX size={13} /> Cancelar</> : <><IconUserPlus size={13} /> Nova empresa</>}
+        <button className="btn primary" onClick={() => { setShowCreate(true); setErr('') }}>
+          <IconUserPlus size={13} /> Nova empresa
         </button>
       </div>
 
       {ok && <div className="alert-inline ok" style={{ marginBottom: 12 }}>{ok}</div>}
-      {err && <div className="alert-inline err" style={{ marginBottom: 12 }}>{err}</div>}
 
       {created && (
         <div className="card" style={{
@@ -207,57 +206,9 @@ export function EmpresasTab() {
               </div>
             )}
           </div>
-          <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-            <button type="button" className="btn ghost sm" onClick={() => setCreated(null)}>
-              Fechar
-            </button>
+          <div style={{ marginTop: 10 }}>
+            <button type="button" className="btn ghost sm" onClick={() => setCreated(null)}>Fechar</button>
           </div>
-        </div>
-      )}
-
-      {showCreate && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <form onSubmit={handleCreate}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <IconBuilding size={14} /> Nova empresa
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-              <div className="field">
-                <label htmlFor="t-name">Nome</label>
-                <input id="t-name" className="input" style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Empresa A" required />
-              </div>
-              <div className="field">
-                <label htmlFor="t-slug">Slug (subdomínio)</label>
-                <input id="t-slug" className="input" style={inputStyle} value={slug} onChange={e => setSlug(e.target.value)} placeholder="empresa-a" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required />
-              </div>
-              <div className="field">
-                <label htmlFor="t-domain">Domínio custom (opcional)</label>
-                <input id="t-domain" className="input" style={inputStyle} value={domain} onChange={e => setDomain(e.target.value)} placeholder="ponto.empresa.com" />
-              </div>
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 700, margin: '12px 0 8px', color: 'var(--fg-muted)' }}>
-              Admin inicial da empresa
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-              <div className="field">
-                <label htmlFor="t-admin-name">Nome do admin</label>
-                <input id="t-admin-name" className="input" style={inputStyle} value={adminName} onChange={e => setAdminName(e.target.value)} placeholder="Maria Silva" required />
-              </div>
-              <div className="field">
-                <label htmlFor="t-admin-user">Usuário</label>
-                <input id="t-admin-user" className="input" style={inputStyle} value={adminUsername} onChange={e => setAdminUsername(e.target.value)} placeholder="maria.silva" autoCapitalize="none" required />
-              </div>
-              <div className="field">
-                <label htmlFor="t-admin-pwd">Senha (mín. 6)</label>
-                <input id="t-admin-pwd" className="input" style={inputStyle} type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} minLength={6} required />
-              </div>
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <button type="submit" className="btn primary" disabled={saving}>
-                {saving ? 'A criar…' : 'Criar empresa'}
-              </button>
-            </div>
-          </form>
         </div>
       )}
 
@@ -293,9 +244,7 @@ export function EmpresasTab() {
                     <td>{t.plan}</td>
                     <td className="tnum" style={{ textAlign: 'right' }}>{t.employee_count}</td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button className="btn ghost sm" onClick={() => { setEditing(t); setEditName(t.name); setEditDomain(t.domain ?? ''); setErr('') }}>
-                        Editar
-                      </button>
+                      <button className="btn ghost sm" onClick={() => openEdit(t)}>Editar</button>
                       <button className="btn ghost sm" disabled={saving} onClick={() => toggleActive(t)} style={{ marginLeft: 6 }}>
                         Desativar
                       </button>
@@ -343,9 +292,7 @@ export function EmpresasTab() {
                         <td className="mono" style={{ fontSize: 12 }}>{t.slug}</td>
                         <td className="tnum" style={{ textAlign: 'right', fontSize: 12 }}>{t.record_count}</td>
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <button className="btn ghost sm" onClick={() => { setEditing(t); setEditName(t.name); setEditDomain(t.domain ?? ''); setErr('') }}>
-                            Editar
-                          </button>
+                          <button className="btn ghost sm" onClick={() => openEdit(t)}>Editar</button>
                           <button className="btn ghost sm" disabled={saving} onClick={() => toggleActive(t)} style={{ marginLeft: 6 }}>
                             Reativar
                           </button>
@@ -373,22 +320,81 @@ export function EmpresasTab() {
         </div>
       )}
 
-      {/* Delete confirmation overlay */}
-      {deleteTarget && (
-        <div
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.45)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 1000, padding: 24,
-          }}
-          onClick={e => { if (e.target === e.currentTarget) { setDeleteTarget(null); setDeleteConfirm('') } }}
-        >
-          <div className="card" style={{ maxWidth: 420, width: '100%' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--err-fg, #c53030)' }}>
-              ⚠ Eliminar permanentemente
+      {/* ── Modal: Nova empresa ── */}
+      {showCreate && (
+        <Modal title="Nova empresa" onClose={() => { setShowCreate(false); setErr('') }} width={620}>
+          <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {err && <div className="alert-inline err">{err}</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              <div className="field">
+                <label htmlFor="t-name">Nome</label>
+                <input id="t-name" className="input" style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Empresa A" required autoFocus />
+              </div>
+              <div className="field">
+                <label htmlFor="t-slug">Slug (subdomínio)</label>
+                <input id="t-slug" className="input" style={inputStyle} value={slug} onChange={e => setSlug(e.target.value)} placeholder="empresa-a" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required />
+              </div>
+              <div className="field">
+                <label htmlFor="t-domain">Domínio custom (opcional)</label>
+                <input id="t-domain" className="input" style={inputStyle} value={domain} onChange={e => setDomain(e.target.value)} placeholder="ponto.empresa.com" />
+              </div>
             </div>
-            <div style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.55, marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <IconBuilding size={12} /> Admin inicial da empresa
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+              <div className="field">
+                <label htmlFor="t-admin-name">Nome do admin</label>
+                <input id="t-admin-name" className="input" style={inputStyle} value={adminName} onChange={e => setAdminName(e.target.value)} placeholder="Maria Silva" required />
+              </div>
+              <div className="field">
+                <label htmlFor="t-admin-user">Usuário</label>
+                <input id="t-admin-user" className="input" style={inputStyle} value={adminUsername} onChange={e => setAdminUsername(e.target.value)} placeholder="maria.silva" autoCapitalize="none" required />
+              </div>
+              <div className="field">
+                <label htmlFor="t-admin-pwd">Senha (mín. 6)</label>
+                <input id="t-admin-pwd" className="input" style={inputStyle} type="password" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} minLength={6} required />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+              <button type="submit" className="btn primary" disabled={saving}>
+                {saving ? 'A criar…' : 'Criar empresa'}
+              </button>
+              <button type="button" className="btn ghost" onClick={() => setShowCreate(false)}>Cancelar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Modal: Editar empresa ── */}
+      {editing && (
+        <Modal title={`Editar "${editing.name}"`} onClose={() => setEditing(null)} width={480}>
+          <form onSubmit={handleEdit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {err && <div className="alert-inline err">{err}</div>}
+            <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
+              Slug: <code>{editing.slug}</code> — não pode ser alterado
+            </div>
+            <div className="field">
+              <label htmlFor="e-name">Nome</label>
+              <input id="e-name" className="input" style={inputStyle} value={editName} onChange={e => setEditName(e.target.value)} required autoFocus />
+            </div>
+            <div className="field">
+              <label htmlFor="e-domain">Domínio custom (vazio = remover)</label>
+              <input id="e-domain" className="input" style={inputStyle} value={editDomain} onChange={e => setEditDomain(e.target.value)} placeholder="ponto.empresa.com" />
+            </div>
+            <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+              <button type="submit" className="btn primary" disabled={saving}>{saving ? 'A guardar…' : 'Guardar'}</button>
+              <button type="button" className="btn ghost" onClick={() => setEditing(null)}>Cancelar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Modal: Eliminar empresa ── */}
+      {deleteTarget && (
+        <Modal title="⚠ Eliminar permanentemente" onClose={() => { setDeleteTarget(null); setDeleteConfirm(''); setErr('') }} width={420}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.6 }}>
               Esta acção é <strong>irreversível</strong>. Elimina a empresa <strong>{deleteTarget.name}</strong>,
               o seu admin e todos os dados associados.
               <br /><br />
@@ -396,13 +402,13 @@ export function EmpresasTab() {
             </div>
             <input
               className="input"
-              style={{ height: 34, marginBottom: 12 }}
+              style={{ height: 34 }}
               value={deleteConfirm}
               onChange={e => setDeleteConfirm(e.target.value)}
               placeholder={deleteTarget.name}
               autoFocus
             />
-            {err && <div className="alert-inline err" style={{ marginBottom: 10 }}>{err}</div>}
+            {err && <div className="alert-inline err">{err}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 className="btn sm"
@@ -421,31 +427,7 @@ export function EmpresasTab() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {editing && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <form onSubmit={handleEdit}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-              Editar &quot;{editing.name}&quot; <span className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>({editing.slug} — slug não pode ser alterado)</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
-              <div className="field">
-                <label htmlFor="e-name">Nome</label>
-                <input id="e-name" className="input" style={inputStyle} value={editName} onChange={e => setEditName(e.target.value)} required />
-              </div>
-              <div className="field">
-                <label htmlFor="e-domain">Domínio custom (vazio = remover)</label>
-                <input id="e-domain" className="input" style={inputStyle} value={editDomain} onChange={e => setEditDomain(e.target.value)} placeholder="ponto.empresa.com" />
-              </div>
-            </div>
-            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-              <button type="submit" className="btn primary" disabled={saving}>{saving ? 'A guardar…' : 'Guardar'}</button>
-              <button type="button" className="btn ghost" onClick={() => setEditing(null)}>Cancelar</button>
-            </div>
-          </form>
-        </div>
+        </Modal>
       )}
     </>
   )

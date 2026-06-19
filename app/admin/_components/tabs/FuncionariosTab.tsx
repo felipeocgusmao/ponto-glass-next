@@ -7,6 +7,7 @@ import { empColor } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import { IconUserPlus, IconSearch, IconDownload } from '../icons'
 import { ImportEmployeesCard } from './ImportEmployeesCard'
+import { Modal } from '../Modal'
 
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
   const { t } = useLang()
@@ -53,7 +54,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
   }
 
   return (
-    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="field">
         <label>{t('emp.full_name')}</label>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="ex: Maria Silva" className="input" />
@@ -188,6 +189,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'employee'>('all')
   const [activeFilter, setActiveFilter] = useState<'active' | 'inactive' | 'all'>('active')
   const [showImport, setShowImport] = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
 
   const handleToggleLock = async (emp: Employee) => {
     setLockingId(emp.id)
@@ -215,6 +217,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
     setName(''); setUsername(''); setEmail(''); setPassword(''); setRole('employee')
     setWorkdayHours('8'); setLunchMin('60'); setRate('')
     setLoading(false); onRefresh()
+    setTimeout(() => { setOk(''); setShowAdd(false) }, 1500)
   }
 
   const handleRemove = async (id: string, empName: string) => {
@@ -235,6 +238,8 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
     onRefresh()
   }
 
+  const editingEmp = editingId ? employees.find(e => e.id === editingId) ?? null : null
+
   const filtered = employees.filter(e => {
     if (activeFilter === 'active' && e.active === false) return false
     if (activeFilter === 'inactive' && e.active !== false) return false
@@ -248,6 +253,79 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
 
   return (
     <>
+      {/* Edit employee modal */}
+      {editingEmp && (
+        <Modal
+          title={`Configurações — ${editingEmp.name}`}
+          onClose={() => setEditingId(null)}
+          width={540}
+        >
+          <EmployeeSettings emp={editingEmp} onDone={() => { setEditingId(null); onRefresh() }} />
+        </Modal>
+      )}
+
+      {/* Add employee modal */}
+      {showAdd && (
+        <Modal title={t('emp.add_new')} onClose={() => { setShowAdd(false); setErr(''); setOk('') }} width={560}>
+          <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="form-grid-2">
+              <div className="field"><label>{t('emp.name')}</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Maria Silva" className="input" required /></div>
+              <div className="field"><label>{t('emp.username_label')}</label><input value={username} onChange={e => setUsername(e.target.value)} placeholder="maria.silva" className="input" required /></div>
+            </div>
+            <div className="field">
+              <label>{t('emp.email_optional')}</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="maria@empresa.com" className="input" />
+            </div>
+            <div className="form-grid-2">
+              <div className="field">
+                <label>{t('auth.password')}</label>
+                <div style={{ position: 'relative' }}>
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Mín. 6 chars" className="input" style={{ paddingRight: 40 }} required />
+                  <button type="button" onClick={() => setShowPassword(v => !v)} tabIndex={-1} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', fontSize: 16, padding: 0, lineHeight: 1 }}>
+                    {showPassword ? '🙈' : '👁'}
+                  </button>
+                </div>
+              </div>
+              <div className="field">
+                <label>{t('emp.profile')}</label>
+                <select value={role} onChange={e => setRole(e.target.value as 'employee' | 'manager' | 'admin')} className="input">
+                  <option value="employee">{t('auth.role.employee')}</option>
+                  <option value="manager">{t('auth.role.manager')}</option>
+                  <option value="admin">{t('auth.role.admin')}</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-grid-3">
+              <div className="field">
+                <label>{t('emp.workday')}</label>
+                <select value={workdayHours} onChange={e => setWorkdayHours(e.target.value)} className="input">
+                  {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => <option key={h} value={h}>{h}h</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>{t('emp.lunch_label')}</label>
+                <select value={lunchMin} onChange={e => setLunchMin(e.target.value)} className="input">
+                  <option value="0">{t('emp.lunch.none')}</option>
+                  <option value="15">{t('emp.lunch.15')}</option>
+                  <option value="30">{t('emp.lunch.30')}</option>
+                  <option value="45">{t('emp.lunch.45')}</option>
+                  <option value="60">{t('emp.lunch.60')}</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>{t('emp.hourly_rate')}</label>
+                <input type="number" min="0" step="0.01" value={rate} onChange={e => setRate(e.target.value)} placeholder="Opcional" className="input" />
+              </div>
+            </div>
+            {err && <div className="alert-inline err">{err}</div>}
+            {ok  && <div className="alert-inline ok">{ok}</div>}
+            <button type="submit" disabled={loading} className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>
+              {loading ? t('emp.adding') : t('emp.add_btn')}
+            </button>
+          </form>
+        </Modal>
+      )}
+
       {/* Page header */}
       <div className="page-head">
         <div>
@@ -258,7 +336,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
           <button className="btn ghost" onClick={() => setShowImport(v => !v)}>
             <IconDownload size={13}/> Importar CSV
           </button>
-          <button className="btn primary" onClick={() => document.getElementById('emp-add-form')?.scrollIntoView({ behavior: 'smooth' })}>
+          <button className="btn primary" onClick={() => setShowAdd(true)}>
             <IconUserPlus size={13}/> {t('emp.add_btn')}
           </button>
         </div>
@@ -319,133 +397,60 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
             </thead>
             <tbody>
               {filtered.map(emp => (
-                <Fragment key={emp.id}>
-                  <tr className={editingId === emp.id ? 'selected' : ''}>
-                    <td>
-                      <div className="cell-emp">
-                        <div className={`avatar size-28 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
-                        <div className="cell-emp-info">
-                          <div className="cell-emp-name">{emp.name}</div>
-                          <div className="cell-emp-sub">@{emp.username}{emp.email ? ` · ${emp.email}` : ''}</div>
-                        </div>
+                <tr key={emp.id} className={editingId === emp.id ? 'selected' : ''}>
+                  <td>
+                    <div className="cell-emp">
+                      <div className={`avatar size-28 av-c${empColor(emp.id)}`}>{avatarInitials(emp.name)}</div>
+                      <div className="cell-emp-info">
+                        <div className="cell-emp-name">{emp.name}</div>
+                        <div className="cell-emp-sub">@{emp.username}{emp.email ? ` · ${emp.email}` : ''}</div>
                       </div>
-                    </td>
-                    <td>
-                      {emp.role === 'admin' && <span className="chip accent" style={{ fontSize: 10 }}>Admin</span>}
-                      {emp.role === 'manager' && <span className="chip accent" style={{ fontSize: 10 }}>{t('auth.role.manager')}</span>}
-                      {emp.role === 'employee' && <span className="muted" style={{ fontSize: 12 }}>{t('auth.role.employee')}</span>}
-                    </td>
-                    <td className="right tnum">{emp.workday_hours}h</td>
-                    <td className="right tnum muted">{emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min` : '—'}</td>
-                    <td className="right tnum">{emp.hourly_rate != null ? `€${Number(emp.hourly_rate).toFixed(2)}` : <span className="muted">—</span>}</td>
-                    <td>
-                      {emp.active === false
-                        ? <span className="chip outline" style={{ fontSize: 10 }}>Inativo</span>
-                        : <span className="chip success" style={{ fontSize: 10 }}><span className="dot"/>Ativo</span>}
-                      {emp.lock_profile && <span className="chip danger" style={{ fontSize: 10, marginLeft: 4 }}>{t('emp.profile_locked')}</span>}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                        {emp.active === false ? (
-                          <button onClick={() => handleRestore(emp.id)} className="btn ghost sm" title="Reativa o funcionário com todo o histórico preservado">
-                            ↺ Restaurar
+                    </div>
+                  </td>
+                  <td>
+                    {emp.role === 'admin' && <span className="chip accent" style={{ fontSize: 10 }}>Admin</span>}
+                    {emp.role === 'manager' && <span className="chip accent" style={{ fontSize: 10 }}>{t('auth.role.manager')}</span>}
+                    {emp.role === 'employee' && <span className="muted" style={{ fontSize: 12 }}>{t('auth.role.employee')}</span>}
+                  </td>
+                  <td className="right tnum">{emp.workday_hours}h</td>
+                  <td className="right tnum muted">{emp.lunch_break_minutes > 0 ? `${emp.lunch_break_minutes}min` : '—'}</td>
+                  <td className="right tnum">{emp.hourly_rate != null ? `€${Number(emp.hourly_rate).toFixed(2)}` : <span className="muted">—</span>}</td>
+                  <td>
+                    {emp.active === false
+                      ? <span className="chip outline" style={{ fontSize: 10 }}>Inativo</span>
+                      : <span className="chip success" style={{ fontSize: 10 }}><span className="dot"/>Ativo</span>}
+                    {emp.lock_profile && <span className="chip danger" style={{ fontSize: 10, marginLeft: 4 }}>{t('emp.profile_locked')}</span>}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                      {emp.active === false ? (
+                        <button onClick={() => handleRestore(emp.id)} className="btn ghost sm" title="Reativa o funcionário com todo o histórico preservado">
+                          ↺ Restaurar
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleToggleLock(emp)}
+                            disabled={lockingId === emp.id}
+                            className={`btn ghost sm icon${emp.lock_profile ? ' danger' : ''}`}
+                            title={emp.lock_profile ? t('emp.unlock_profile') : t('emp.lock_profile')}
+                            style={{ opacity: lockingId === emp.id ? 0.5 : 1 }}
+                          >
+                            {emp.lock_profile ? '🔒' : '🔓'}
                           </button>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => handleToggleLock(emp)}
-                              disabled={lockingId === emp.id}
-                              className={`btn ghost sm icon${emp.lock_profile ? ' danger' : ''}`}
-                              title={emp.lock_profile ? t('emp.unlock_profile') : t('emp.lock_profile')}
-                              style={{ opacity: lockingId === emp.id ? 0.5 : 1 }}
-                            >
-                              {emp.lock_profile ? '🔒' : '🔓'}
-                            </button>
-                            <button onClick={() => setEditingId(editingId === emp.id ? null : emp.id)} className="btn ghost sm icon" title="Configurações">⚙</button>
-                            {emp.role !== 'admin' && (
-                              <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">{t('emp.remove')}</button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  {editingId === emp.id && (
-                    <tr>
-                      <td colSpan={7} style={{ padding: '0 16px 16px', borderBottom: '1px solid var(--border)' }}>
-                        <EmployeeSettings emp={emp} onDone={() => { setEditingId(null); onRefresh() }} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                          <button onClick={() => setEditingId(emp.id)} className="btn ghost sm icon" title="Configurações">⚙</button>
+                          {emp.role !== 'admin' && (
+                            <button onClick={() => handleRemove(emp.id, emp.name)} className="btn danger sm">{t('emp.remove')}</button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
         )}
-      </div>
-
-      <div className="card" id="emp-add-form">
-        <div className="card-head">
-          <div className="card-title">{t('emp.add_new')}</div>
-        </div>
-        <div className="card-body">
-          <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
-            <div className="form-grid-2">
-              <div className="field"><label>{t('emp.name')}</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Maria Silva" className="input" required /></div>
-              <div className="field"><label>{t('emp.username_label')}</label><input value={username} onChange={e => setUsername(e.target.value)} placeholder="maria.silva" className="input" required /></div>
-            </div>
-            <div className="field">
-              <label>{t('emp.email_optional')}</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="maria@empresa.com" className="input" />
-            </div>
-            <div className="form-grid-2">
-              <div className="field">
-                <label>{t('auth.password')}</label>
-                <div style={{ position: 'relative' }}>
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Mín. 6 chars" className="input" style={{ paddingRight: 40 }} required />
-                  <button type="button" onClick={() => setShowPassword(v => !v)} tabIndex={-1} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', fontSize: 16, padding: 0, lineHeight: 1 }}>
-                    {showPassword ? '🙈' : '👁'}
-                  </button>
-                </div>
-              </div>
-              <div className="field">
-                <label>{t('emp.profile')}</label>
-                <select value={role} onChange={e => setRole(e.target.value as 'employee' | 'manager' | 'admin')} className="input">
-                  <option value="employee">{t('auth.role.employee')}</option>
-                  <option value="manager">{t('auth.role.manager')}</option>
-                  <option value="admin">{t('auth.role.admin')}</option>
-                </select>
-              </div>
-            </div>
-            <div className="form-grid-3">
-              <div className="field">
-                <label>{t('emp.workday')}</label>
-                <select value={workdayHours} onChange={e => setWorkdayHours(e.target.value)} className="input">
-                  {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => <option key={h} value={h}>{h}h</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label>{t('emp.lunch_label')}</label>
-                <select value={lunchMin} onChange={e => setLunchMin(e.target.value)} className="input">
-                  <option value="0">{t('emp.lunch.none')}</option>
-                  <option value="15">{t('emp.lunch.15')}</option>
-                  <option value="30">{t('emp.lunch.30')}</option>
-                  <option value="45">{t('emp.lunch.45')}</option>
-                  <option value="60">{t('emp.lunch.60')}</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>{t('emp.hourly_rate')}</label>
-                <input type="number" min="0" step="0.01" value={rate} onChange={e => setRate(e.target.value)} placeholder="Opcional" className="input" />
-              </div>
-            </div>
-            {err && <div className="alert-inline err">{err}</div>}
-            {ok  && <div className="alert-inline ok">{ok}</div>}
-            <button type="submit" disabled={loading} className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>
-              {loading ? t('emp.adding') : t('emp.add_btn')}
-            </button>
-          </form>
-        </div>
       </div>
     </>
   )
