@@ -4,9 +4,62 @@ import { verifyApiAuth } from '@/lib/apiAuth'
 import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
-import { calcWorkDate } from '@/lib/utils'
+import { calcWorkDate, calcNetMinutes } from '@/lib/utils'
 import { rateLimit } from '@/lib/rateLimit'
 import { validateGeofence, isDuplicatePunch, isValidPunchType, resolvePunchTimestamp } from '@/lib/punchValidation'
+import type { PunchRecord } from '@/lib/types'
+import webpush from 'web-push'
+
+if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  )
+}
+
+async function maybeNotifyDailyTarget(tenantId: string, empId: string, date: string, newRecord: PunchRecord) {
+  try {
+    const [{ data: empRow }, { data: prevRecs }] = await Promise.all([
+      supabase.from('employees')
+        .select('workday_hours, lunch_break_minutes')
+        .eq('id', empId).maybeSingle(),
+      supabase.from('records').select('*')
+        .eq('tenant_id', tenantId).eq('employee_id', empId).eq('date', date)
+        .order('timestamp', { ascending: true }),
+    ])
+    if (!empRow) return
+    const targetMin = (empRow.workday_hours ?? 8) * 60
+    const lunch = empRow.lunch_break_minutes ?? 60
+    const recsWithout = (prevRecs ?? []).filter((r: PunchRecord) => r.id !== newRecord.id) as PunchRecord[]
+    const recsWithNew = [...recsWithout, newRecord]
+    const beforeMin = calcNetMinutes(recsWithout, lunch)
+    const afterMin = calcNetMinutes(recsWithNew, lunch)
+    if (beforeMin >= targetMin || afterMin < targetMin) return
+
+    const { data: subs } = await supabase
+      .from('push_subscriptions')
+      .select('subscription')
+      .eq('tenant_id', tenantId)
+      .eq('employee_id', empId)
+    if (!subs?.length) return
+
+    const h = Math.floor(targetMin / 60)
+    const m = targetMin % 60
+    const label = m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
+    const payload = JSON.stringify({
+      title: 'Jornada concluída 🏁',
+      body: `Concluíste a jornada de ${label} de hoje. Não te esqueças de registar a saída!`,
+      tag: `daily-target-${date}`,
+      url: '/ponto',
+    })
+    await Promise.allSettled(
+      subs.map(({ subscription }) =>
+        webpush.sendNotification(subscription as webpush.PushSubscription, payload).catch(() => {})
+      )
+    )
+  } catch { /* non-critical */ }
+}
 
 export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
@@ -110,6 +163,11 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (onBehalf) await logAudit(user, 'punch_on_behalf', { id: empId, name: empName }, { type })
+
+  // Fire-and-forget: notify the employee if today's worked hours just hit their daily target.
+  if (!onBehalf && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+    void maybeNotifyDailyTarget(user.tenant_id, empId, workDate, data as PunchRecord)
+  }
 
   return NextResponse.json(timestampAdjusted ? { ...data, timestamp_adjusted: true } : data)
 }

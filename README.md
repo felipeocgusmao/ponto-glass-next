@@ -93,7 +93,7 @@ Existe **um URL** e **uma senha**.
 │   Push        →   Web Push API  (VAPID)                 │
 │   E-mail      →   Microsoft Graph API  (+ SMTP fallback)│
 │   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
-│   Cron        →   Vercel Cron Jobs  (ausências, saída)  │
+│   Cron        →   Vercel Cron Jobs  (ausência, saída, mensal, semanal)│
 │   Voz         →   Web Speech API  (reconhecimento + TTS)│
 │   Testes      →   Vitest  (147 unit) + Playwright  (E2E) │
 │   Monitor     →   Sentry  (erros cliente + servidor)    │
@@ -142,13 +142,15 @@ Cada peça foi escolhida com intenção:
   ● Desconto de almoço automático*     ● Relatórios por período             ● Alterar nome de usuário
   ● Horas extras acumuladas            ● Exportar CSV profissional          ● Criar usuários (funcionário/gerente/admin)
   ● Banco de horas pessoal             ● Exportar PDF profissional          ● Audit log de ações administrativas
-  ● Solicitar correção de registo      ● Gerir feriados e folgas            ● Gerir solicitações de correção
-  ● Notificações push de fim jornada   ● Aprovar/rejeitar correções         ● Configurar geo por funcionário
-  ● Histórico mensal (lista)           ● Dashboard com gráficos             ● Bloquear perfil de funcionário
-  ● Vista calendário mensal            ● Alerta de saídas em falta          ● Ajustar banco de horas manualmente
-  ● Trocar senha                       ● Quiosque de ponto                  ● Definir horário esperado por func.
-  ● Selector de idioma (PT/BR/EN/ES)   ● Push de ausência (cron 09h UTC)    ● Comentário em qualquer registo
-  ● Tema claro/escuro (persiste)       ● Comentários em registos
+  ● Solicitar correção de registo      ● Exportar ICS (calendário)          ● Gerir solicitações de correção
+  ● Notificações push de fim jornada   ● Gerir feriados e folgas            ● Configurar geo por funcionário
+  ● Push server-side ao cumprir horas  ● Aprovar/rejeitar correções         ● Bloquear perfil de funcionário
+  ● Histórico mensal (lista)           ● Dashboard com gráficos             ● Ajustar banco de horas manualmente
+  ● Vista calendário mensal            ● Alerta de saídas em falta          ● Definir horário esperado por func.
+  ● Trocar senha                       ● Quiosque de ponto                  ● Comentário em qualquer registo
+  ● Terminar outras sessões            ● Push de ausência (cron 09h UTC)    ● Relatório semanal automático por e-mail
+  ● Selector de idioma (PT/BR/EN/ES)   ● Comentários em registos            ● Monitorização via /api/health
+  ● Tema claro/escuro (persiste)       ● Paginação automática em relatórios
 ```
 
 *\*desconto automático só se aplica quando pausas explícitas não foram registradas (fallback legado)*
@@ -226,6 +228,8 @@ A deteção é automática (via `navigator.language` + `localStorage`). Todas as
 ponto_glass_next/
 │
 ├── app/
+│   ├── _components/
+│   │   └── ErrorBoundary.tsx     ← React class component — captura erros de rendering por tab
 │   ├── page.tsx                  ← redirect inteligente (admin/manager → /admin | employee → /ponto)
 │   ├── login/page.tsx            ← autenticação (split-screen com relógio animado)
 │   ├── reset-password/page.tsx   ← reset de senha via link de e-mail
@@ -243,7 +247,7 @@ ponto_glass_next/
 │   │       ├── TopBar            ← breadcrumbs + ⌘K + tema + sino com badge
 │   │       ├── CommandPalette    ← navegação por teclado e ações rápidas (⌘K / Ctrl+K)
 │   │       ├── NotificationsDropdown  ← popover do sino: correções, saídas em falta, ausências
-│   │       ├── SettingsModal     ← tema, idioma, palavra-passe, sair
+│   │       ├── SettingsModal     ← tema, idioma, palavra-passe, terminar outras sessões, sair
 │   │       └── tabs/
 │   │           ├── MeuPontoTab       ← ponto do admin/gerente logado
 │   │           ├── DashboardTab      ← KPIs, sparkline, gráfico 14 dias, feed de batidas, atrasos
@@ -252,20 +256,22 @@ ponto_glass_next/
 │   │           ├── FuncionariosTab   ← filter bar + tabela densa + drawer de configurações
 │   │           ├── BancoHorasTab     ← KPI grid, tabela com trend bars centradas em zero
 │   │           ├── FeriadosTab       ← toggle Lista/Calendário (grelha mensal navegável)
-│   │           ├── RelatoriosTab     ← KPI summary, quick range pills, tabela por funcionário (Resumo/Detalhado)
+│   │           ├── RelatoriosTab     ← KPI summary, quick range pills, tabela por funcionário (Resumo/Detalhado), exportação ICS, paginação automática
 │   │           ├── CorrecoesTab      ← aprovar/rejeitar solicitações de correção
 │   │           └── AuditoriaTab      ← search + filtro de ator + exportar JSON
 │   │
 │   └── api/
+│       ├── health/               ← endpoint público de saúde (sem auth, retorna status DB)
 │       ├── auth/
-│       │   ├── login/            ← bcrypt + JWT + cookie + rate limit
+│       │   ├── login/            ← bcrypt + JWT + cookie + rate limit (IP + por utilizador)
 │       │   ├── logout/           ← limpa cookie
 │       │   ├── password/         ← troca de senha autenticada
 │       │   ├── forgot-password/  ← envia link de reset por e-mail
 │       │   ├── reset-password/   ← valida token e redefine senha
-│       │   └── recover/          ← reset de emergência via RECOVERY_SECRET
+│       │   ├── recover/          ← reset de emergência via RECOVERY_SECRET
+│       │   └── revoke-other-sessions/ ← revoga sessões anteriores + emite novo token
 │       ├── me/                   ← perfil completo + PATCH (tema, e-mail, geo_mode)
-│       ├── punch/                ← registra ponto (admin pode registrar por outros)
+│       ├── punch/                ← registra ponto + push quando jornada concluída
 │       ├── records/              ← lista / edita / remove registros + comentários
 │       │   └── [id]/
 │       ├── employees/            ← CRUD funcionários + horário esperado + turno noturno
@@ -273,7 +279,9 @@ ponto_glass_next/
 │       ├── cron/
 │       │   ├── entry-reminder/   ← push de entrada previsto na próxima hora (CRON_SECRET)
 │       │   ├── absence-check/    ← push de ausência (protegido por CRON_SECRET)
-│       │   └── missing-exit/     ← alerta de saída não registada às 17h (protegido por CRON_SECRET)
+│       │   ├── missing-exit/     ← alerta de saída não registada às 17h (protegido por CRON_SECRET)
+│       │   ├── monthly-report/   ← relatório mensal por e-mail (1º do mês, 08h UTC)
+│       │   └── weekly-report/    ← relatório semanal por e-mail (2ª-feira, 08h UTC)
 │       ├── hour-bank/            ← saldo do banco de horas + ajustes manuais
 │       │   └── [id]/
 │       ├── correction-requests/  ← criar / listar / aprovar / rejeitar correções
@@ -282,7 +290,8 @@ ponto_glass_next/
 │       │   └── [id]/
 │       ├── push-subscribe/       ← regista subscription VAPID do browser
 │       ├── audit/                ← audit log (admin only)
-│       └── reports/              ← relatório por período (máx 366 dias)
+│       └── reports/              ← relatório por período (máx 366 dias, paginação automática)
+│           └── calendar/         ← exportar registros como .ics (iCalendar, 1 VEVENT/dia)
 │
 ├── components/
 │   └── ChangePasswordModal.tsx
@@ -532,7 +541,8 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  JWT assinado com HS256 em httpOnly cookie (inatingível por JS)
   ✓  Middleware de RBAC em todas as rotas sensíveis (admin / manager / employee)
   ✓  Service role key nunca exposta ao cliente
-  ✓  Rate limiting: 5 tentativas/15min no login e na recuperação
+  ✓  Rate limiting por IP: 5 tentativas / 15 min no login e na recuperação
+  ✓  Rate limiting por utilizador: 10 tentativas / 30 min (lockout independente do IP)
   ✓  Row Level Security habilitado no Supabase
   ✓  Funcionários só enxergam os próprios registros
   ✓  Soft delete — nenhum dado é apagado permanentemente
@@ -544,6 +554,8 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Reset de senha por e-mail com token de uso único e expiração
   ✓  Geofencing por funcionário (Haversine, validação no servidor — não confia no cliente)
   ✓  Sessões revogáveis via sessions_valid_from no JWT payload
+  ✓  "Terminar outras sessões" — revoga tokens anteriores, emite sessão fresca
+  ✓  React Error Boundary em todos os tabs — falhas de rendering não quebram o shell
   ✓  Monitorização Sentry — erros capturados sem expor segredos
 ```
 
@@ -623,6 +635,15 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Importação CSV/XLSX de funcionários (preview com validação por linha, modelo para download)
   ✓  2FA TOTP opt-in (QR no perfil, código no login, reset por admin)
   ✓  Relatório mensal automático por e-mail (cron + disparo manual)
+  ✓  React Error Boundary em todos os tabs do admin (recuperação sem refresh total)
+  ✓  Endpoint /api/health para monitorização externa (sem autenticação)
+  ✓  Bloqueio de conta por utilizador (10 tentativas / 30 min, independente do IP)
+  ✓  "Terminar outras sessões" — revoga sessões anteriores, emite token fresco (admin + funcionário)
+  ✓  Push server-side de jornada concluída (ao cruzar workday_hours na batida)
+  ✓  Relatório semanal automático por e-mail (cron 2ª-feira 08h UTC)
+  ✓  Exportação .ics (iCalendar) — um VEVENT por dia trabalhado, botão no RelatoriosTab
+  ✓  UI otimista nos registos de ponto — estado visual muda antes da resposta do servidor
+  ✓  Relatórios sem truncagem — paginação automática (todas as páginas em paralelo)
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
 

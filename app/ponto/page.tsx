@@ -538,6 +538,20 @@ export default function PontoPage() {
         return
       }
     }
+
+    // Optimistic: add a temporary record before the network round-trip so the
+    // UI state (ring, status chip, action buttons) flips immediately.
+    const tempId = `optimistic-${Date.now()}`
+    const optimisticRec: PunchRecord = {
+      id: tempId,
+      employee_id: user.id,
+      employee_name: user.name,
+      type,
+      timestamp: new Date().toISOString(),
+      date: businessDate(),
+    }
+    setRecords(prev => [...prev, optimisticRec])
+
     try {
       const res = await fetch('/api/punch', {
         method: 'POST',
@@ -545,18 +559,21 @@ export default function PontoPage() {
         body: JSON.stringify({ type, ...(geo ? { latitude: geo.lat, longitude: geo.lng } : {}) }),
       })
       if (res.ok) {
-        // Optimistic update from the server's inserted record, so the state flips
-        // immediately even if the follow-up reload is slow, fails, or arrives stale.
         const rec: PunchRecord = await res.json()
-        setRecords(prev => [...prev.filter(r => r.id !== rec.id), rec])
-        setHistoryLoaded(false) // invalidate history cache
+        // Replace optimistic record with the authoritative server record
+        setRecords(prev => [...prev.filter(r => r.id !== tempId), rec])
+        setHistoryLoaded(false)
         showToast(type === 'entrada' ? t('ponto.registered_in') : type === 'saída' ? t('ponto.registered_out') : PUNCH_LABEL_PT[type])
-        loadRecords() // reconcile in the background (guarded against stale responses)
+        loadRecords()
       } else {
+        setRecords(prev => prev.filter(r => r.id !== tempId))
         const d = await res.json()
         showToast(d.error ?? 'Erro ao registrar')
       }
-    } catch { queueOfflinePunch(type) }
+    } catch {
+      setRecords(prev => prev.filter(r => r.id !== tempId))
+      queueOfflinePunch(type)
+    }
     finally { setPunching(false) }
   }
 
@@ -1158,6 +1175,18 @@ export default function PontoPage() {
                 </button>
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
                   <TotpSection />
+                </div>
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
+                  <button
+                    className="btn-emp"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                    onClick={async () => {
+                      await fetch('/api/auth/revoke-other-sessions', { method: 'POST' })
+                      showToast('Outras sessões terminadas.')
+                    }}
+                  >
+                    Terminar outras sessões
+                  </button>
                 </div>
               </div>
             )}

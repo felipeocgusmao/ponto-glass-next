@@ -70,17 +70,26 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const params = new URLSearchParams({ from, to })
+      const params = new URLSearchParams({ from, to, limit: '500' })
       if (filterEmpId !== 'all') params.set('employeeId', filterEmpId)
       const [res, excRes] = await Promise.all([
-        fetch(`/api/reports?${params}`),
+        fetch(`/api/reports?${params}&page=1`),
         fetch(`/api/day-exceptions?from=${from}&to=${to}`),
       ])
       if (!res.ok) { const d = await res.json(); setError(d.error ?? t('error.connect')); return }
       const json = await res.json()
-      const data: PunchRecord[] = json.data
-      setRecords(data)
-      setTruncated(data.length >= 2000)
+      let allData: PunchRecord[] = json.data
+      const { totalPages } = json.pagination as { totalPages: number }
+      // Fetch remaining pages in parallel so large periods load completely
+      if (totalPages > 1) {
+        const pages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
+        const rest = await Promise.all(
+          pages.map(p => fetch(`/api/reports?${params}&page=${p}`).then(r => r.json()))
+        )
+        rest.forEach(j => { allData = allData.concat(j.data as PunchRecord[]) })
+      }
+      setRecords(allData)
+      setTruncated(false)
       if (excRes.ok) {
         const exc: { date: string }[] = await excRes.json()
         setDayExceptions(exc.map(e => e.date))
@@ -169,6 +178,11 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                 onClick={() => exportPDF(records, `ponto_${from}_${to}.pdf`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })), `${from} a ${to}`)}
                 className="btn"
               ><IconDownload size={13}/> PDF</button>
+              <a
+                href={`/api/reports/calendar?from=${from}&to=${to}${filterEmpId !== 'all' ? `&employeeId=${filterEmpId}` : ''}`}
+                download={`ponto_${from}_${to}.ics`}
+                className="btn"
+              ><IconDownload size={13}/> ICS</a>
             </>
           )}
           <button onClick={sendEmailReport} disabled={emailSending} className="btn" title="Enviar relatório do período seleccionado por e-mail">

@@ -28,6 +28,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Usuário e senha são obrigatórios' }, { status: 400 })
   }
 
+  const userKey = `login:user:${String(username).trim().toLowerCase()}`
+  const userRl = await checkRateLimit(userKey, 10, 30 * 60 * 1000)
+  if (!userRl.allowed) {
+    const res = NextResponse.json(
+      { error: 'Conta temporariamente bloqueada. Tente novamente em 30 minutos.' },
+      { status: 429 }
+    )
+    applyRateLimitHeaders(res.headers, userRl)
+    return res
+  }
+
   // Which tenant is this login attempt for? Resolved from the host (custom
   // domain → slug subdomain → default). Null means the URL names a tenant
   // subdomain that doesn't exist — refuse instead of guessing.
