@@ -78,7 +78,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
       const params = new URLSearchParams({ from, to })
       if (empId !== 'all') params.set('employeeId', empId)
       const res = await fetch(`/api/reports?${params}`)
-      if (res.ok) setRecords(await res.json())
+      if (res.ok) setRecords((await res.json()).data)
       else { const d = await res.json(); setError(d.error ?? t('error.connect')) }
     } catch { setError(t('error.connect')) }
     finally { setLoading(false) }

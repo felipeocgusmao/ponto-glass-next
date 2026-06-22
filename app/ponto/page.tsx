@@ -215,7 +215,7 @@ export default function PontoPage() {
         fetch(`/api/day-exceptions?from=${from}&to=${to}`),
       ])
       if (res.ok) {
-        setHistoryRecs(await res.json())
+        setHistoryRecs((await res.json()).data)
         if (excRes.ok) {
           const exc: DayException[] = await excRes.json()
           setHistoryExceptions(exc.map(e => e.date))

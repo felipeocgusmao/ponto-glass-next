@@ -41,7 +41,7 @@ export function useNotifications({
     try {
       const res = await fetch(`/api/reports?from=${fromDate}&to=${today}`)
       if (!res.ok) return
-      const records: PunchRecord[] = await res.json()
+      const { data: records }: { data: PunchRecord[] } = await res.json()
       const byEmpDate = new Map<string, Map<string, PunchRecord[]>>()
       records.forEach(r => {
         if (!byEmpDate.has(r.employee_id)) byEmpDate.set(r.employee_id, new Map())

@@ -54,7 +54,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
         fetch('/api/records?today=true'),
         fetch(`/api/day-exceptions?from=${todayStr}&to=${next30Str}`),
       ])
-      if (mRes.ok) setMonthRecs(await mRes.json())
+      if (mRes.ok) setMonthRecs((await mRes.json()).data)
       if (tRes.ok) setTodayRecs(await tRes.json())
       if (eRes.ok) setExceptions(await eRes.json())
     } catch { /* silent */ }
