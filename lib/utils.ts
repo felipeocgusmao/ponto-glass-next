@@ -116,7 +116,11 @@ function hasExplicitBreaks(records: PunchRecord[]): boolean {
 }
 
 export function calcNetMinutes(records: PunchRecord[], lunchBreakMinutes = 0): number {
-  if (hasExplicitBreaks(records)) return Math.max(0, calcTimeBreakdown(records).workedMin)
+  if (hasExplicitBreaks(records)) {
+    // Coffee breaks count as worked time; lunch is unpaid and excluded.
+    const { workedMin, coffeeMin } = calcTimeBreakdown(records)
+    return Math.max(0, workedMin + coffeeMin)
+  }
   return Math.max(0, pairMinutes(records) - lunchBreakMinutes)
 }
 
@@ -416,7 +420,7 @@ export async function exportPDF(
       const day = [...empDays.get(date)!].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       const explicit = day.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
       const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
-      const exactNet = explicit ? workedMin : Math.max(0, calcNetMinutes(day, autoLunch))
+      const exactNet = Math.max(0, calcNetMinutes(day, autoLunch))
       // Round each day to the nearest 15-min mark so the PDF total = sum of displayed rows.
       const netMin = roundToQuarter(exactNet)
       const incomplete = isIncompleteDay(day)
