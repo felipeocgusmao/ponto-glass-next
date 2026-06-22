@@ -61,6 +61,29 @@ async function maybeNotifyDailyTarget(tenantId: string, empId: string, date: str
   } catch { /* non-critical */ }
 }
 
+async function fireWebhooks(tenantId: string, payload: Record<string, unknown>) {
+  try {
+    const { data: configs } = await supabase
+      .from('webhook_configs')
+      .select('url, secret')
+      .eq('tenant_id', tenantId)
+      .eq('active', true)
+    if (!configs?.length) return
+    const body = JSON.stringify({ event: 'punch', ts: new Date().toISOString(), ...payload })
+    await Promise.allSettled(
+      configs.map(async (cfg: { url: string; secret: string | null }) => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (cfg.secret) {
+          const { createHmac } = await import('crypto')
+          const sig = createHmac('sha256', cfg.secret).update(body).digest('hex')
+          headers['X-PontoGlass-Signature'] = `sha256=${sig}`
+        }
+        await fetch(cfg.url, { method: 'POST', headers, body, signal: AbortSignal.timeout(5000) }).catch(() => {})
+      })
+    )
+  } catch { /* non-critical */ }
+}
+
 export async function POST(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -168,6 +191,9 @@ export async function POST(request: NextRequest) {
   if (!onBehalf && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
     void maybeNotifyDailyTarget(user.tenant_id, empId, workDate, data as PunchRecord)
   }
+
+  // Fire-and-forget: deliver outbound webhooks for this punch event.
+  void fireWebhooks(user.tenant_id, { record: data, employeeName: empName, type })
 
   return NextResponse.json(timestampAdjusted ? { ...data, timestamp_adjusted: true } : data)
 }

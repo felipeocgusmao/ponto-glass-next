@@ -872,6 +872,64 @@ export default function PontoPage() {
         {/* ── HISTÓRICO TAB ─────────────────────────────────────────────────── */}
         {tab === 'historico' && (
           <div className="emp-card">
+            {/* Weekly bar chart — only shown when viewing the current month */}
+            {isCurrentHistMonth && !historyLoading && byDay.size > 0 && (() => {
+              const targetMin = (user?.workday_hours ?? 8) * 60
+              const today = businessDate()
+              const days7: { date: string; min: number; isToday: boolean; isWeekend: boolean }[] = []
+              for (let i = 6; i >= 0; i--) {
+                const d = new Date(today + 'T12:00:00')
+                d.setDate(d.getDate() - i)
+                const iso = d.toISOString().split('T')[0]
+                const recs = byDay.get(iso) ?? []
+                const dow = d.getDay()
+                days7.push({
+                  date: iso,
+                  min: recs.length > 0 ? roundToQuarter(calcNetMinutes(recs, user.lunch_break_minutes)) : 0,
+                  isToday: iso === today,
+                  isWeekend: dow === 0 || dow === 6,
+                })
+              }
+              const maxMin = Math.max(targetMin * 1.2, ...days7.map(d => d.min))
+              const W = 44, GAP = 6, H = 52, LABEL_H = 18
+              const totalW = days7.length * W + (days7.length - 1) * GAP
+              return (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 8 }}>Últimos 7 dias</div>
+                  <svg width="100%" viewBox={`0 0 ${totalW} ${H + LABEL_H}`} style={{ overflow: 'visible', display: 'block' }}>
+                    {/* target line */}
+                    <line
+                      x1={0} y1={H - (targetMin / maxMin) * H}
+                      x2={totalW} y2={H - (targetMin / maxMin) * H}
+                      stroke="var(--accent)" strokeWidth="1" strokeDasharray="3 3" opacity="0.5"
+                    />
+                    {days7.map((d, i) => {
+                      const barH = d.min > 0 ? Math.max(3, (d.min / maxMin) * H) : 0
+                      const x = i * (W + GAP)
+                      const [, mo, day] = d.date.split('-').map(Number)
+                      const fill = d.isToday ? 'var(--accent)' : d.isWeekend ? 'var(--surface-3)' : 'var(--surface-2)'
+                      const textColor = d.isToday ? 'var(--accent)' : 'var(--fg-subtle)'
+                      return (
+                        <g key={d.date}>
+                          <rect
+                            x={x} y={H - barH} width={W} height={barH}
+                            rx={4} fill={fill} opacity={d.isWeekend && !d.min ? 0.4 : 1}
+                          />
+                          {d.min > 0 && (
+                            <text x={x + W / 2} y={H - barH - 3} textAnchor="middle" fontSize={8} fill="var(--fg-muted)" fontFamily="var(--font-mono)">
+                              {Math.floor(d.min / 60)}h{d.min % 60 > 0 ? String(d.min % 60).padStart(2,'0') : ''}
+                            </text>
+                          )}
+                          <text x={x + W / 2} y={H + 12} textAnchor="middle" fontSize={9} fill={textColor} fontWeight={d.isToday ? 700 : 400}>
+                            {String(day).padStart(2,'0')}/{String(mo).padStart(2,'0')}
+                          </text>
+                        </g>
+                      )
+                    })}
+                  </svg>
+                </div>
+              )
+            })()}
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

@@ -47,6 +47,28 @@ function ArrowIcon({ size = 14 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
 }
 
+function QrModal({ emp, onClose }: { emp: Employee; onClose: () => void }) {
+  const [qrUrl, setQrUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    fetch(`/api/qr?employeeId=${emp.id}`)
+      .then(r => r.json())
+      .then(d => { setQrUrl(d.qrDataUrl); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [emp.id])
+  return (
+    <div className="drawer-overlay" onClick={onClose} style={{ zIndex: 90 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--sidebar-bg)', borderRadius: 16, padding: 28, textAlign: 'center', maxWidth: 320, margin: 'auto' }}>
+        <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{emp.name}</div>
+        <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 20 }}>Digitalize para registar ponto com o telemóvel</div>
+        {loading && <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)' }}>A gerar QR…</div>}
+        {qrUrl && <img src={qrUrl} alt="QR Code" style={{ width: 200, height: 200, borderRadius: 8, display: 'block', margin: '0 auto' }} />}
+        <button onClick={onClose} className="btn" style={{ marginTop: 20, width: '100%', justifyContent: 'center' }}>Fechar</button>
+      </div>
+    </div>
+  )
+}
+
 export default function KioskPage() {
   const { t } = useLang()
   const router = useRouter()
@@ -59,6 +81,7 @@ export default function KioskPage() {
   const [punchType, setPunchType] = useState<PunchType>('entrada')
   const [punching, setPunching] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [qrEmp, setQrEmp] = useState<Employee | null>(null)
 
   const [now, setNow] = useState(new Date())
   const recsSeq = useRef(0)
@@ -248,6 +271,11 @@ export default function KioskPage() {
                           {fmtMinutes(dayMin)}
                         </div>
                       )}
+                      <button
+                        onClick={e => { e.stopPropagation(); setQrEmp(emp) }}
+                        title="Ver QR Code"
+                        style={{ marginTop: 6, fontSize: 10, padding: '2px 8px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', color: 'var(--fg-muted)' }}
+                      >QR</button>
                     </div>
                   </button>
                 )
@@ -256,6 +284,9 @@ export default function KioskPage() {
           )}
         </div>
       </main>
+
+      {/* QR modal */}
+      {qrEmp && <QrModal emp={qrEmp} onClose={() => setQrEmp(null)} />}
 
       {/* Punch modal */}
       {selected && (

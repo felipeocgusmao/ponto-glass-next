@@ -8,7 +8,7 @@ import { useLang, type Lang } from '@/lib/LangContext'
 import {
   IconClock, IconDashboard, IconStatus, IconList, IconUsers,
   IconBank, IconCalendar, IconBar, IconAudit, IconEdit,
-  IconChevronsLeft, IconSettings, IconBuilding,
+  IconChevronsLeft, IconSettings, IconBuilding, IconBell,
 } from './icons'
 
 const TAB_ICONS: Record<Tab, React.ReactNode> = {
@@ -23,6 +23,8 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   relatorios:   <IconBar />,
   auditoria:    <IconAudit />,
   empresas:     <IconBuilding />,
+  alertas:      <IconBell />,
+  integracoes:  <IconSettings />,
 }
 
 const NAV_GROUPS: { key: string; labels: Record<Lang, string>; tabs: Tab[] }[] = [
@@ -40,6 +42,11 @@ const NAV_GROUPS: { key: string; labels: Record<Lang, string>; tabs: Tab[] }[] =
     key: 'analise',
     labels: { 'pt-PT': 'Análise', 'pt-BR': 'Análise', 'en': 'Analysis', 'es': 'Análisis' },
     tabs: ['relatorios', 'auditoria'],
+  },
+  {
+    key: 'sistema',
+    labels: { 'pt-PT': 'Sistema', 'pt-BR': 'Sistema', 'en': 'System', 'es': 'Sistema' },
+    tabs: ['alertas', 'integracoes'],
   },
   {
     key: 'plataforma',

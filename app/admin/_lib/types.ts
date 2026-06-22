@@ -1,6 +1,6 @@
 'use client'
 
-export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes' | 'empresas'
+export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes' | 'empresas' | 'alertas' | 'integracoes'
 
 // Appended to ALL_TABS only for super-admins (platform operators).
 export const SUPER_ADMIN_TABS: { id: Tab; label: string }[] = [
@@ -8,16 +8,18 @@ export const SUPER_ADMIN_TABS: { id: Tab; label: string }[] = [
 ]
 
 export const ALL_TABS: { id: Tab; label: string }[] = [
-  { id: 'meu_ponto',    label: 'Meu Ponto'  },
-  { id: 'dashboard',    label: 'Dashboard'  },
-  { id: 'status',       label: 'Status'     },
-  { id: 'registros',    label: 'Registros'  },
-  { id: 'correcoes',    label: 'Correções'  },
-  { id: 'funcionarios', label: 'Equipe'     },
-  { id: 'banco',        label: 'Banco'      },
-  { id: 'feriados',     label: 'Feriados'   },
-  { id: 'relatorios',   label: 'Relatório'  },
-  { id: 'auditoria',    label: 'Auditoria'  },
+  { id: 'meu_ponto',    label: 'Meu Ponto'    },
+  { id: 'dashboard',    label: 'Dashboard'    },
+  { id: 'status',       label: 'Status'       },
+  { id: 'registros',    label: 'Registros'    },
+  { id: 'correcoes',    label: 'Correções'    },
+  { id: 'funcionarios', label: 'Equipe'       },
+  { id: 'banco',        label: 'Banco'        },
+  { id: 'feriados',     label: 'Feriados'     },
+  { id: 'relatorios',   label: 'Relatório'    },
+  { id: 'alertas',      label: 'Alertas'      },
+  { id: 'integracoes',  label: 'Integrações'  },
+  { id: 'auditoria',    label: 'Auditoria'    },
 ]
 
 export const MANAGER_TABS: { id: Tab; label: string }[] = [
