@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { exportCSV, exportPDF, fmtCentesimal, fmtCentesimalSigned, fmtEur, roundToQuarter, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, calcTimeBreakdown, businessDate, isIncompleteDay, avatarInitials } from '@/lib/utils'
+import { exportCSV, exportPDF, fmtCentesimal, fmtCentesimalSigned, fmtEur, roundToQuarter, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, businessDate, isIncompleteDay, avatarInitials } from '@/lib/utils'
 import { empColor, getWorkingDays, openPayslip } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import { IconDownload, IconRefresh } from '../icons'
@@ -335,9 +335,8 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                   empMap.forEach((dayRecs, eId) => {
                     const e = employees.find(emp => emp.id === eId)
                     const lMin = e?.lunch_break_minutes ?? 60
-                    const hasBreaks = dayRecs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
                     // Round per (employee × day) so the chart bar agrees with the rounded daily values shown in the table below.
-                    const dayExact = hasBreaks ? calcTimeBreakdown(dayRecs).workedMin : Math.max(0, calcNetMinutes(dayRecs, lMin))
+                    const dayExact = Math.max(0, calcNetMinutes(dayRecs, lMin))
                     totalMin += roundToQuarter(dayExact)
                   })
                   return { date, min: totalMin }

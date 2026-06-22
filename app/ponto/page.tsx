@@ -42,7 +42,14 @@ function getWorkState(recs: PunchRecord[]): { state: WorkState; since: string | 
 function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
   const { state, since } = getWorkState(recs)
   const hasBreaks = recs.some(r => ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe'].includes(r.type))
-  const base = hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, lunchAuto)
+  if (hasBreaks) {
+    const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(recs)
+    const completed = workedMin + lunchMin + coffeeMin
+    if ((state === 'working' || state === 'lunch' || state === 'coffee') && since)
+      return Math.round(completed + (Date.now() - new Date(since).getTime()) / 60_000)
+    return Math.round(completed)
+  }
+  const base = calcNetMinutes(recs, lunchAuto)
   if (state === 'working' && since)
     return Math.round(base + (Date.now() - new Date(since).getTime()) / 60_000)
   return Math.round(base)
@@ -629,8 +636,7 @@ export default function PontoPage() {
   // displayed rows (each rounded to the nearest quarter-hour).
   const totalMonthMin = sortedDays.reduce((sum, date) => {
     const recs = byDay.get(date)!
-    const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
-    const exact = Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
+    const exact = calcNetMinutes(recs, user.lunch_break_minutes)
     return sum + roundToQuarter(exact)
   }, 0)
   // working weekdays in the loaded month with no records = absent
@@ -935,8 +941,7 @@ export default function PontoPage() {
                     )
                   }
                   const recs = byDay.get(date)!.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                  const hasBreaks = recs.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
-                  const exactDayMin = Math.max(0, hasBreaks ? calcTimeBreakdown(recs).workedMin : calcNetMinutes(recs, user.lunch_break_minutes))
+                  const exactDayMin = calcNetMinutes(recs, user.lunch_break_minutes)
                   // Historical rows display the rounded centesimal value (matches relatório / holerite).
                   const dayMin = roundToQuarter(exactDayMin)
                   const dt = new Date(date + 'T12:00:00')

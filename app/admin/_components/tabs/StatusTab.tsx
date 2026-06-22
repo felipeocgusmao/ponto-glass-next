@@ -154,9 +154,11 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
     let liveNetMin = 0
     if (hasBreaks) {
       const bd = calcTimeBreakdown(empToday)
-      const lastWorkStart = isWorking && !stateFromPriorDay ? sortedToday.slice().reverse().find(r => WORKING_TYPES.includes(r.type)) : undefined
-      const ongoingMin = lastWorkStart ? (liveMs - new Date(lastWorkStart.timestamp).getTime()) / 60_000 : 0
-      liveNetMin = Math.max(0, bd.workedMin + ongoingMin)
+      const completed = bd.workedMin + bd.lunchMin + bd.coffeeMin
+      const isActive = (isWorking || isOnLunch || isOnCafe) && !stateFromPriorDay
+      const lastActive = isActive ? sortedToday.at(-1) : undefined
+      const ongoingMin = lastActive ? (liveMs - new Date(lastActive.timestamp).getTime()) / 60_000 : 0
+      liveNetMin = Math.max(0, completed + ongoingMin)
     } else {
       const lastEntry = isWorking && !stateFromPriorDay ? sortedToday.slice().reverse().find(r => r.type === 'entrada') : undefined
       const currentSessionMin = lastEntry ? (liveMs - new Date(lastEntry.timestamp).getTime()) / 60_000 : 0

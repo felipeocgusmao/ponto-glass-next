@@ -31,11 +31,12 @@ export function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
   const { state } = getWorkState(recs)
   if (hasBreaks) {
     const bd = calcTimeBreakdown(recs)
-    if (state !== 'working') return bd.workedMin
+    const completed = bd.workedMin + bd.lunchMin + bd.coffeeMin
+    if (state !== 'working' && state !== 'lunch' && state !== 'coffee') return completed
     const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    const lastWork = sorted.slice().reverse().find(r => WORKING_TYPES.includes(r.type))
-    const ongoing = lastWork ? (Date.now() - new Date(lastWork.timestamp).getTime()) / 60000 : 0
-    return Math.max(0, bd.workedMin + ongoing)
+    const lastRecord = sorted.at(-1)
+    const ongoing = lastRecord ? (Date.now() - new Date(lastRecord.timestamp).getTime()) / 60000 : 0
+    return Math.max(0, completed + ongoing)
   }
   const totalWorked = calcNetMinutes(recs, 0)
   const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
