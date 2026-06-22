@@ -93,7 +93,7 @@ Existe **um URL** e **uma senha**.
 │   Push        →   Web Push API  (VAPID)                 │
 │   E-mail      →   Microsoft Graph API  (+ SMTP fallback)│
 │   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
-│   Cron        →   Vercel Cron Jobs  (ausência, saída, mensal, semanal)│
+│   Cron        →   Vercel Cron Jobs  (ausência, saída, mensal, semanal, alertas)│
 │   Voz         →   Web Speech API  (reconhecimento + TTS)│
 │   Testes      →   Vitest  (147 unit) + Playwright  (E2E) │
 │   Monitor     →   Sentry  (erros cliente + servidor)    │
@@ -150,7 +150,10 @@ Cada peça foi escolhida com intenção:
   ● Trocar senha                       ● Quiosque de ponto                  ● Comentário em qualquer registo
   ● Terminar outras sessões            ● Push de ausência (cron 09h UTC)    ● Relatório semanal automático por e-mail
   ● Selector de idioma (PT/BR/EN/ES)   ● Comentários em registos            ● Monitorização via /api/health
-  ● Tema claro/escuro (persiste)       ● Paginação automática em relatórios
+  ● Tema claro/escuro (persiste)       ● Paginação automática em relatórios ● Alertas configuráveis (banco/jornada)
+  ● Dashboard pessoal (gráfico 7d)     ● Relatório de pontualidade          ● Webhooks de saída (HMAC assinados)
+                                       ● QR code por funcionário no quiosque● Integrações (Zapier, Make, ERPs)
+                                       ● Aprovação de semana por funcionário
 ```
 
 *\*desconto automático só se aplica quando pausas explícitas não foram registradas (fallback legado)*
@@ -160,7 +163,7 @@ Nenhuma configuração manual de banco necessária.
 
 **Recuperação de emergência:** rota `/api/auth/recover` com `RECOVERY_SECRET` para quando o admin perde o acesso.
 
-**Modo Quiosque:** página `/kiosk` para tablet/ecrã compartilhado — qualquer funcionário bate o ponto sem fazer login individual. Variante `/kiosk/glass` otimizada para **smart glasses Android** (640×400 landscape, alto contraste, navegação por D-pad/teclado, batida com contagem regressiva de 3s cancelável). Suporta **comandos de voz** via Web Speech API: pressione **M** (ou toque 🎙) e diga *"Maria entrada"* — o sistema seleciona a pessoa, bate o ponto e confirma com TTS em PT-PT. Funciona com nomes parciais, sem acentos, e reconhece sinónimos (`"almoço"`, `"pausa"`, `"voltei do almoço"`, `"cancelar"`). Gracioso em Firefox (botão some se a API não existir).
+**Modo Quiosque:** página `/kiosk` para tablet/ecrã compartilhado — qualquer funcionário bate o ponto sem fazer login individual. O admin pode gerar um **QR code HMAC** por funcionário (botão "QR" em cada tile); o funcionário escaneia com o próprio telemóvel e abre `/kiosk/confirm` — página pública que valida o token e regista a batida sem exigir login. O token é derivado de HMAC-SHA256(`empId:tenantId`) e nunca expira, mas pode ser invalidado trocando `QR_SECRET`. Variante `/kiosk/glass` otimizada para **smart glasses Android** (640×400 landscape, alto contraste, navegação por D-pad/teclado, batida com contagem regressiva de 3s cancelável). Suporta **comandos de voz** via Web Speech API: pressione **M** (ou toque 🎙) e diga *"Maria entrada"* — o sistema seleciona a pessoa, bate o ponto e confirma com TTS em PT-PT. Funciona com nomes parciais, sem acentos, e reconhece sinónimos (`"almoço"`, `"pausa"`, `"voltei do almoço"`, `"cancelar"`). Gracioso em Firefox (botão some se a API não existir).
 
 **Horas centesimais:** relatórios, holerites, CSV, banco de horas e ganhos exibem o tempo em **base 100** — `7h45m → 7,75`. Cada dia é arredondado ao **quarto de hora mais próximo** (`:00 / :15 / :30 / :45`), então o total na tela sempre bate com a soma das linhas. O cronómetro ao vivo do `/ponto` continua exato em tempo real.
 
@@ -258,7 +261,9 @@ ponto_glass_next/
 │   │           ├── FeriadosTab       ← toggle Lista/Calendário (grelha mensal navegável)
 │   │           ├── RelatoriosTab     ← KPI summary, quick range pills, tabela por funcionário (Resumo/Detalhado), exportação ICS, paginação automática
 │   │           ├── CorrecoesTab      ← aprovar/rejeitar solicitações de correção
-│   │           └── AuditoriaTab      ← search + filtro de ator + exportar JSON
+│   │           ├── AuditoriaTab      ← search + filtro de ator + exportar JSON
+│   │           ├── AlertasTab        ← thresholds de banco de horas negativo e jornada longa
+│   │           └── IntegracoesTab    ← gestão de webhooks de saída (HMAC, toggle, remover)
 │   │
 │   └── api/
 │       ├── health/               ← endpoint público de saúde (sem auth, retorna status DB)
@@ -280,8 +285,9 @@ ponto_glass_next/
 │       │   ├── entry-reminder/   ← push de entrada previsto na próxima hora (CRON_SECRET)
 │       │   ├── absence-check/    ← push de ausência (protegido por CRON_SECRET)
 │       │   ├── missing-exit/     ← alerta de saída não registada às 17h (protegido por CRON_SECRET)
-│       │   ├── monthly-report/   ← relatório mensal por e-mail (1º do mês, 08h UTC)
-│       │   └── weekly-report/    ← relatório semanal por e-mail (2ª-feira, 08h UTC)
+│       │   ├── monthly-report/   ← relatório mensal por e-mail com tabela diária (1º do mês, 08h UTC)
+│       │   ├── weekly-report/    ← relatório semanal por e-mail (2ª-feira, 08h UTC)
+│       │   └── alert-check/      ← alertas configuráveis: banco negativo + jornada longa (seg-sex 18h UTC)
 │       ├── hour-bank/            ← saldo do banco de horas + ajustes manuais
 │       │   └── [id]/
 │       ├── correction-requests/  ← criar / listar / aprovar / rejeitar correções
@@ -290,8 +296,14 @@ ponto_glass_next/
 │       │   └── [id]/
 │       ├── push-subscribe/       ← regista subscription VAPID do browser
 │       ├── audit/                ← audit log (admin only)
+│       ├── qr/                   ← gera QR code HMAC por funcionário (data URL)
+│       │   └── punch/            ← endpoint público: valida token HMAC e insere batida
+│       ├── tenant-settings/      ← lê/escreve alert_settings (thresholds de alerta)
+│       ├── timesheet-approvals/  ← aprovação/revogação de semana por funcionário
+│       ├── webhook-configs/      ← CRUD de webhooks de saída (URL, segredo, toggle)
 │       └── reports/              ← relatório por período (máx 366 dias, paginação automática)
-│           └── calendar/         ← exportar registros como .ics (iCalendar, 1 VEVENT/dia)
+│           ├── calendar/         ← exportar registros como .ics (iCalendar, 1 VEVENT/dia)
+│           └── punctuality/      ← estatísticas de pontualidade por funcionário (on-time/atrasado)
 │
 ├── components/
 │   └── ChangePasswordModal.tsx
@@ -513,6 +525,33 @@ push_subscriptions (
   created_at  TIMESTAMPTZ
 )
 
+-- aprovações de semana (timesheet lock)
+timesheet_approvals (
+  id          UUID  PRIMARY KEY,
+  tenant_id   UUID  → tenants.id,
+  employee_id UUID  → employees.id,
+  week_start  DATE,              ← segunda-feira da semana aprovada
+  approved_by UUID,
+  approved_at TIMESTAMPTZ
+)
+
+-- webhooks de saída
+webhook_configs (
+  id          UUID  PRIMARY KEY,
+  tenant_id   UUID  → tenants.id,
+  url         TEXT,              ← endpoint HTTPS de destino
+  secret      TEXT,              ← chave HMAC-SHA256 (opcional)
+  active      BOOLEAN,
+  events      TEXT[],            ← ['punch']
+  created_at  TIMESTAMPTZ
+)
+
+-- configurações de alertas (coluna JSON em tenants)
+tenants.alert_settings JSONB → {
+  hour_bank_low_threshold: number | null,  ← minutos negativos
+  long_day_threshold:      number | null   ← minutos máximos/dia
+}
+
 -- audit log
 audit_logs (
   id          UUID  PRIMARY KEY,
@@ -557,6 +596,9 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  "Terminar outras sessões" — revoga tokens anteriores, emite sessão fresca
   ✓  React Error Boundary em todos os tabs — falhas de rendering não quebram o shell
   ✓  Monitorização Sentry — erros capturados sem expor segredos
+  ✓  QR kiosk com token HMAC-SHA256 (empId:tenantId) — batida sem login, sem cookie
+  ✓  Webhooks assinados com X-PontoGlass-Signature: sha256={hex} (segredo opcional por endpoint)
+  ✓  Timeout de 5s em entrega de webhooks — falhas silenciosas, não bloqueiam a batida
 ```
 
 <br/>
@@ -634,7 +676,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Lixeira de funcionários — desativados ficam visíveis no filtro Inativos com Restaurar
   ✓  Importação CSV/XLSX de funcionários (preview com validação por linha, modelo para download)
   ✓  2FA TOTP opt-in (QR no perfil, código no login, reset por admin)
-  ✓  Relatório mensal automático por e-mail (cron + disparo manual)
+  ✓  Relatório mensal automático por e-mail com tabela diária (breakdown dia-a-dia no corpo do e-mail)
   ✓  React Error Boundary em todos os tabs do admin (recuperação sem refresh total)
   ✓  Endpoint /api/health para monitorização externa (sem autenticação)
   ✓  Bloqueio de conta por utilizador (10 tentativas / 30 min, independente do IP)
@@ -644,6 +686,14 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Exportação .ics (iCalendar) — um VEVENT por dia trabalhado, botão no RelatoriosTab
   ✓  UI otimista nos registos de ponto — estado visual muda antes da resposta do servidor
   ✓  Relatórios sem truncagem — paginação automática (todas as páginas em paralelo)
+  ✓  Relatório de pontualidade — on-time vs atrasado por funcionário, com filtro por período e média de atraso
+  ✓  Alertas configuráveis — thresholds de banco de horas negativo e jornada longa, cron seg-sex 18h UTC
+  ✓  QR code por funcionário no quiosque — HMAC-SHA256, página /kiosk/confirm pública, sem login
+  ✓  Aprovação de semana — admin aprova/revoga semana por funcionário no RegistrosTab
+  ✓  Dashboard pessoal — gráfico SVG dos últimos 7 dias com linha-alvo no historico do /ponto
+  ✓  Webhooks de saída — POST assinado para endpoints externos a cada batida (Zapier, Make, ERPs)
+  ✓  Tab Integrações — gestão de webhooks com segredo HMAC, toggle ativo/pausado, remover
+  ✓  Tab Alertas — configurar thresholds de push para admins (banco e jornada)
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
 
