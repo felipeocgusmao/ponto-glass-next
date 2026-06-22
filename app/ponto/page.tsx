@@ -43,9 +43,9 @@ function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
   const { state, since } = getWorkState(recs)
   const hasBreaks = recs.some(r => ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe'].includes(r.type))
   if (hasBreaks) {
-    const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(recs)
-    const completed = workedMin + lunchMin + coffeeMin
-    if ((state === 'working' || state === 'lunch' || state === 'coffee') && since)
+    const { workedMin, coffeeMin } = calcTimeBreakdown(recs)
+    const completed = workedMin + coffeeMin
+    if ((state === 'working' || state === 'coffee') && since)
       return Math.round(completed + (Date.now() - new Date(since).getTime()) / 60_000)
     return Math.round(completed)
   }

@@ -57,8 +57,8 @@ describe('calcNetMinutes', () => {
       rec('fim_almoco',    '2026-05-28T14:00:00Z'),
       rec('saída',         '2026-05-28T17:00:00Z'),
     ]
-    // 5h before lunch + 1h lunch + 3h after = 9h = 540min (break counts as worked)
-    expect(calcNetMinutes(records, 60)).toBe(540)
+    // 5h worked before lunch + 3h after = 8h = 480min (lunch is unpaid, excluded)
+    expect(calcNetMinutes(records, 60)).toBe(480)
   })
 })
 

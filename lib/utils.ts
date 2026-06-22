@@ -117,9 +117,9 @@ function hasExplicitBreaks(records: PunchRecord[]): boolean {
 
 export function calcNetMinutes(records: PunchRecord[], lunchBreakMinutes = 0): number {
   if (hasExplicitBreaks(records)) {
-    // Break time counts as worked — include lunchMin + coffeeMin in the total.
-    const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(records)
-    return Math.max(0, workedMin + lunchMin + coffeeMin)
+    // Coffee breaks count as worked time; lunch is unpaid and excluded.
+    const { workedMin, coffeeMin } = calcTimeBreakdown(records)
+    return Math.max(0, workedMin + coffeeMin)
   }
   return Math.max(0, pairMinutes(records) - lunchBreakMinutes)
 }

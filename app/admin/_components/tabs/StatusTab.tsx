@@ -154,8 +154,9 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
     let liveNetMin = 0
     if (hasBreaks) {
       const bd = calcTimeBreakdown(empToday)
-      const completed = bd.workedMin + bd.lunchMin + bd.coffeeMin
-      const isActive = (isWorking || isOnLunch || isOnCafe) && !stateFromPriorDay
+      const completed = bd.workedMin + bd.coffeeMin
+      // Lunch is unpaid — don't add ongoing time while on lunch.
+      const isActive = (isWorking || isOnCafe) && !stateFromPriorDay
       const lastActive = isActive ? sortedToday.at(-1) : undefined
       const ongoingMin = lastActive ? (liveMs - new Date(lastActive.timestamp).getTime()) / 60_000 : 0
       liveNetMin = Math.max(0, completed + ongoingMin)

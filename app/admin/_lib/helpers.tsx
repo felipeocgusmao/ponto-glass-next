@@ -31,8 +31,8 @@ export function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
   const { state } = getWorkState(recs)
   if (hasBreaks) {
     const bd = calcTimeBreakdown(recs)
-    const completed = bd.workedMin + bd.lunchMin + bd.coffeeMin
-    if (state !== 'working' && state !== 'lunch' && state !== 'coffee') return completed
+    const completed = bd.workedMin + bd.coffeeMin
+    if (state !== 'working' && state !== 'coffee') return completed
     const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     const lastRecord = sorted.at(-1)
     const ongoing = lastRecord ? (Date.now() - new Date(lastRecord.timestamp).getTime()) / 60000 : 0
