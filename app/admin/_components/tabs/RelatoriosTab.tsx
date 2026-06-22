@@ -77,7 +77,8 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
         fetch(`/api/day-exceptions?from=${from}&to=${to}`),
       ])
       if (!res.ok) { const d = await res.json(); setError(d.error ?? t('error.connect')); return }
-      const data: PunchRecord[] = await res.json()
+      const json = await res.json()
+      const data: PunchRecord[] = json.data
       setRecords(data)
       setTruncated(data.length >= 2000)
       if (excRes.ok) {

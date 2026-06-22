@@ -45,7 +45,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
       const from = yest.toISOString().split('T')[0]
       const res = await fetch(`/api/reports?from=${from}&to=${today}`)
       if (res.ok) {
-        const data = await res.json()
+        const { data } = await res.json()
         // Ignore out-of-order responses so a slow interval fetch can't revert a fresh punch.
         if (seq === loadSeq.current) setRecords(data)
       }
@@ -63,7 +63,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
     if (fmt(yesterday) < fmt(monday)) { setWeekRecords([]); return }
     try {
       const res = await fetch(`/api/reports?from=${fmt(monday)}&to=${fmt(yesterday)}`)
-      if (res.ok) setWeekRecords(await res.json())
+      if (res.ok) setWeekRecords((await res.json()).data)
     } catch { /* keep current */ }
   }, [])
 
