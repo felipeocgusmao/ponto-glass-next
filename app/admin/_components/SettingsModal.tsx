@@ -11,12 +11,14 @@ export default function SettingsModal({
   onToggleTheme,
   onChangePwd,
   onLogout,
+  onRevokeOtherSessions,
   onClose,
 }: {
   theme: string
   onToggleTheme: () => void
   onChangePwd: () => void
   onLogout: () => void
+  onRevokeOtherSessions?: () => void
   onClose: () => void
 }) {
   const { lang, setLang, t } = useLang()
@@ -104,6 +106,16 @@ export default function SettingsModal({
               <LockSmIcon />
               {t('auth.change_password')}
             </button>
+            {onRevokeOtherSessions && (
+              <button
+                className="btn ghost"
+                style={{ justifyContent: 'flex-start', gap: 10 }}
+                onClick={() => { onRevokeOtherSessions(); onClose() }}
+              >
+                <LockSmIcon />
+                Terminar outras sessões
+              </button>
+            )}
             <button
               className="btn ghost danger"
               style={{ justifyContent: 'flex-start', gap: 10 }}

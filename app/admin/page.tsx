@@ -11,6 +11,7 @@ import TopBar from './_components/TopBar'
 import CommandPalette from './_components/CommandPalette'
 import SettingsModal from './_components/SettingsModal'
 import MissingExitBanner from './_components/MissingExitBanner'
+import { ErrorBoundary } from '@/app/_components/ErrorBoundary'
 // Eagerly loaded — these are the default landing tabs for admin and manager roles.
 import { MeuPontoTab } from './_components/tabs/MeuPontoTab'
 import { DashboardTab } from './_components/tabs/DashboardTab'
@@ -155,6 +156,10 @@ export default function AdminPage() {
     router.push('/login')
   }
 
+  const handleRevokeOtherSessions = async () => {
+    await fetch('/api/auth/revoke-other-sessions', { method: 'POST' })
+  }
+
   const handleCmdAction = (id: string) => {
     if (id === 'toggle_theme') toggleTheme()
     if (id === 'new_employee') setTab('funcionarios')
@@ -187,6 +192,7 @@ export default function AdminPage() {
           onToggleTheme={toggleTheme}
           onChangePwd={() => { setShowSettings(false); setShowPwd(true) }}
           onLogout={handleLogout}
+          onRevokeOtherSessions={handleRevokeOtherSessions}
           onClose={() => setShowSettings(false)}
         />
       )}
@@ -225,17 +231,19 @@ export default function AdminPage() {
         />
         <div className="page" id="main-content">
           <MissingExitBanner />
-          {tab === 'meu_ponto'    && <MeuPontoTab user={user} />}
-          {tab === 'dashboard'    && <DashboardTab employees={activeEmployees} />}
-          {tab === 'status'       && <StatusTab employees={activeEmployees} currentUserId={user.id} />}
-          {tab === 'registros'    && <RegistrosTab employees={activeEmployees} />}
-          {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
-          {tab === 'banco'        && <BancoHorasTab employees={activeEmployees} />}
-          {tab === 'feriados'     && <FeriadosTab />}
-          {tab === 'relatorios'   && <RelatoriosTab employees={activeEmployees} />}
-          {tab === 'correcoes'    && <CorrecoesTab onAction={refreshPendingCount} />}
-          {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
-          {tab === 'empresas'     && user.super_admin === true && <EmpresasTab />}
+          <ErrorBoundary>
+            {tab === 'meu_ponto'    && <MeuPontoTab user={user} />}
+            {tab === 'dashboard'    && <DashboardTab employees={activeEmployees} />}
+            {tab === 'status'       && <StatusTab employees={activeEmployees} currentUserId={user.id} />}
+            {tab === 'registros'    && <RegistrosTab employees={activeEmployees} />}
+            {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}
+            {tab === 'banco'        && <BancoHorasTab employees={activeEmployees} />}
+            {tab === 'feriados'     && <FeriadosTab />}
+            {tab === 'relatorios'   && <RelatoriosTab employees={activeEmployees} />}
+            {tab === 'correcoes'    && <CorrecoesTab onAction={refreshPendingCount} />}
+            {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
+            {tab === 'empresas'     && user.super_admin === true && <EmpresasTab />}
+          </ErrorBoundary>
         </div>
       </div>
     </div>

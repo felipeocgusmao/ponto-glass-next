@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 
-const PUBLIC = ['/login', '/reset-password', '/api/auth/login', '/api/auth/logout', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/recover', '/api/auth/confirm-email', '/api/cron']
+const PUBLIC = ['/login', '/reset-password', '/api/auth/login', '/api/auth/logout', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/recover', '/api/auth/confirm-email', '/api/cron', '/api/health']
 
 // Force a fresh fetch of every HTML page on every navigation. Without this,
 // iOS Safari (and other browsers) can serve a stale login or admin shell from
