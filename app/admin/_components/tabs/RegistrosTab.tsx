@@ -9,6 +9,105 @@ import type { TranslationKey } from '@/lib/i18n'
 import * as XLSX from 'xlsx'
 import { IconDownload, IconRefresh, IconSearch } from '../icons'
 
+interface TimesheetApproval { id: string; employee_id: string; week_start: string; approved_by_name: string; created_at: string }
+
+function mondayOf(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + diff)
+  return d.toISOString().split('T')[0]
+}
+
+function TimesheetApprovalSection({ employees }: { employees: Employee[] }) {
+  const [open, setOpen] = useState(false)
+  const [selEmpId, setSelEmpId] = useState('')
+  const [weekStart, setWeekStart] = useState(mondayOf(businessDate()))
+  const [approvals, setApprovals] = useState<TimesheetApproval[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  const load = useCallback(async () => {
+    if (!selEmpId) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/timesheet-approvals?employeeId=${selEmpId}`)
+      if (res.ok) setApprovals(await res.json())
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }, [selEmpId])
+
+  useEffect(() => { if (open && selEmpId) load() }, [open, selEmpId, load])
+
+  const approve = async () => {
+    if (!selEmpId || !weekStart) return
+    setSaving(true); setMsg(null)
+    try {
+      const res = await fetch('/api/timesheet-approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: selEmpId, weekStart }),
+      })
+      const d = await res.json()
+      if (res.ok) { setApprovals(prev => [d, ...prev.filter(a => a.week_start !== weekStart)]); setMsg({ ok: true, text: 'Semana aprovada.' }) }
+      else setMsg({ ok: false, text: d.error ?? 'Erro ao aprovar.' })
+    } catch { setMsg({ ok: false, text: 'Erro de conexão.' }) }
+    finally { setSaving(false) }
+  }
+
+  const revoke = async (id: string) => {
+    const res = await fetch(`/api/timesheet-approvals?id=${id}`, { method: 'DELETE' })
+    if (res.ok) setApprovals(prev => prev.filter(a => a.id !== id))
+  }
+
+  const isApproved = approvals.some(a => a.week_start === weekStart)
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-head" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => setOpen(o => !o)}>
+        <div className="card-title">Aprovação de semanas</div>
+        <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Funcionário</label>
+              <select value={selEmpId} onChange={e => { setSelEmpId(e.target.value); setMsg(null) }} className="input" style={{ minWidth: 180 }}>
+                <option value="">Selecionar…</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Semana (segunda-feira)</label>
+              <input type="date" value={weekStart} onChange={e => setWeekStart(mondayOf(e.target.value))} className="input" />
+            </div>
+            <button className={`btn ${isApproved ? '' : 'primary'}`} onClick={approve} disabled={!selEmpId || !weekStart || saving}>
+              {isApproved ? '✓ Já aprovada' : saving ? 'A aprovar…' : 'Aprovar semana'}
+            </button>
+          </div>
+          {msg && <div className={`alert-inline ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
+          {selEmpId && !loading && approvals.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {approvals.slice(0, 12).map(a => (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                  <span className="chip success" style={{ fontSize: 10 }}>{a.week_start}</span>
+                  <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>por {a.approved_by_name}</span>
+                  <button onClick={() => revoke(a.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger-fg)', fontSize: 11, padding: '0 2px' }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {selEmpId && !loading && approvals.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Nenhuma semana aprovada para este funcionário.</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const PAGE_SIZE = 25
 type RangePreset = 'today' | '7d' | '14d' | '30d' | 'all' | 'custom'
 
@@ -376,6 +475,9 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
           }
         </div>
       </div>
+
+      {/* Timesheet approvals */}
+      <TimesheetApprovalSection employees={employees} />
 
       {/* Add new record */}
       <div className="card">

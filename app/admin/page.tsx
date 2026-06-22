@@ -39,6 +39,8 @@ const RelatoriosTab = dynamic(() => import('./_components/tabs/RelatoriosTab').t
 const AuditoriaTab  = dynamic(() => import('./_components/tabs/AuditoriaTab').then(m => ({ default: m.AuditoriaTab })), { loading: TabSkeleton })
 const CorrecoesTab  = dynamic(() => import('./_components/tabs/CorrecoesTab').then(m => ({ default: m.CorrecoesTab })), { loading: TabSkeleton })
 const EmpresasTab   = dynamic(() => import('./_components/tabs/EmpresasTab').then(m => ({ default: m.EmpresasTab })), { loading: TabSkeleton })
+const AlertasTab    = dynamic(() => import('./_components/tabs/AlertasTab').then(m => ({ default: m.AlertasTab })), { loading: TabSkeleton })
+const IntegracoesTab = dynamic(() => import('./_components/tabs/IntegracoesTab').then(m => ({ default: m.IntegracoesTab })), { loading: TabSkeleton })
 
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
@@ -243,6 +245,8 @@ export default function AdminPage() {
             {tab === 'correcoes'    && <CorrecoesTab onAction={refreshPendingCount} />}
             {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
             {tab === 'empresas'     && user.super_admin === true && <EmpresasTab />}
+            {tab === 'alertas'      && user.role === 'admin' && <AlertasTab />}
+            {tab === 'integracoes'  && user.role === 'admin' && <IntegracoesTab />}
           </ErrorBoundary>
         </div>
       </div>

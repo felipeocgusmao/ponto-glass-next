@@ -21,6 +21,8 @@ const PAGE_TITLES: Record<Tab, string> = {
   relatorios:   'tab.relatorios',
   auditoria:    'tab.auditoria',
   empresas:     'tab.empresas',
+  alertas:      'tab.alertas',
+  integracoes:  'tab.integracoes',
 } as const
 
 export default function TopBar({

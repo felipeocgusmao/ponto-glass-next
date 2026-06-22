@@ -21,6 +21,8 @@ const t = {
     'tab.relatorios':   'Relatório',
     'tab.auditoria':    'Auditoria',
     'tab.empresas':     'Empresas',
+    'tab.alertas':      'Alertas',
+    'tab.integracoes':  'Integrações',
 
     // ── Common ───────────────────────────────────────────────────────────
     'common.save':      'Guardar',
@@ -418,6 +420,8 @@ const t = {
     'tab.relatorios':   'Relatório',
     'tab.auditoria':    'Auditoria',
     'tab.empresas':     'Empresas',
+    'tab.alertas':      'Alertas',
+    'tab.integracoes':  'Integrações',
 
     'common.save':      'Salvar',
     'common.cancel':    'Cancelar',
@@ -797,6 +801,8 @@ const t = {
     'tab.relatorios':   'Reports',
     'tab.auditoria':    'Audit',
     'tab.empresas':     'Companies',
+    'tab.alertas':      'Alerts',
+    'tab.integracoes':  'Integrations',
 
     'common.save':      'Save',
     'common.cancel':    'Cancel',
@@ -1176,6 +1182,8 @@ const t = {
     'tab.relatorios':   'Informes',
     'tab.auditoria':    'Auditoría',
     'tab.empresas':     'Empresas',
+    'tab.alertas':      'Alertas',
+    'tab.integracoes':  'Integraciones',
 
     'common.save':      'Guardar',
     'common.cancel':    'Cancelar',

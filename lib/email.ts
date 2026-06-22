@@ -130,6 +130,7 @@ export async function sendMonthlyReportEmployeeEmail(opts: {
   days: number
   incompleteDays: number
   appUrl: string
+  dailyRows?: { date: string; netMin: number; incomplete: boolean }[]
 }): Promise<boolean> {
   const subject = `Relatório de ponto — ${opts.period}`
   // Relatórios usam horas centesimais (base 100): 45min → "0,75", 7h30 → "7,50".
@@ -143,6 +144,27 @@ export async function sendMonthlyReportEmployeeEmail(opts: {
   const earningsRow = opts.earnings != null
     ? `<tr><td style="padding:10px 16px;color:#6b7280">Ganhos estimados</td><td style="padding:10px 16px;text-align:right;font-weight:600">${opts.earnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}</td></tr>`
     : ''
+
+  // Day-by-day breakdown table (optional payslip detail)
+  const dailySection = opts.dailyRows && opts.dailyRows.length > 0
+    ? `<div style="margin-top:24px">
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Detalhe por dia</div>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;font-size:12px">
+          <thead><tr style="background:#f3f4f6">
+            <th style="padding:7px 12px;text-align:left;color:#6b7280;font-weight:600">Data</th>
+            <th style="padding:7px 12px;text-align:right;color:#6b7280;font-weight:600">Horas</th>
+          </tr></thead>
+          <tbody>${opts.dailyRows.map((r, i) => {
+            const [y, m, d] = r.date.split('-').map(Number)
+            const label = new Date(y, m - 1, d).toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })
+            const hVal = r.incomplete ? '<span style="color:#ef4444">Incompleto</span>' : fmtH(r.netMin)
+            const bg = i % 2 === 0 ? '#fff' : '#f9fafb'
+            return `<tr style="background:${bg}"><td style="padding:6px 12px;border-top:1px solid #e5e7eb;text-transform:capitalize">${label}</td><td style="padding:6px 12px;border-top:1px solid #e5e7eb;text-align:right;font-weight:500">${hVal}</td></tr>`
+          }).join('')}</tbody>
+        </table>
+      </div>`
+    : ''
+
   const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif">
 <div style="max-width:540px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
   <div style="background:#6366f1;padding:28px 32px 24px">
@@ -159,6 +181,7 @@ export async function sendMonthlyReportEmployeeEmail(opts: {
       ${incompleteRow}${earningsRow}
     </table>
     ${opts.incompleteDays > 0 ? `<p style="margin:16px 0 0;font-size:12px;color:#ef4444">⚠ Tem ${opts.incompleteDays} dia(s) sem saída registada. Submeta uma correcção para regularizar.</p>` : ''}
+    ${dailySection}
     <div style="margin-top:24px">
       <a href="${opts.appUrl}/ponto" style="display:inline-block;padding:10px 22px;background:#6366f1;color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600">Ver os meus registos</a>
     </div>

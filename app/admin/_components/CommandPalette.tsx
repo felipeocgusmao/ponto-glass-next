@@ -7,7 +7,7 @@ import {
   IconClock, IconDashboard, IconStatus, IconList, IconUsers,
   IconBank, IconCalendar, IconBar, IconAudit, IconEdit,
   IconDownload, IconUserPlus, SunIcon, MoonIcon, IconSearch,
-  IconBuilding,
+  IconBuilding, IconBell, IconSettings,
 } from './icons'
 
 type CmdItem = {
@@ -31,6 +31,8 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   relatorios:   <IconBar size={15} />,
   auditoria:    <IconAudit size={15} />,
   empresas:     <IconBuilding size={15} />,
+  alertas:      <IconBell size={15} />,
+  integracoes:  <IconSettings size={15} />,
 }
 
 export default function CommandPalette({

@@ -7,6 +7,7 @@ import {
   calcWorkedMinutesPeriod,
   calcOvertimePeriod,
   isIncompleteDay,
+  calcDayRounded,
 } from '@/lib/utils'
 import { sendMonthlyReportEmployeeEmail, sendMonthlyReportAdminEmail } from '@/lib/email'
 import { activeTenantIds } from '@/lib/tenant'
@@ -87,10 +88,20 @@ async function runReport(params: ReportParams) {
     totalWorkedMin += workedMin
     if (earnings != null) totalEarnings += earnings
 
+    // Build day-by-day breakdown for the payslip section of the email
+    const dailyRows = Array.from(byDate.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, dayRecs]) => ({
+        date,
+        netMin: calcDayRounded(dayRecs, emp.lunch_break_minutes),
+        incomplete: isIncompleteDay(dayRecs),
+      }))
+
     if (emp.email && days > 0) {
       const ok = await sendMonthlyReportEmployeeEmail({
         to: emp.email, name: emp.name, period: label,
         workedMin, overtimeMin, earnings, days, incompleteDays, appUrl,
+        dailyRows,
       })
       if (ok) sent++
     }

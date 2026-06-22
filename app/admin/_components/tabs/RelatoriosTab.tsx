@@ -7,6 +7,88 @@ import { empColor, getWorkingDays, openPayslip } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import { IconDownload, IconRefresh } from '../icons'
 
+interface PunctualityRow {
+  empId: string; name: string; expected_start: string | null
+  total_days: number; on_time: number; late: number; avg_late_min: number
+}
+
+function PunctualitySection({ from, to }: { from: string; to: string }) {
+  const [rows, setRows] = useState<PunctualityRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const load = async () => {
+    if (!open) { setOpen(true) }
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/reports/punctuality?from=${from}&to=${to}`)
+      if (res.ok) { setRows(await res.json()); setLoaded(true) }
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="card">
+      <div
+        className="card-head"
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => { if (!open) load(); else setOpen(false) }}
+      >
+        <div className="card-title">Pontualidade {loaded && rows.length > 0 && <span className="chip" style={{ fontSize: 11, marginLeft: 6 }}>{rows.length} pessoas</span>}</div>
+        <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div className="card-body">
+          {loading && <div className="alert-inline info">A carregar…</div>}
+          {!loading && loaded && rows.length === 0 && (
+            <div className="empty"><div className="desc">Nenhum dado de pontualidade no período. Configure o horário esperado por funcionário.</div></div>
+          )}
+          {!loading && loaded && rows.length > 0 && (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--fg-muted)' }}>Funcionário</th>
+                    <th style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--fg-muted)' }}>Esperado</th>
+                    <th style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--fg-muted)' }}>Dias</th>
+                    <th style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--fg-muted)' }}>Pontual</th>
+                    <th style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--fg-muted)' }}>Atraso</th>
+                    <th style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--fg-muted)' }}>Média atraso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => {
+                    const pct = r.total_days > 0 ? Math.round((r.on_time / r.total_days) * 100) : 0
+                    const h = Math.floor(r.avg_late_min / 60)
+                    const m = r.avg_late_min % 60
+                    return (
+                      <tr key={r.empId} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '8px 12px', fontWeight: 500 }}>{r.name}</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--fg-muted)' }}>{r.expected_start ?? '—'}</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>{r.total_days}</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                          <span className={`chip ${pct >= 90 ? 'success' : pct >= 70 ? 'warn' : 'danger'}`} style={{ fontSize: 11 }}>{pct}%</span>
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', color: r.late > 0 ? 'var(--danger-fg)' : 'var(--fg-muted)' }}>
+                          {r.late > 0 ? `${r.late} vez${r.late > 1 ? 'es' : ''}` : '—'}
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
+                          {r.avg_late_min > 0 ? (h > 0 ? `${h}h${String(m).padStart(2,'0')}m` : `${m}m`) : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type RangePreset = 'this_month' | 'last_month' | '30d' | 'quarter' | 'custom'
 
 function pad(n: number) { return String(n).padStart(2, '0') }
@@ -419,6 +501,9 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                   </div>
                 )
               })()}
+
+              {/* Pontualidade — lazy-loaded on demand */}
+              <PunctualitySection from={from} to={to} />
             </>
           )}
         </>
