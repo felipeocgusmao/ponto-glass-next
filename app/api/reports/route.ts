@@ -4,6 +4,9 @@ import { verifyApiAuth } from '@/lib/apiAuth'
 import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 
+const DEFAULT_PAGE_SIZE = 500
+const MAX_PAGE_SIZE = 2000
+
 export async function GET(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -38,29 +41,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const employeeId = isPrivileged ? requestedId : user.id
 
-  const MAX_ROWS = 2000
+  // Pagination: page is 1-based, limit is capped at MAX_PAGE_SIZE.
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
+  const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(searchParams.get('limit') ?? String(DEFAULT_PAGE_SIZE), 10) || DEFAULT_PAGE_SIZE))
+  const offset = (page - 1) * limit
 
   let query = supabase
     .from('records')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('tenant_id', user.tenant_id)
     .gte('date', from)
     .lte('date', to)
     .order('timestamp', { ascending: true })
-    .limit(MAX_ROWS + 1)
+    .range(offset, offset + limit - 1)
 
   if (employeeId) query = query.eq('employee_id', employeeId)
 
-  const { data, error } = await query
+  const { data, error, count } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const truncated = data.length > MAX_ROWS
-  const records = truncated ? data.slice(0, MAX_ROWS) : data
+  const total = count ?? 0
+  const totalPages = Math.ceil(total / limit)
 
-  const res = NextResponse.json(records, {
-    headers: { 'Cache-Control': 'no-store' },
-  })
-  if (truncated) res.headers.set('X-Truncated', 'true')
-  return res
+  return NextResponse.json(
+    { data, pagination: { page, limit, total, totalPages } },
+    { headers: { 'Cache-Control': 'no-store' } }
+  )
 }

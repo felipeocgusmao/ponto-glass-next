@@ -4,7 +4,7 @@ import { verifyApiAuth } from '@/lib/apiAuth'
 import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
-import { generateTotpSecret, totpKeyUri, verifyTotpCode } from '@/lib/totp'
+import { generateTotpSecret, totpKeyUri, verifyTotpCode, generateBackupCodes, hashBackupCode } from '@/lib/totp'
 
 // Self-service TOTP management for the logged-in user.
 //   GET            → { enabled, pending }
@@ -69,14 +69,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Inicie a configuração primeiro.' }, { status: 400 })
     if (!verifyTotpCode(code, emp.totp_secret))
       return NextResponse.json({ error: 'Código inválido. Confira o aplicativo autenticador.' }, { status: 400 })
+
+    const backupCodes = generateBackupCodes(10)
+    const backupHashes = backupCodes.map(hashBackupCode)
+
     const { error } = await supabase
       .from('employees')
-      .update({ totp_enabled: true })
+      .update({ totp_enabled: true, totp_backup_codes: backupHashes })
       .eq('tenant_id', user.tenant_id)
       .eq('id', user.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     await logAudit(user, 'totp_enabled', null)
-    return NextResponse.json({ ok: true })
+    // Backup codes are shown only once — the client must prompt the user to save them.
+    return NextResponse.json({ ok: true, backupCodes })
+  }
+
+  if (action === 'regenerate_backup_codes') {
+    if (!emp.totp_enabled)
+      return NextResponse.json({ error: '2FA não está ativo.' }, { status: 400 })
+    if (!verifyTotpCode(code, emp.totp_secret ?? ''))
+      return NextResponse.json({ error: 'Código inválido. Confira o aplicativo autenticador.' }, { status: 400 })
+
+    const backupCodes = generateBackupCodes(10)
+    const backupHashes = backupCodes.map(hashBackupCode)
+
+    const { error } = await supabase
+      .from('employees')
+      .update({ totp_backup_codes: backupHashes })
+      .eq('tenant_id', user.tenant_id)
+      .eq('id', user.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await logAudit(user, 'totp_backup_codes_regenerated', null)
+    return NextResponse.json({ ok: true, backupCodes })
   }
 
   if (action === 'disable') {
