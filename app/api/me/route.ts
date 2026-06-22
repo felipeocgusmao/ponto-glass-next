@@ -3,6 +3,8 @@ import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
 import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
+import { createPasswordResetToken } from '@/lib/auth'
+import { sendEmailVerification } from '@/lib/email'
 
 export async function GET() {
   const token = cookies().get('ponto_token')?.value
@@ -17,7 +19,7 @@ export async function GET() {
   // sign in instead of being kicked into a logout loop on every refresh.
   const ext = await supabase
     .from('employees')
-    .select('id, name, username, role, super_admin, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, lock_profile, theme, expected_start, expected_end, shift_start')
+    .select('id, name, username, role, super_admin, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, pending_email, lock_profile, theme, expected_start, expected_end, shift_start')
     .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
     .maybeSingle()
@@ -51,7 +53,7 @@ export async function PATCH(request: NextRequest) {
     // user could redirect their own password-reset emails (account-takeover vector).
     const { data: emp } = await supabase
       .from('employees')
-      .select('lock_profile')
+      .select('name, lock_profile')
       .eq('tenant_id', user.tenant_id)
       .eq('id', user.id)
       .single()
@@ -61,7 +63,33 @@ export async function PATCH(request: NextRequest) {
     const trimmed = email ? String(email).trim().toLowerCase() : null
     if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed))
       return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
-    updates.email = trimmed
+
+    if (trimmed) {
+      // Instead of changing the email directly, store it as pending and send a
+      // confirmation link to the new address. If the columns don't exist yet
+      // (migration not applied), fall back to the old direct-update behaviour.
+      const token = await createPasswordResetToken(user.id, `email:${trimmed}`)
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+      const confirmUrl = `${appUrl}/api/auth/confirm-email?token=${encodeURIComponent(token)}&tenant=${user.tenant_id}`
+      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
+      const { error: pendingError } = await supabase
+        .from('employees')
+        .update({ pending_email: trimmed, pending_email_token: token, pending_email_expires_at: expires })
+        .eq('tenant_id', user.tenant_id)
+        .eq('id', user.id)
+
+      if (pendingError) {
+        // Columns don't exist yet (migration pending) — fall back to direct update.
+        updates.email = trimmed
+      } else {
+        await sendEmailVerification({ to: trimmed, name: emp?.name ?? user.name, confirmUrl })
+        return NextResponse.json({ ok: true, pending_verification: true })
+      }
+    } else {
+      // Clearing the email is immediate (no verification needed).
+      updates.email = null
+    }
   }
 
   if (Object.keys(updates).length === 0) return NextResponse.json({ ok: true })

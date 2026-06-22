@@ -88,6 +88,9 @@ export async function POST(request: NextRequest) {
   // queuedAt; file them under that instant (never for punches on behalf).
   const now = new Date()
   const punchTime = onBehalf ? now : resolvePunchTimestamp(queuedAt, now)
+  // Detect when the server had to override the client-supplied timestamp (future
+  // or too-old queuedAt) so the response can inform the UI.
+  const timestampAdjusted = !onBehalf && queuedAt != null && punchTime === now
 
   const { data: lastRec } = await supabase
     .from('records').select('type, timestamp')
@@ -108,5 +111,5 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (onBehalf) await logAudit(user, 'punch_on_behalf', { id: empId, name: empName }, { type })
 
-  return NextResponse.json(data)
+  return NextResponse.json(timestampAdjusted ? { ...data, timestamp_adjusted: true } : data)
 }

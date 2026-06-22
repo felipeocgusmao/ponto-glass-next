@@ -2,17 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { createJWT, createTotpPendingToken } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-import { rateLimit, clientIp } from '@/lib/rateLimit'
+import { checkRateLimit, clientIp, applyRateLimitHeaders } from '@/lib/rateLimit'
 import { logAudit } from '@/lib/audit'
 import { DEFAULT_TENANT_ID, resolveLoginTenant } from '@/lib/tenant'
+import { isCsrfSafe } from '@/lib/csrf'
 
 export async function POST(request: NextRequest) {
+  if (!isCsrfSafe(request))
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const ip = clientIp(request)
-  if (!(await rateLimit(`login:${ip}`, 5, 15 * 60 * 1000))) {
-    return NextResponse.json(
+  const rl = await checkRateLimit(`login:${ip}`, 5, 15 * 60 * 1000)
+  if (!rl.allowed) {
+    const res = NextResponse.json(
       { error: 'Muitas tentativas. Tente novamente em 15 minutos.' },
       { status: 429 }
     )
+    applyRateLimitHeaders(res.headers, rl)
+    return res
   }
 
   const { username, password } = await request.json()

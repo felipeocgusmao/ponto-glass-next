@@ -1,6 +1,29 @@
 import nodemailer from 'nodemailer'
 import { fmtCentesimal, fmtCentesimalSigned } from './utils'
 
+// ── Retry helper ────────────────────────────────────────────────────────────────
+// Retries an async operation up to `attempts` times with exponential backoff.
+// Keeps email failures non-fatal while giving transient network errors a chance
+// to recover. Final failure is logged and returned as `false`.
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  attempts = 3,
+  delayMs = 1000,
+): Promise<T | false> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (i < attempts - 1) {
+        await new Promise(r => setTimeout(r, delayMs * 2 ** i))
+      } else {
+        console.error('[email] send failed after', attempts, 'attempts:', err)
+      }
+    }
+  }
+  return false
+}
+
 // ── Microsoft Graph API (preferred) ────────────────────────────────────────────
 // Uses Client Credentials flow: no user interaction, token cached per invocation.
 // Requires MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_SENDER_EMAIL.
@@ -42,7 +65,7 @@ async function sendViaGraph(message: GraphMessage): Promise<boolean> {
   const token = await getGraphToken()
   if (!token) return false
   const sender = encodeURIComponent(process.env.MS_SENDER_EMAIL!)
-  try {
+  const result = await withRetry(async () => {
     const res = await fetch(
       `https://graph.microsoft.com/v1.0/users/${sender}/sendMail`,
       {
@@ -51,8 +74,10 @@ async function sendViaGraph(message: GraphMessage): Promise<boolean> {
         body: JSON.stringify({ message, saveToSentItems: true }),
       }
     )
-    return res.ok || res.status === 202
-  } catch { return false }
+    if (!res.ok && res.status !== 202) throw new Error(`Graph API ${res.status}`)
+    return true
+  })
+  return result !== false
 }
 
 // ── SMTP fallback ───────────────────────────────────────────────────────────────
@@ -91,10 +116,8 @@ export async function sendPasswordResetEmail(opts: {
   const transporter = getTransporter()
   if (!transporter) return false
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
-  try {
-    await transporter.sendMail({ from, to: opts.to, subject, html })
-    return true
-  } catch { return false }
+  const result = await withRetry(() => transporter.sendMail({ from, to: opts.to, subject, html }))
+  return result !== false
 }
 
 export async function sendMonthlyReportEmployeeEmail(opts: {
@@ -149,8 +172,8 @@ export async function sendMonthlyReportEmployeeEmail(opts: {
   const transporter = getTransporter()
   if (!transporter) return false
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
-  try { await transporter.sendMail({ from, to: opts.to, subject, html }); return true }
-  catch { return false }
+  const result = await withRetry(() => transporter.sendMail({ from, to: opts.to, subject, html }))
+  return result !== false
 }
 
 export async function sendMonthlyReportAdminEmail(opts: {
@@ -224,8 +247,8 @@ export async function sendMonthlyReportAdminEmail(opts: {
   const transporter = getTransporter()
   if (!transporter) return false
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
-  try { await transporter.sendMail({ from, to: opts.to, subject, html }); return true }
-  catch { return false }
+  const result = await withRetry(() => transporter.sendMail({ from, to: opts.to, subject, html }))
+  return result !== false
 }
 
 export async function sendCorrectionEmail(opts: {
@@ -257,6 +280,31 @@ export async function sendCorrectionEmail(opts: {
   const transporter = getTransporter()
   if (!transporter) return
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
-  try { await transporter.sendMail({ from, to: opts.to, subject, html }) }
-  catch { /* email failure is non-fatal */ }
+  await withRetry(() => transporter.sendMail({ from, to: opts.to, subject, html }))
+}
+
+export async function sendEmailVerification(opts: {
+  to: string
+  name: string
+  confirmUrl: string
+}): Promise<boolean> {
+  const subject = 'Confirme o seu novo e-mail — PontoGlass'
+  const html = `<p>Olá <strong>${opts.name}</strong>,</p>
+    <p>Recebemos um pedido para alterar o seu e-mail no PontoGlass.</p>
+    <p><a href="${opts.confirmUrl}" style="display:inline-block;padding:10px 20px;background:#6366f1;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Confirmar novo e-mail</a></p>
+    <p style="color:#6b7280;font-size:13px">O link é válido durante <strong>24 horas</strong>. Se não pediu esta alteração, ignore este e-mail — o seu e-mail atual permanece inalterado.</p>`
+
+  if (hasGraphConfig()) {
+    return sendViaGraph({
+      subject,
+      body: { contentType: 'HTML', content: html },
+      toRecipients: [{ emailAddress: { address: opts.to, name: opts.name } }],
+    })
+  }
+
+  const transporter = getTransporter()
+  if (!transporter) return false
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
+  const result = await withRetry(() => transporter.sendMail({ from, to: opts.to, subject, html }))
+  return result !== false
 }
