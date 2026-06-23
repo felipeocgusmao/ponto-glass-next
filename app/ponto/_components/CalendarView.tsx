@@ -2,6 +2,7 @@
 
 import type { PunchRecord, DayException } from '@/lib/types'
 import { calcNetMinutes, businessDate } from '@/lib/utils'
+import { useLang } from '@/lib/LangContext'
 
 interface CalendarViewProps {
   records: PunchRecord[]
@@ -19,6 +20,7 @@ function fmtMin(min: number): string {
 }
 
 export function CalendarView({ records, exceptions, year, month, lunchBreakMinutes, onDayClick }: CalendarViewProps) {
+  const { t } = useLang()
   const today = businessDate()
   const exceptionDates = new Set(exceptions.map(e => e.date))
   const exceptionMap = new Map(exceptions.map(e => [e.date, e]))
@@ -37,7 +39,10 @@ export function CalendarView({ records, exceptions, year, month, lunchBreakMinut
   for (let d = 1; d <= lastDay.getDate(); d++) cells.push(d)
   while (cells.length % 7 !== 0) cells.push(null)
 
-  const weekDays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+  const weekDays = [
+    t('cal.wd.mon'), t('cal.wd.tue'), t('cal.wd.wed'), t('cal.wd.thu'),
+    t('cal.wd.fri'), t('cal.wd.sat'), t('cal.wd.sun'),
+  ]
 
   return (
     <div>
@@ -76,7 +81,7 @@ export function CalendarView({ records, exceptions, year, month, lunchBreakMinut
           if (isException) {
             bg = 'color-mix(in oklch, var(--accent) 12%, var(--bg))'
             textColor = 'var(--accent)'
-            label = exc?.type === 'holiday' ? 'Feriado' : 'Folga'
+            label = exc?.type === 'holiday' ? t('cal.exc.holiday') : t('cal.exc.day_off')
           } else if (isWeekend) {
             bg = 'var(--surface)'
             textColor = 'var(--fg-dim)'
@@ -117,10 +122,10 @@ export function CalendarView({ records, exceptions, year, month, lunchBreakMinut
       </div>
       <div style={{ display: 'flex', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
         {[
-          { color: 'var(--success-fg)', label: 'Trabalhado' },
-          { color: 'var(--danger-fg)',  label: 'Ausente' },
-          { color: 'var(--accent)',     label: 'Feriado/Folga' },
-          { color: 'var(--fg-dim)',     label: 'Fim de semana' },
+          { color: 'var(--success-fg)', label: t('cal.legend.worked') },
+          { color: 'var(--danger-fg)',  label: t('cal.legend.absent') },
+          { color: 'var(--accent)',     label: t('cal.legend.holiday') },
+          { color: 'var(--fg-dim)',     label: t('cal.legend.weekend') },
         ].map(({ color, label }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--fg-muted)' }}>
             <div style={{ width: 8, height: 8, borderRadius: 2, background: `color-mix(in oklch, ${color} 30%, var(--bg))`, border: `1px solid ${color}`, flexShrink: 0 }} />
