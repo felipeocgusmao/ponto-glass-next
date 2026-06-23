@@ -619,9 +619,12 @@ select.input { padding-right: 24px; appearance: none; background-image: url("dat
   .app[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
   .sidebar-overlay {
     position: fixed; inset: 0; z-index: 99;
-    background: rgba(0,0,0,0.4); animation: pg-fadeIn 0.2s ease;
+    background: rgba(0,0,0,0.08);
+    backdrop-filter: blur(10px) saturate(1.5);
+    -webkit-backdrop-filter: blur(10px) saturate(1.5);
+    animation: pg-fadeIn 0.2s ease;
   }
-  [data-theme="dark"] .sidebar-overlay { background: rgba(0,0,0,0.6); }
+  [data-theme="dark"] .sidebar-overlay { background: rgba(0,0,0,0.18); }
   .topbar-hamburger { display: grid; }
   .topbar-search { display: none; }
   .topbar { padding: 0 12px; gap: 8px; }
