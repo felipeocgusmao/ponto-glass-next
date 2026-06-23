@@ -55,7 +55,7 @@ export default function TopBar({
       <button
         onClick={onOpenMobileNav}
         className="topbar-hamburger"
-        aria-label="Abrir menu"
+        aria-label={t('topbar.open_menu')}
       >
         <IconHamburger size={16} />
       </button>
@@ -66,17 +66,17 @@ export default function TopBar({
         <span className="crumb current">{title}</span>
       </div>
 
-      <button className="topbar-search" onClick={onOpenCmdK} aria-label="Abrir busca">
+      <button className="topbar-search" onClick={onOpenCmdK} aria-label={t('topbar.open_search')}>
         <IconSearch size={13} />
-        <span className="placeholder">Buscar funcionários, registros…</span>
+        <span className="placeholder">{t('topbar.search_placeholder')}</span>
         <kbd>⌘K</kbd>
       </button>
 
       <button
         className="theme-toggle"
         onClick={onToggleTheme}
-        title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
-        aria-label={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
+        title={theme === 'dark' ? t('topbar.theme_light') : t('topbar.theme_dark')}
+        aria-label={theme === 'dark' ? t('topbar.theme_light') : t('topbar.theme_dark')}
       >
         {theme === 'dark' ? <SunIcon aria-hidden /> : <MoonIcon aria-hidden />}
       </button>
@@ -85,8 +85,8 @@ export default function TopBar({
         <button
           className="topbar-action"
           onClick={onToggleNotifications}
-          title="Notificações"
-          aria-label="Notificações"
+          title={t('topbar.notifications')}
+          aria-label={t('topbar.notifications')}
           aria-expanded={notificationsOpen}
         >
           <IconBell size={14} />
