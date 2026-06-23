@@ -5,10 +5,11 @@ import { useState, useEffect, useCallback } from 'react'
 interface AlertSettings {
   hour_bank_low_threshold: number | null
   long_day_threshold: number | null
+  hour_bank_max_positive: number | null
 }
 
 export function AlertasTab() {
-  const [settings, setSettings] = useState<AlertSettings>({ hour_bank_low_threshold: null, long_day_threshold: null })
+  const [settings, setSettings] = useState<AlertSettings>({ hour_bank_low_threshold: null, long_day_threshold: null, hour_bank_max_positive: null })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -16,6 +17,7 @@ export function AlertasTab() {
   // Local form state (in hours for UX, stored as minutes)
   const [bankHours, setBankHours] = useState('')
   const [dayHours,  setDayHours]  = useState('')
+  const [maxBankHours, setMaxBankHours] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -26,6 +28,7 @@ export function AlertasTab() {
         setSettings(d)
         setBankHours(d.hour_bank_low_threshold !== null ? String(Math.abs(d.hour_bank_low_threshold) / 60) : '')
         setDayHours(d.long_day_threshold !== null ? String(d.long_day_threshold / 60) : '')
+        setMaxBankHours(d.hour_bank_max_positive !== null ? String(d.hour_bank_max_positive / 60) : '')
       }
     } catch { /* silent */ }
     finally { setLoading(false) }
@@ -39,6 +42,7 @@ export function AlertasTab() {
       const payload: Partial<AlertSettings> = {
         hour_bank_low_threshold: bankHours ? -(parseFloat(bankHours) * 60) : null,
         long_day_threshold: dayHours ? parseFloat(dayHours) * 60 : null,
+        hour_bank_max_positive: maxBankHours ? parseFloat(maxBankHours) * 60 : null,
       }
       const res = await fetch('/api/tenant-settings', {
         method: 'PATCH',
@@ -113,6 +117,28 @@ export function AlertasTab() {
                 <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>horas/dia</span>
                 {dayHours && <span className="chip warn" style={{ fontSize: 11 }}>alerta se &gt; {dayHours}h/dia</span>}
                 {!dayHours && <span className="chip" style={{ fontSize: 11 }}>desativado</span>}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Máximo de banco de horas</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
+                Limita o saldo positivo de banco de horas. O excesso é removido automaticamente no 1º dia de cada mês.
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={maxBankHours}
+                  onChange={e => setMaxBankHours(e.target.value)}
+                  placeholder="ex: 40"
+                  className="input"
+                  style={{ width: 100 }}
+                />
+                <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>horas</span>
+                {maxBankHours && <span className="chip warn" style={{ fontSize: 11 }}>máximo de {maxBankHours}h — excesso removido no 1º do mês</span>}
+                {!maxBankHours && <span className="chip" style={{ fontSize: 11 }}>desativado</span>}
               </div>
             </div>
 

@@ -7,6 +7,7 @@ import { isCsrfSafe } from '@/lib/csrf'
 export interface TenantAlertSettings {
   hour_bank_low_threshold: number | null   // minutes, e.g. -120 = alert when < -2h
   long_day_threshold: number | null         // minutes, e.g. 600 = alert when > 10h/day
+  hour_bank_max_positive: number | null    // minutes, e.g. 1200 = cap at +20h
 }
 
 export async function GET() {
@@ -29,6 +30,7 @@ export async function GET() {
   const settings: TenantAlertSettings = {
     hour_bank_low_threshold: null,
     long_day_threshold: null,
+    hour_bank_max_positive: null,
     ...((data?.alert_settings as TenantAlertSettings | null) ?? {}),
   }
   return NextResponse.json(settings)
@@ -54,6 +56,7 @@ export async function PATCH(request: NextRequest) {
   const merged: TenantAlertSettings = {
     hour_bank_low_threshold: null,
     long_day_threshold: null,
+    hour_bank_max_positive: null,
     ...((existing?.alert_settings as TenantAlertSettings | null) ?? {}),
   }
 
@@ -61,6 +64,8 @@ export async function PATCH(request: NextRequest) {
     merged.hour_bank_low_threshold = body.hour_bank_low_threshold !== undefined ? (body.hour_bank_low_threshold === null ? null : Number(body.hour_bank_low_threshold)) : merged.hour_bank_low_threshold
   if ('long_day_threshold' in body)
     merged.long_day_threshold = body.long_day_threshold !== undefined ? (body.long_day_threshold === null ? null : Number(body.long_day_threshold)) : merged.long_day_threshold
+  if ('hour_bank_max_positive' in body)
+    merged.hour_bank_max_positive = body.hour_bank_max_positive !== undefined ? (body.hour_bank_max_positive === null ? null : Number(body.hour_bank_max_positive)) : merged.hour_bank_max_positive
 
   const { error } = await supabase
     .from('tenants')

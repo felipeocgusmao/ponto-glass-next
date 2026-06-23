@@ -89,6 +89,79 @@ function PunctualitySection({ from, to }: { from: string; to: string }) {
   )
 }
 
+interface AbsenceRow {
+  empId: string; name: string; absent_count: number; absent_days: string[]
+}
+
+function AbsencesSection({ from, to }: { from: string; to: string }) {
+  const [rows, setRows] = useState<AbsenceRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const load = async () => {
+    if (!open) { setOpen(true) }
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/reports/absences?from=${from}&to=${to}`)
+      if (res.ok) { setRows(await res.json()); setLoaded(true) }
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }
+
+  const padD = (n: number) => String(n).padStart(2, '0')
+
+  return (
+    <div className="card">
+      <div
+        className="card-head"
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => { if (!open) load(); else setOpen(false) }}
+      >
+        <div className="card-title">Ausências {loaded && rows.length > 0 && <span className="chip danger" style={{ fontSize: 11, marginLeft: 6 }}>{rows.length} pessoas</span>}</div>
+        <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div className="card-body">
+          {loading && <div className="alert-inline info">A carregar…</div>}
+          {!loading && loaded && rows.length === 0 && (
+            <div className="empty"><div className="desc">Nenhuma ausência no período.</div></div>
+          )}
+          {!loading && loaded && rows.length > 0 && (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--fg-muted)' }}>Funcionário</th>
+                    <th style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--fg-muted)' }}>Ausências</th>
+                    <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--fg-muted)' }}>Dias</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.empId} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 500 }}>{r.name}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        <span className="chip danger" style={{ fontSize: 11 }}>{r.absent_count}</span>
+                      </td>
+                      <td style={{ padding: '8px 12px', color: 'var(--fg-muted)', fontSize: 12 }}>
+                        {r.absent_days.map(d => {
+                          const dt = new Date(d + 'T12:00:00')
+                          return `${padD(dt.getDate())}/${padD(dt.getMonth() + 1)}`
+                        }).join(', ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type RangePreset = 'this_month' | 'last_month' | '30d' | 'quarter' | 'custom'
 
 function pad(n: number) { return String(n).padStart(2, '0') }
@@ -504,6 +577,9 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
 
               {/* Pontualidade — lazy-loaded on demand */}
               <PunctualitySection from={from} to={to} />
+
+              {/* Ausências — lazy-loaded on demand */}
+              <AbsencesSection from={from} to={to} />
             </>
           )}
         </>
