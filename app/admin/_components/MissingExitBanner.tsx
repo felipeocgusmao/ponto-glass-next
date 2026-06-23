@@ -3,8 +3,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PunchRecord } from '@/lib/types'
 import { businessDate } from '@/lib/utils'
+import { useLang } from '@/lib/LangContext'
+
+const LANG_TO_LOCALE: Record<string, string> = {
+  'pt-PT': 'pt-PT',
+  'pt-BR': 'pt-BR',
+  'en':    'en-GB',
+  'es':    'es-ES',
+}
 
 export default function MissingExitBanner() {
+  const { lang, t } = useLang()
   const [alerts, setAlerts] = useState<{ name: string; date: string; reason: string }[]>([])
   const [dismissed, setDismissed] = useState(false)
 
@@ -72,11 +81,11 @@ export default function MissingExitBanner() {
   return (
     <div className="alert-inline warn" style={{ alignItems: 'flex-start', gap: 12 }}>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>⚠ {alerts.length} dia(s) sem saída registrada</div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>{t('banner.missing_exit').replace('{n}', String(alerts.length))}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {alerts.map((a) => (
             <div key={`${a.name}-${a.date}`} style={{ fontSize: 12 }}>
-              {a.name} — {new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+              {a.name} — {new Date(a.date + 'T12:00:00').toLocaleDateString(LANG_TO_LOCALE[lang] ?? 'pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
               <span style={{ color: 'var(--fg-dim)', marginLeft: 6 }}>({a.reason})</span>
             </div>
           ))}

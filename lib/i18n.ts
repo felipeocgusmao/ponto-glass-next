@@ -406,6 +406,33 @@ const t = {
 
     // ── Error states ──────────────────────────────────────────────────────
     'error.connect':        'Erro ao conectar. Verifique a sua conexão.',
+
+    // ── Settings modal ────────────────────────────────────────────────────
+    'settings.title':           'Configurações',
+    'settings.theme':           'Tema',
+    'settings.language':        'Idioma',
+    'settings.accent':          'Destaque',
+    'settings.font':            'Fonte',
+    'settings.sessions':        'Histórico de sessões',
+    'settings.sessions_loading':'A carregar sessões…',
+    'settings.sessions_none':   'Nenhuma sessão registada.',
+    'settings.revoked':         'Revogada',
+    'settings.revoke':          'Revogar',
+    'settings.revoke_others':   'Terminar outras sessões',
+    'settings.font.flat':       'flat moderno',
+    'settings.font.mono':       'mono denso',
+    'settings.font.editorial':  'espaçoso',
+
+    // ── TopBar ────────────────────────────────────────────────────────────
+    'topbar.search_placeholder': 'Pesquisar funcionários, registos…',
+    'topbar.theme_light':        'Tema claro',
+    'topbar.theme_dark':         'Tema escuro',
+    'topbar.notifications':      'Notificações',
+    'topbar.open_menu':          'Abrir menu',
+    'topbar.open_search':        'Abrir pesquisa',
+
+    // ── Missing exit banner ───────────────────────────────────────────────
+    'banner.missing_exit':       '⚠ {n} dia(s) sem saída registada',
   },
 
   'pt-BR': {
@@ -787,6 +814,33 @@ const t = {
     'calendar.list_view':      'Lista',
     'calendar.calendar_view':  'Calendário',
     'error.connect':        'Erro ao conectar. Verifique sua conexão.',
+
+    // ── Settings modal ────────────────────────────────────────────────────
+    'settings.title':           'Configurações',
+    'settings.theme':           'Tema',
+    'settings.language':        'Idioma',
+    'settings.accent':          'Destaque',
+    'settings.font':            'Fonte',
+    'settings.sessions':        'Histórico de sessões',
+    'settings.sessions_loading':'Carregando sessões…',
+    'settings.sessions_none':   'Nenhuma sessão registrada.',
+    'settings.revoked':         'Revogada',
+    'settings.revoke':          'Revogar',
+    'settings.revoke_others':   'Encerrar outras sessões',
+    'settings.font.flat':       'flat moderno',
+    'settings.font.mono':       'mono denso',
+    'settings.font.editorial':  'espaçoso',
+
+    // ── TopBar ────────────────────────────────────────────────────────────
+    'topbar.search_placeholder': 'Pesquisar funcionários, registros…',
+    'topbar.theme_light':        'Tema claro',
+    'topbar.theme_dark':         'Tema escuro',
+    'topbar.notifications':      'Notificações',
+    'topbar.open_menu':          'Abrir menu',
+    'topbar.open_search':        'Abrir pesquisa',
+
+    // ── Missing exit banner ───────────────────────────────────────────────
+    'banner.missing_exit':       '⚠ {n} dia(s) sem saída registrada',
   },
 
   'en': {
@@ -1168,6 +1222,33 @@ const t = {
     'calendar.list_view':      'List',
     'calendar.calendar_view':  'Calendar',
     'error.connect':        'Connection error. Check your network.',
+
+    // ── Settings modal ────────────────────────────────────────────────────
+    'settings.title':           'Settings',
+    'settings.theme':           'Theme',
+    'settings.language':        'Language',
+    'settings.accent':          'Accent',
+    'settings.font':            'Font',
+    'settings.sessions':        'Login sessions',
+    'settings.sessions_loading':'Loading sessions…',
+    'settings.sessions_none':   'No sessions found.',
+    'settings.revoked':         'Revoked',
+    'settings.revoke':          'Revoke',
+    'settings.revoke_others':   'End other sessions',
+    'settings.font.flat':       'modern flat',
+    'settings.font.mono':       'dense mono',
+    'settings.font.editorial':  'spacious',
+
+    // ── TopBar ────────────────────────────────────────────────────────────
+    'topbar.search_placeholder': 'Search employees, records…',
+    'topbar.theme_light':        'Light theme',
+    'topbar.theme_dark':         'Dark theme',
+    'topbar.notifications':      'Notifications',
+    'topbar.open_menu':          'Open menu',
+    'topbar.open_search':        'Open search',
+
+    // ── Missing exit banner ───────────────────────────────────────────────
+    'banner.missing_exit':       '⚠ {n} day(s) missing clock-out',
   },
 
   'es': {
@@ -1549,6 +1630,33 @@ const t = {
     'calendar.list_view':      'Lista',
     'calendar.calendar_view':  'Calendario',
     'error.connect':        'Error de conexión. Comprueba tu red.',
+
+    // ── Settings modal ────────────────────────────────────────────────────
+    'settings.title':           'Configuración',
+    'settings.theme':           'Tema',
+    'settings.language':        'Idioma',
+    'settings.accent':          'Acento',
+    'settings.font':            'Fuente',
+    'settings.sessions':        'Historial de sesiones',
+    'settings.sessions_loading':'Cargando sesiones…',
+    'settings.sessions_none':   'Sin sesiones registradas.',
+    'settings.revoked':         'Revocada',
+    'settings.revoke':          'Revocar',
+    'settings.revoke_others':   'Cerrar otras sesiones',
+    'settings.font.flat':       'plana moderna',
+    'settings.font.mono':       'mono densa',
+    'settings.font.editorial':  'espacioso',
+
+    // ── TopBar ────────────────────────────────────────────────────────────
+    'topbar.search_placeholder': 'Buscar empleados, registros…',
+    'topbar.theme_light':        'Tema claro',
+    'topbar.theme_dark':         'Tema oscuro',
+    'topbar.notifications':      'Notificaciones',
+    'topbar.open_menu':          'Abrir menú',
+    'topbar.open_search':        'Abrir búsqueda',
+
+    // ── Missing exit banner ───────────────────────────────────────────────
+    'banner.missing_exit':       '⚠ {n} día(s) sin fichar salida',
   },
 } as const
 

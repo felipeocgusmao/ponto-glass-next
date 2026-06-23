@@ -4,12 +4,28 @@
 *, *::before, *::after { box-sizing: border-box; }
 * { margin: 0; padding: 0; }
 html, body { height: 100%; }
+
+/* Background gradient blobs — visible through glassy surfaces */
+html {
+  background:
+    radial-gradient(ellipse 62% 50% at 10% 15%, rgba(94,106,210,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 45% at 90% 85%, rgba(124,58,237,0.05) 0%, transparent 70%),
+    var(--bg);
+}
+html[data-theme="dark"] {
+  background:
+    radial-gradient(ellipse 62% 50% at 10% 15%, rgba(124,140,248,0.14) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 45% at 90% 85%, rgba(167,139,250,0.11) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 52% 48%, rgba(34,211,238,0.05) 0%, transparent 65%),
+    #08090b;
+}
+
 body {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--fg);
-  background: var(--bg);
+  background: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'cv11', 'ss01', 'ss03';
@@ -170,7 +186,7 @@ ul, ol { list-style: none; }
   grid-template-columns: var(--sidebar-w, 240px) 1fr;
   height: 100vh;
   height: 100dvh;
-  background: var(--bg-app);
+  background: transparent;
   transition: grid-template-columns 0.2s ease;
 }
 .app[data-collapsed="true"] { --sidebar-w: 56px; }
@@ -179,10 +195,13 @@ ul, ol { list-style: none; }
 .sidebar {
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: rgba(250,250,252,0.80);
   border-right: 1px solid var(--border);
   overflow: hidden;
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
 }
+[data-theme="dark"] .sidebar { background: rgba(8,9,11,0.72); }
 .sb-head {
   display: flex; align-items: center; gap: 10px;
   padding: 14px;
@@ -271,8 +290,11 @@ ul, ol { list-style: none; }
   display: flex; align-items: center; gap: 12px;
   padding: 0 18px; height: 49px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg); flex-shrink: 0;
+  background: rgba(250,250,252,0.75); flex-shrink: 0;
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
 }
+[data-theme="dark"] .topbar { background: rgba(8,9,11,0.65); }
 .breadcrumbs { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg-muted); }
 .breadcrumbs .crumb { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: var(--r-sm); }
 .breadcrumbs .crumb:hover { background: var(--hover); color: var(--fg); }
@@ -399,7 +421,8 @@ ul, ol { list-style: none; }
 .btn.lg { height: 36px; font-size: 13.5px; padding: 0 16px; }
 
 /* ─── Cards ─── */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+.card { background: rgba(255,255,255,0.78); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+[data-theme="dark"] .card { background: rgba(19,20,23,0.72); }
 .card-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border);
@@ -414,12 +437,13 @@ ul, ol { list-style: none; }
 @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 .kpi {
   padding: 16px 16px 14px; border-radius: var(--r-lg);
-  background: var(--surface); border: 1px solid var(--border);
+  background: rgba(255,255,255,0.78); border: 1px solid var(--border);
   display: flex; flex-direction: column; gap: 6px;
   /* Allow the card to shrink below its content's intrinsic width so chips
      wrap inside the grid cell instead of pushing past the card border. */
   min-width: 0;
 }
+[data-theme="dark"] .kpi { background: rgba(19,20,23,0.72); }
 .kpi-label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; color: var(--fg-muted); }
 .kpi-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 /* flex (not inline-flex) + wrap so multiple chips on a narrow card move to a
