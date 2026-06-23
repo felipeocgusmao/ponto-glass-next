@@ -20,6 +20,7 @@ interface ShiftTemplate {
 }
 
 function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
+  const { t } = useLang()
   const [templates, setTemplates] = useState<ShiftTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState('')
@@ -60,14 +61,14 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
         setShowCreate(false)
         await load()
       } else {
-        const d = await res.json(); setErr(d.error ?? 'Erro ao criar template')
+        const d = await res.json(); setErr(d.error ?? t('tmpl.err.create'))
       }
-    } catch { setErr('Erro de conexão') }
+    } catch { setErr(t('error.connect')) }
     finally { setCreating(false) }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remover este template de turno?')) return
+    if (!confirm(t('tmpl.del_confirm'))) return
     await fetch(`/api/shift-templates?id=${id}`, { method: 'DELETE' })
     setTemplates(prev => prev.filter(t => t.id !== id))
   }
@@ -82,19 +83,19 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
         body: JSON.stringify({ templateId: applyModal.id, employeeIds: selectedEmps }),
       })
       const d = await res.json()
-      if (res.ok) setApplyMsg({ ok: true, text: `Template aplicado a ${d.applied} funcionário(s).` })
-      else setApplyMsg({ ok: false, text: d.error ?? 'Erro ao aplicar' })
-    } catch { setApplyMsg({ ok: false, text: 'Erro de conexão' }) }
+      if (res.ok) setApplyMsg({ ok: true, text: t('tmpl.applied').replace('{n}', String(d.applied)) })
+      else setApplyMsg({ ok: false, text: d.error ?? t('tmpl.err.apply') })
+    } catch { setApplyMsg({ ok: false, text: t('error.connect') }) }
     finally { setApplying(false) }
   }
 
   return (
     <>
       {applyModal && (
-        <Modal title={`Aplicar "${applyModal.name}"`} onClose={() => { setApplyModal(null); setSelectedEmps([]); setApplyMsg(null) }} width={460}>
+        <Modal title={t('tmpl.apply_title').replace('{name}', applyModal.name)} onClose={() => { setApplyModal(null); setSelectedEmps([]); setApplyMsg(null) }} width={460}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-              Selecione os funcionários que receberão as configurações do template:
+              {t('tmpl.modal_hint')}
               <strong> {applyModal.workday_hours}h/dia, {applyModal.lunch_break_minutes}min almoço</strong>
               {applyModal.expected_start && `, entrada ${applyModal.expected_start}`}
               {applyModal.expected_end && `, saída ${applyModal.expected_end}`}
@@ -112,13 +113,13 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={() => setSelectedEmps(employees.filter(e => e.active !== false).map(e => e.id))}>Selecionar todos</button>
-              <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={() => setSelectedEmps([])}>Limpar</button>
+              <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={() => setSelectedEmps(employees.filter(e => e.active !== false).map(e => e.id))}>{t('tmpl.select_all')}</button>
+              <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={() => setSelectedEmps([])}>{t('tmpl.clear')}</button>
             </div>
             {applyMsg && <div className={`alert-inline ${applyMsg.ok ? 'ok' : 'err'}`}>{applyMsg.text}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn primary" disabled={applying || !selectedEmps.length} onClick={handleApply} style={{ flex: 1, justifyContent: 'center' }}>
-                {applying ? 'A aplicar…' : `Aplicar a ${selectedEmps.length} funcionário(s)`}
+                {applying ? t('tmpl.applying') : t('tmpl.apply_to').replace('{n}', String(selectedEmps.length))}
               </button>
             </div>
           </div>
@@ -127,9 +128,9 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
 
       <div className="card">
         <div className="card-head">
-          <div className="card-title">Templates de turno</div>
+          <div className="card-title">{t('tmpl.title')}</div>
           <button className="btn ghost sm" onClick={() => setShowCreate(v => !v)}>
-            {showCreate ? 'Cancelar' : '+ Novo template'}
+            {showCreate ? t('common.cancel') : t('tmpl.new')}
           </button>
         </div>
 
@@ -138,11 +139,11 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div className="form-grid-2">
                 <div className="field">
-                  <label>Nome do template</label>
-                  <input value={name} onChange={e => setName(e.target.value)} placeholder="ex: Turno manhã" className="input" required />
+                  <label>{t('tmpl.name_label')}</label>
+                  <input value={name} onChange={e => setName(e.target.value)} placeholder={t('tmpl.name_ph')} className="input" required />
                 </div>
                 <div className="field">
-                  <label>Jornada</label>
+                  <label>{t('emp.workday')}</label>
                   <select value={workdayHours} onChange={e => setWorkdayHours(e.target.value)} className="input">
                     {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => <option key={h} value={h}>{h}h</option>)}
                   </select>
@@ -150,9 +151,9 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
               </div>
               <div className="form-grid-2">
                 <div className="field">
-                  <label>Pausa almoço</label>
+                  <label>{t('tmpl.lunch_label')}</label>
                   <select value={lunchMin} onChange={e => setLunchMin(e.target.value)} className="input">
-                    <option value="0">Sem almoço</option>
+                    <option value="0">{t('tmpl.no_lunch')}</option>
                     <option value="15">15 min</option>
                     <option value="30">30 min</option>
                     <option value="45">45 min</option>
@@ -160,47 +161,47 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
                   </select>
                 </div>
                 <div className="field">
-                  <label>Início de turno</label>
+                  <label>{t('tmpl.shift_label')}</label>
                   <input type="time" value={shiftStart} onChange={e => setShiftStart(e.target.value)} className="input" />
                 </div>
               </div>
               <div className="form-grid-2">
                 <div className="field">
-                  <label>Entrada esperada (opcional)</label>
+                  <label>{t('tmpl.exp_in_label')}</label>
                   <input type="time" value={expectedStart} onChange={e => setExpectedStart(e.target.value)} className="input" />
                 </div>
                 <div className="field">
-                  <label>Saída esperada (opcional)</label>
+                  <label>{t('tmpl.exp_out_label')}</label>
                   <input type="time" value={expectedEnd} onChange={e => setExpectedEnd(e.target.value)} className="input" />
                 </div>
               </div>
               {err && <div className="alert-inline err">{err}</div>}
               <button type="submit" disabled={creating} className="btn primary" style={{ alignSelf: 'flex-start' }}>
-                {creating ? 'A criar…' : 'Criar template'}
+                {creating ? t('tmpl.creating') : t('tmpl.create_btn')}
               </button>
             </form>
           </div>
         )}
 
         <div className="card-body">
-          {loading && <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>A carregar…</div>}
+          {loading && <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('common.loading')}</div>}
           {!loading && templates.length === 0 && (
-            <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Nenhum template criado ainda.</div>
+            <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('tmpl.empty')}</div>
           )}
           {!loading && templates.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {templates.map(t => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              {templates.map(tmpl => (
+                <div key={tmpl.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{tmpl.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
-                      {t.workday_hours}h · {t.lunch_break_minutes}min almoço
-                      {t.expected_start && ` · entrada ${t.expected_start}`}
-                      {t.expected_end && ` · saída ${t.expected_end}`}
+                      {tmpl.workday_hours}h · {tmpl.lunch_break_minutes}min almoço
+                      {tmpl.expected_start && ` · entrada ${tmpl.expected_start}`}
+                      {tmpl.expected_end && ` · saída ${tmpl.expected_end}`}
                     </div>
                   </div>
-                  <button className="btn ghost sm" onClick={() => { setApplyModal(t); setSelectedEmps([]); setApplyMsg(null) }}>Aplicar</button>
-                  <button className="btn danger sm" onClick={() => handleDelete(t.id)}>Remover</button>
+                  <button className="btn ghost sm" onClick={() => { setApplyModal(tmpl); setSelectedEmps([]); setApplyMsg(null) }}>{t('tmpl.apply_btn')}</button>
+                  <button className="btn danger sm" onClick={() => handleDelete(tmpl.id)}>{t('common.delete')}</button>
                 </div>
               ))}
             </div>

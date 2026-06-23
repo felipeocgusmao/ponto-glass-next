@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useLang } from '@/lib/LangContext'
 
 interface WebhookConfig {
   id: string
@@ -11,6 +12,7 @@ interface WebhookConfig {
 }
 
 export function IntegracoesTab() {
+  const { t } = useLang()
   const [hooks, setHooks] = useState<WebhookConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [newUrl, setNewUrl] = useState('')
@@ -30,7 +32,7 @@ export function IntegracoesTab() {
   useEffect(() => { load() }, [load])
 
   const add = async () => {
-    if (!newUrl.startsWith('https://')) { setMsg({ ok: false, text: 'A URL deve começar com https://' }); return }
+    if (!newUrl.startsWith('https://')) { setMsg({ ok: false, text: t('integ.url_https') }); return }
     setAdding(true); setMsg(null)
     try {
       const res = await fetch('/api/webhook-configs', {
@@ -42,12 +44,12 @@ export function IntegracoesTab() {
         const d = await res.json()
         setHooks(prev => [d, ...prev])
         setNewUrl(''); setNewSecret('')
-        setMsg({ ok: true, text: 'Webhook adicionado.' })
+        setMsg({ ok: true, text: t('integ.added') })
       } else {
         const d = await res.json()
-        setMsg({ ok: false, text: d.error ?? 'Erro ao adicionar.' })
+        setMsg({ ok: false, text: d.error ?? t('integ.err.add') })
       }
-    } catch { setMsg({ ok: false, text: 'Erro de conexão.' }) }
+    } catch { setMsg({ ok: false, text: t('integ.err.connect') }) }
     finally { setAdding(false) }
   }
 
@@ -64,7 +66,7 @@ export function IntegracoesTab() {
   }
 
   const remove = async (id: string) => {
-    if (!confirm('Eliminar este webhook?')) return
+    if (!confirm(t('integ.del_confirm'))) return
     const res = await fetch(`/api/webhook-configs?id=${id}`, { method: 'DELETE' })
     if (res.ok) setHooks(prev => prev.filter(h => h.id !== id))
   }
@@ -73,17 +75,17 @@ export function IntegracoesTab() {
     <>
       <div className="page-head">
         <div>
-          <div className="page-title">Integrações</div>
-          <div className="page-sub">Webhooks de saída — receba eventos de ponto em sistemas externos</div>
+          <div className="page-title">{t('tab.integracoes')}</div>
+          <div className="page-sub">{t('integ.subtitle')}</div>
         </div>
       </div>
 
       {/* Add form */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13 }}>Adicionar webhook</div>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13 }}>{t('integ.add_title')}</div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="field" style={{ marginBottom: 0 }}>
-            <label>URL do endpoint <span style={{ color: 'var(--danger-fg)' }}>*</span></label>
+            <label>{t('integ.url_label')} <span style={{ color: 'var(--danger-fg)' }}>*</span></label>
             <input
               type="url"
               className="input"
@@ -93,24 +95,23 @@ export function IntegracoesTab() {
             />
           </div>
           <div className="field" style={{ marginBottom: 0 }}>
-            <label>Segredo HMAC (opcional)</label>
+            <label>{t('integ.secret_label')}</label>
             <input
               type="password"
               className="input"
               value={newSecret}
               onChange={e => setNewSecret(e.target.value)}
-              placeholder="Chave secreta para assinar os payloads"
+              placeholder={t('integ.secret_ph')}
             />
           </div>
           {msg && <div className={`alert-inline ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
           <div>
             <button className="btn primary" onClick={add} disabled={adding || !newUrl}>
-              {adding ? 'A adicionar…' : 'Adicionar'}
+              {adding ? t('integ.adding') : t('integ.add_btn')}
             </button>
           </div>
           <div style={{ fontSize: 12, color: 'var(--fg-muted)', padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)' }}>
-            O PontoGlass envia um <code>POST</code> com <code>Content-Type: application/json</code> para este URL sempre que um ponto é registado.
-            Se definir um segredo, o payload vem assinado com <code>X-PontoGlass-Signature: sha256=…</code>.
+            {t('integ.hint')}
           </div>
         </div>
       </div>
@@ -118,15 +119,15 @@ export function IntegracoesTab() {
       {/* List */}
       <div className="card">
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13 }}>
-          Webhooks configurados {hooks.length > 0 && <span className="chip" style={{ fontSize: 11, marginLeft: 6 }}>{hooks.length}</span>}
+          {t('integ.list_title')} {hooks.length > 0 && <span className="chip" style={{ fontSize: 11, marginLeft: 6 }}>{hooks.length}</span>}
         </div>
         {loading ? (
-          <div style={{ padding: 20, color: 'var(--fg-muted)', fontSize: 13 }}>A carregar…</div>
+          <div style={{ padding: 20, color: 'var(--fg-muted)', fontSize: 13 }}>{t('common.loading')}</div>
         ) : hooks.length === 0 ? (
           <div style={{ padding: 20 }}>
             <div className="empty">
-              <div className="title">Nenhum webhook configurado</div>
-              <div className="desc">Adicione um endpoint acima para integrar com Zapier, Make, ERPs e outros sistemas.</div>
+              <div className="title">{t('integ.empty_title')}</div>
+              <div className="desc">{t('integ.empty_desc')}</div>
             </div>
           </div>
         ) : (
@@ -136,13 +137,13 @@ export function IntegracoesTab() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)', wordBreak: 'break-all', opacity: h.active ? 1 : 0.5 }}>{h.url}</div>
                   <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
-                    Eventos: {h.events?.join(', ') || 'punch'} · Criado em {new Date(h.created_at).toLocaleDateString('pt-PT')}
+                    {t('integ.events_label')} {h.events?.join(', ') || 'punch'} · {t('integ.created_label')} {new Date(h.created_at).toLocaleDateString()}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  <span className={`chip ${h.active ? 'success' : ''}`} style={{ fontSize: 10 }}>{h.active ? 'ativo' : 'pausado'}</span>
-                  <button className="btn ghost sm" onClick={() => toggle(h)}>{h.active ? 'Pausar' : 'Ativar'}</button>
-                  <button className="btn ghost sm danger" onClick={() => remove(h.id)}>Remover</button>
+                  <span className={`chip ${h.active ? 'success' : ''}`} style={{ fontSize: 10 }}>{h.active ? t('integ.status.active') : t('integ.status.paused')}</span>
+                  <button className="btn ghost sm" onClick={() => toggle(h)}>{h.active ? t('integ.pause') : t('integ.activate')}</button>
+                  <button className="btn ghost sm danger" onClick={() => remove(h.id)}>{t('common.delete')}</button>
                 </div>
               </div>
             ))}

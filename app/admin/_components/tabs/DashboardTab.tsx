@@ -520,7 +520,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
           <div className="card-body flush">
             {recentPunches.length === 0 ? (
               <div className="empty">
-                <div className="desc">Nenhuma batida hoje.</div>
+                <div className="desc">{t('dash.no_punches_today')}</div>
               </div>
             ) : recentPunches.map(r => {
               const emp = employees.find(e => e.id === r.employee_id)

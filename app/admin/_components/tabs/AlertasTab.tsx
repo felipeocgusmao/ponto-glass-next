@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useLang } from '@/lib/LangContext'
 
 interface AlertSettings {
   hour_bank_low_threshold: number | null
@@ -9,6 +10,7 @@ interface AlertSettings {
 }
 
 export function AlertasTab() {
+  const { t } = useLang()
   const [settings, setSettings] = useState<AlertSettings>({ hour_bank_low_threshold: null, long_day_threshold: null, hour_bank_max_positive: null })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -52,12 +54,12 @@ export function AlertasTab() {
       if (res.ok) {
         const d = await res.json()
         setSettings(d)
-        setMsg({ ok: true, text: 'Alertas guardados com sucesso.' })
+        setMsg({ ok: true, text: t('alertas.saved') })
       } else {
         const d = await res.json()
-        setMsg({ ok: false, text: d.error ?? 'Erro ao guardar.' })
+        setMsg({ ok: false, text: d.error ?? t('alertas.err.save') })
       }
-    } catch { setMsg({ ok: false, text: 'Erro de conexão.' }) }
+    } catch { setMsg({ ok: false, text: t('alertas.err.connect') }) }
     finally { setSaving(false) }
   }
 
@@ -65,21 +67,21 @@ export function AlertasTab() {
     <>
       <div className="page-head">
         <div>
-          <div className="page-title">Alertas</div>
-          <div className="page-sub">Configure notificações automáticas por push para administradores</div>
+          <div className="page-title">{t('tab.alertas')}</div>
+          <div className="page-sub">{t('alertas.subtitle')}</div>
         </div>
       </div>
 
       {loading ? (
-        <div className="card"><div style={{ padding: '20px', color: 'var(--fg-muted)' }}>A carregar…</div></div>
+        <div className="card"><div style={{ padding: '20px', color: 'var(--fg-muted)' }}>{t('common.loading')}</div></div>
       ) : (
         <div className="card">
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Banco de horas negativo</div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{t('alertas.bank_neg.title')}</div>
               <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
-                Envia uma notificação push quando o saldo de banco de horas de um funcionário ficar abaixo deste valor.
+                {t('alertas.bank_neg.desc')}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input
@@ -92,16 +94,16 @@ export function AlertasTab() {
                   className="input"
                   style={{ width: 100 }}
                 />
-                <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>horas negativas</span>
-                {bankHours && <span className="chip warn" style={{ fontSize: 11 }}>alerta se saldo &lt; -{bankHours}h</span>}
-                {!bankHours && <span className="chip" style={{ fontSize: 11 }}>desativado</span>}
+                <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>{t('alertas.bank_neg.unit')}</span>
+                {bankHours && <span className="chip warn" style={{ fontSize: 11 }}>{t('alertas.bank_neg.chip').replace('{n}', bankHours)}</span>}
+                {!bankHours && <span className="chip" style={{ fontSize: 11 }}>{t('alertas.disabled')}</span>}
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Jornada muito longa</div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{t('alertas.long_day.title')}</div>
               <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
-                Envia uma notificação push no final do dia quando um funcionário trabalhar mais do que este limite.
+                {t('alertas.long_day.desc')}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input
@@ -114,16 +116,16 @@ export function AlertasTab() {
                   className="input"
                   style={{ width: 100 }}
                 />
-                <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>horas/dia</span>
-                {dayHours && <span className="chip warn" style={{ fontSize: 11 }}>alerta se &gt; {dayHours}h/dia</span>}
-                {!dayHours && <span className="chip" style={{ fontSize: 11 }}>desativado</span>}
+                <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>{t('alertas.long_day.unit')}</span>
+                {dayHours && <span className="chip warn" style={{ fontSize: 11 }}>{t('alertas.long_day.chip').replace('{n}', dayHours)}</span>}
+                {!dayHours && <span className="chip" style={{ fontSize: 11 }}>{t('alertas.disabled')}</span>}
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Máximo de banco de horas</div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{t('alertas.max_bank.title')}</div>
               <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
-                Limita o saldo positivo de banco de horas. O excesso é removido automaticamente no 1º dia de cada mês.
+                {t('alertas.max_bank.desc')}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input
@@ -136,9 +138,9 @@ export function AlertasTab() {
                   className="input"
                   style={{ width: 100 }}
                 />
-                <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>horas</span>
-                {maxBankHours && <span className="chip warn" style={{ fontSize: 11 }}>máximo de {maxBankHours}h — excesso removido no 1º do mês</span>}
-                {!maxBankHours && <span className="chip" style={{ fontSize: 11 }}>desativado</span>}
+                <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>{t('alertas.max_bank.unit')}</span>
+                {maxBankHours && <span className="chip warn" style={{ fontSize: 11 }}>{t('alertas.max_bank.chip').replace('{n}', maxBankHours)}</span>}
+                {!maxBankHours && <span className="chip" style={{ fontSize: 11 }}>{t('alertas.disabled')}</span>}
               </div>
             </div>
 
@@ -146,13 +148,13 @@ export function AlertasTab() {
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn primary" onClick={save} disabled={saving}>
-                {saving ? 'A guardar…' : 'Guardar configurações'}
+                {saving ? t('alertas.saving') : t('alertas.save_btn')}
               </button>
-              <button className="btn ghost" onClick={load} disabled={loading}>Cancelar</button>
+              <button className="btn ghost" onClick={load} disabled={loading}>{t('common.cancel')}</button>
             </div>
 
             <div style={{ padding: '12px 16px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--fg-muted)' }}>
-              <strong>Nota:</strong> As notificações requerem push web ativo. O cron de verificação corre todos os dias de semana às 18h. Deixe vazio para desativar um alerta.
+              <strong>{t('alertas.note')}</strong> {t('alertas.note_text')}
             </div>
           </div>
         </div>

@@ -57,9 +57,9 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
         if (action === 'approve') window.dispatchEvent(new Event('pg:records-changed'))
       } else {
         const d = await res.json().catch(() => ({}))
-        setActErr(d.error ?? 'Falha ao processar o pedido. Tente novamente.')
+        setActErr(d.error ?? t('corr.err.generic'))
       }
-    } catch { setActErr('Erro de conexão. Tente novamente.') }
+    } catch { setActErr(t('corr.err.connect')) }
     finally { setActionId(null) }
   }
 
