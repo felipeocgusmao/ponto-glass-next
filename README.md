@@ -93,7 +93,7 @@ Existe **um URL** e **uma senha**.
 │   Push        →   Web Push API  (VAPID)                 │
 │   E-mail      →   Microsoft Graph API  (+ SMTP fallback)│
 │   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
-│   Cron        →   Vercel Cron Jobs  (ausência, saída, mensal, semanal, alertas)│
+│   Cron        →   Vercel Cron Jobs  (ausência, saída, mensal, semanal, alertas, bank-cap)│
 │   Voz         →   Web Speech API  (reconhecimento + TTS)│
 │   Testes      →   Vitest  (147 unit) + Playwright  (E2E) │
 │   Monitor     →   Sentry  (erros cliente + servidor)    │
@@ -152,8 +152,10 @@ Cada peça foi escolhida com intenção:
   ● Selector de idioma (PT/BR/EN/ES)   ● Comentários em registos            ● Monitorização via /api/health
   ● Tema claro/escuro (persiste)       ● Paginação automática em relatórios ● Alertas configuráveis (banco/jornada)
   ● Dashboard pessoal (gráfico 7d)     ● Relatório de pontualidade          ● Webhooks de saída (HMAC assinados)
-                                       ● QR code por funcionário no quiosque● Integrações (Zapier, Make, ERPs)
-                                       ● Aprovação de semana por funcionário
+  ● 9 cores de destaque               ● Relatório de ausências             ● Integrações (Zapier, Make, ERPs)
+  ● 3 variantes de fonte              ● QR code por funcionário no quiosque● Templates de turno reutilizáveis
+  ● Histórico de sessões (revoke)     ● Aprovação de semana por funcionário● Limite de banco de horas (cap + cron)
+                                       ● Foto no quiosque (webcam JPEG)     ● Auto saída por geofencing (5 min)
 ```
 
 *\*desconto automático só se aplica quando pausas explícitas não foram registradas (fallback legado)*
@@ -194,13 +196,14 @@ Inspirado no minimalismo do Linear, Notion e VSCode: estrutura clara, hierarquia
 .app[data-collapsed="true"] { --sidebar-w: 56px; }
 ```
 
-**Admin shell** — sidebar agrupada (OPERAÇÃO / PESSOAS / ANÁLISE), botão de colapsar com persistência em `localStorage`, topbar com breadcrumbs, busca **⌘K** que abre uma **Command Palette** (navegação + ações), **Notifications Dropdown** no sino (correções pendentes, saídas em falta, ausências) e um **Settings Modal** centralizado para tema, idioma, palavra-passe e logout.
+**Admin shell** — sidebar agrupada (OPERAÇÃO / PESSOAS / ANÁLISE), botão de colapsar com persistência em `localStorage`, topbar com breadcrumbs, busca **⌘K** que abre uma **Command Palette** (navegação + ações), **Notifications Dropdown** no sino (correções pendentes, saídas em falta, ausências) e um **Settings Modal** centralizado com glassmorphism: tema claro/escuro, 9 cores de destaque em swatches, 3 variantes de fonte (Inter / JetBrains Mono / Lora serif), idioma, segurança (2FA + histórico de sessões com revoke) e logout.
 
 **Page-head** consistente em todos os tabs: título, subtítulo dinâmico (contagem ou estado) e botões de ação (Atualizar, Exportar, etc.).
 
 **Employee shell** — ecrã `/ponto` em layout fullscreen com relógio ao vivo, anel de progresso, ações contextuais (entrada / almoço / pausa / saída) e navegação inferior por 5 tabs (Ponto, Histórico, Banco, Correções, Perfil).
 
-Tema claro/escuro com um clique — persiste via `localStorage` e no banco por funcionário.  
+Tema claro/escuro, 9 cores de destaque e 3 variantes de fonte persistem via `localStorage` (restauradas sem FOUC pelo inline script no `<head>`). Modais, drawers e command palette usam `backdrop-filter: blur` para efeito glassmorphism.  
+Tema claro/escuro também persiste no banco por funcionário.  
 Cores de avatar (`av-c1` → `av-c8`) atribuídas por hash do ID, sem campo extra no banco.  
 Interface totalmente responsiva: sidebar em drawer mobile (≤768px), colunas ocultas/encolhidas em ecrãs estreitos, layout específico ≤480px.
 
@@ -250,7 +253,7 @@ ponto_glass_next/
 │   │       ├── TopBar            ← breadcrumbs + ⌘K + tema + sino com badge
 │   │       ├── CommandPalette    ← navegação por teclado e ações rápidas (⌘K / Ctrl+K)
 │   │       ├── NotificationsDropdown  ← popover do sino: correções, saídas em falta, ausências
-│   │       ├── SettingsModal     ← tema, idioma, palavra-passe, terminar outras sessões, sair
+│   │       ├── SettingsModal     ← glassmorphism; tema, 9 accents, 3 fontes, idioma, sessões, sair
 │   │       └── tabs/
 │   │           ├── MeuPontoTab       ← ponto do admin/gerente logado
 │   │           ├── DashboardTab      ← KPIs, sparkline, gráfico 14 dias, feed de batidas, atrasos
@@ -287,7 +290,8 @@ ponto_glass_next/
 │       │   ├── missing-exit/     ← alerta de saída não registada às 17h (protegido por CRON_SECRET)
 │       │   ├── monthly-report/   ← relatório mensal por e-mail com tabela diária (1º do mês, 08h UTC)
 │       │   ├── weekly-report/    ← relatório semanal por e-mail (2ª-feira, 08h UTC)
-│       │   └── alert-check/      ← alertas configuráveis: banco negativo + jornada longa (seg-sex 18h UTC)
+│       │   ├── alert-check/      ← alertas configuráveis: banco negativo + jornada longa (seg-sex 18h UTC)
+│       │   └── hour-bank-cap/    ← capa saldo positivo ao limite configurado (1º do mês, 08h UTC)
 │       ├── hour-bank/            ← saldo do banco de horas + ajustes manuais
 │       │   └── [id]/
 │       ├── correction-requests/  ← criar / listar / aprovar / rejeitar correções
@@ -298,12 +302,17 @@ ponto_glass_next/
 │       ├── audit/                ← audit log (admin only)
 │       ├── qr/                   ← gera QR code HMAC por funcionário (data URL)
 │       │   └── punch/            ← endpoint público: valida token HMAC e insere batida
-│       ├── tenant-settings/      ← lê/escreve alert_settings (thresholds de alerta)
+│       ├── tenant-settings/      ← lê/escreve alert_settings (thresholds + hour_bank_max_positive)
 │       ├── timesheet-approvals/  ← aprovação/revogação de semana por funcionário
 │       ├── webhook-configs/      ← CRUD de webhooks de saída (URL, segredo, toggle)
+│       ├── shift-templates/      ← CRUD de templates de turno
+│       │   └── apply/            ← aplica template a lista de funcionários
+│       ├── login-sessions/       ← histórico de sessões (GET últimas 20, DELETE revoke)
+│       ├── kiosk-photos/         ← armazena/recupera foto capturada no quiosque
 │       └── reports/              ← relatório por período (máx 366 dias, paginação automática)
 │           ├── calendar/         ← exportar registros como .ics (iCalendar, 1 VEVENT/dia)
-│           └── punctuality/      ← estatísticas de pontualidade por funcionário (on-time/atrasado)
+│           ├── punctuality/      ← estatísticas de pontualidade por funcionário (on-time/atrasado)
+│           └── absences/         ← dias ausentes por funcionário no mês
 │
 ├── components/
 │   └── ChangePasswordModal.tsx
@@ -546,10 +555,45 @@ webhook_configs (
   created_at  TIMESTAMPTZ
 )
 
+-- templates de turno
+shift_templates (
+  id                   UUID  PRIMARY KEY,
+  tenant_id            UUID  → tenants.id,
+  name                 TEXT,
+  workday_hours        DECIMAL(4,2),
+  lunch_break_minutes  INT,
+  expected_start       TIME,
+  expected_end         TIME,
+  shift_start          TIME,
+  created_at           TIMESTAMPTZ
+)
+
+-- sessões de login
+login_sessions (
+  id          UUID  PRIMARY KEY,
+  employee_id UUID  → employees.id,
+  tenant_id   UUID  → tenants.id,
+  ip          TEXT,
+  user_agent  TEXT,
+  created_at  TIMESTAMPTZ,
+  revoked_at  TIMESTAMPTZ        ← NULL = ativa
+)
+
+-- fotos do quiosque
+kiosk_photos (
+  id          UUID  PRIMARY KEY,
+  tenant_id   UUID  → tenants.id,
+  record_id   UUID  → records.id,
+  employee_id UUID  → employees.id,
+  photo_data  TEXT,              ← data URL JPEG (≤ 300 KB)
+  created_at  TIMESTAMPTZ
+)
+
 -- configurações de alertas (coluna JSON em tenants)
 tenants.alert_settings JSONB → {
-  hour_bank_low_threshold: number | null,  ← minutos negativos
-  long_day_threshold:      number | null   ← minutos máximos/dia
+  hour_bank_low_threshold:  number | null,  ← minutos negativos
+  long_day_threshold:       number | null,  ← minutos máximos/dia
+  hour_bank_max_positive:   number | null   ← cap máximo de saldo positivo
 }
 
 -- audit log
@@ -694,6 +738,16 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Webhooks de saída — POST assinado para endpoints externos a cada batida (Zapier, Make, ERPs)
   ✓  Tab Integrações — gestão de webhooks com segredo HMAC, toggle ativo/pausado, remover
   ✓  Tab Alertas — configurar thresholds de push para admins (banco e jornada)
+  ✓  Relatório de ausências — tabela por funcionário (dias ausentes no mês) no RelatoriosTab
+  ✓  Templates de turno — criar templates reutilizáveis e aplicar a múltiplos funcionários de uma vez
+  ✓  Histórico de sessões — últimas 20 sessões com IP e User-Agent, revogar individualmente em Configurações
+  ✓  Limite de banco de horas — cap máximo de saldo positivo, cron mensal (1º do mês 08h UTC) que capa e notifica
+  ✓  Auto punch-out geofencing — intervalo de 5 min em /ponto; saída automática se fora do raio 1,5×
+  ✓  Foto no quiosque — captura webcam (canvas JPEG) no momento do punch; visualização em AuditoriaTab
+  ✓  Glassmorphism — blur em todos os modais, painéis e command palette (backdrop-filter 6–24px)
+  ✓  9 cores de destaque — Índigo, Violeta, Ciano, Verde, Teal, Âmbar, Laranja, Rosa, Cinza (persistidas)
+  ✓  3 variantes de fonte — Linear (Inter), Workbench (JetBrains Mono), Editorial (Lora serif)
+  ✓  Settings Modal redesenhado — grid responsivo, swatches de cor, seletor de fonte por card
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
 
