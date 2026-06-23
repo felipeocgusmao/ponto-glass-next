@@ -20,6 +20,7 @@ function mondayOf(dateStr: string): string {
 }
 
 function TimesheetApprovalSection({ employees }: { employees: Employee[] }) {
+  const { t } = useLang()
   const [open, setOpen] = useState(false)
   const [selEmpId, setSelEmpId] = useState('')
   const [weekStart, setWeekStart] = useState(mondayOf(businessDate()))
@@ -51,8 +52,8 @@ function TimesheetApprovalSection({ employees }: { employees: Employee[] }) {
       })
       const d = await res.json()
       if (res.ok) { setApprovals(prev => [d, ...prev.filter(a => a.week_start !== weekStart)]); setMsg({ ok: true, text: 'Semana aprovada.' }) }
-      else setMsg({ ok: false, text: d.error ?? 'Erro ao aprovar.' })
-    } catch { setMsg({ ok: false, text: 'Erro de conexão.' }) }
+      else setMsg({ ok: false, text: d.error ?? t('reg.err.approve') })
+    } catch { setMsg({ ok: false, text: t('error.connect') }) }
     finally { setSaving(false) }
   }
 
@@ -100,7 +101,7 @@ function TimesheetApprovalSection({ employees }: { employees: Employee[] }) {
             </div>
           )}
           {selEmpId && !loading && approvals.length === 0 && (
-            <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Nenhuma semana aprovada para este funcionário.</div>
+            <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('reg.no_weeks')}</div>
           )}
         </div>
       )}
@@ -313,13 +314,13 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar funcionário…"
+                placeholder={t('reg.search_emp')}
                 className="input search"
                 style={{ width: '100%' }}
               />
             </div>
             <select value={empId} onChange={e => setEmpId(e.target.value)} className="input" style={{ width: 'auto' }}>
-              <option value="all">Todos funcionários</option>
+              <option value="all">{t('reg.all_emp')}</option>
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
             <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as typeof typeFilter)} className="input" style={{ width: 'auto' }}>

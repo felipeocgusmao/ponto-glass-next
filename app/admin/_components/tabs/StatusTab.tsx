@@ -243,7 +243,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
             {filteredStatuses.length === 0 ? (
               <div className="card" style={{ gridColumn: '1 / -1' }}>
                 <div className="empty">
-                  <div className="title">Nenhum funcionário neste estado</div>
+                  <div className="title">{t('status.none_in_state')}</div>
                   <div className="desc">Ajuste o filtro acima.</div>
                 </div>
               </div>
@@ -315,7 +315,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
             <div style={{ padding: '16px 20px' }}><div className="alert-inline info">{t('status.none_emp')}</div></div>
           )}
           {filteredStatuses.length === 0 && workers.length > 0 && (
-            <div className="empty"><div className="desc">Nenhum funcionário neste estado.</div></div>
+            <div className="empty"><div className="desc">{t('status.none_in_state')}</div></div>
           )}
           {filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal, stateFromPriorDay, lastRecord }) => {
             const targetMin = emp.workday_hours * 60

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useLang } from '@/lib/LangContext'
 
 type Status = 'loading' | 'off' | 'enrolling' | 'on'
 
@@ -8,6 +9,7 @@ type Status = 'loading' | 'off' | 'enrolling' | 'on'
 // /ponto profile. Talks to /api/auth/totp; QR rendered client-side from the
 // otpauth URI (the secret never goes through a third-party chart service).
 export function TotpSection() {
+  const { t } = useLang()
   const [status, setStatus] = useState<Status>('loading')
   const [qr, setQr] = useState('')          // data URL
   const [secret, setSecret] = useState('')  // manual-entry fallback
@@ -31,13 +33,13 @@ export function TotpSection() {
         body: JSON.stringify({ action: 'setup' }),
       })
       const data = await res.json()
-      if (!res.ok) { setErr(data.error ?? 'Erro'); return }
+      if (!res.ok) { setErr(data.error ?? t('totp.err.generic')); return }
       const QRCode = (await import('qrcode')).default
       setQr(await QRCode.toDataURL(data.uri, { margin: 1, width: 180 }))
       setSecret(data.secret)
       setCode('')
       setStatus('enrolling')
-    } catch { setErr('Erro de conexão') }
+    } catch { setErr(t('totp.err.connect')) }
     finally { setBusy(false) }
   }
 
@@ -50,10 +52,10 @@ export function TotpSection() {
         body: JSON.stringify({ action, code }),
       })
       const data = await res.json()
-      if (!res.ok) { setErr(data.error ?? 'Código inválido'); return }
+      if (!res.ok) { setErr(data.error ?? t('totp.err.invalid')); return }
       setCode(''); setQr(''); setSecret('')
       setStatus(action === 'enable' ? 'on' : 'off')
-    } catch { setErr('Erro de conexão') }
+    } catch { setErr(t('totp.err.connect')) }
     finally { setBusy(false) }
   }
 
@@ -64,17 +66,17 @@ export function TotpSection() {
       style={{ height: 36, textAlign: 'center', letterSpacing: '0.25em', maxWidth: 140 }} />
   )
 
-  if (status === 'loading') return <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>A carregar…</div>
+  if (status === 'loading') return <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('totp.loading')}</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {status === 'off' && (
         <>
           <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-            Proteja a sua conta exigindo um código do aplicativo autenticador (Google Authenticator, 1Password…) além da senha.
+            {t('totp.protect_hint')}
           </div>
           <button className="btn primary sm" onClick={begin} disabled={busy} style={{ alignSelf: 'flex-start' }}>
-            {busy ? 'A preparar…' : 'Ativar verificação em duas etapas'}
+            {busy ? t('totp.preparing') : t('totp.enable')}
           </button>
         </>
       )}
@@ -82,16 +84,16 @@ export function TotpSection() {
       {status === 'enrolling' && (
         <>
           <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-            1. Escaneie o QR no aplicativo autenticador · 2. Digite o código gerado para confirmar.
+            {t('totp.enroll_hint')}
           </div>
-          {qr && <img src={qr} alt="QR code para o aplicativo autenticador" width={180} height={180} style={{ borderRadius: 8, alignSelf: 'center' }} />}
+          {qr && <img src={qr} alt="QR code" width={180} height={180} style={{ borderRadius: 8, alignSelf: 'center' }} />}
           <div className="mono" style={{ fontSize: 10, color: 'var(--fg-subtle)', wordBreak: 'break-all', textAlign: 'center' }}>
-            Sem câmera? Chave manual: {secret}
+            {t('totp.manual_key')} {secret}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
             {codeInput}
             <button className="btn primary sm" disabled={busy || code.length !== 6} onClick={() => submitCode('enable')}>
-              Confirmar
+              {t('totp.confirm')}
             </button>
           </div>
         </>
@@ -99,12 +101,12 @@ export function TotpSection() {
 
       {status === 'on' && (
         <>
-          <div className="alert-inline ok" style={{ fontSize: 12 }}>Verificação em duas etapas ativa.</div>
-          <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Para desativar, confirme um código atual do aplicativo:</div>
+          <div className="alert-inline ok" style={{ fontSize: 12 }}>{t('totp.active')}</div>
+          <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('totp.disable_hint')}</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {codeInput}
             <button className="btn ghost sm danger" disabled={busy || code.length !== 6} onClick={() => submitCode('disable')}>
-              Desativar
+              {t('totp.disable')}
             </button>
           </div>
         </>

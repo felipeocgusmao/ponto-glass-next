@@ -103,12 +103,12 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
           <div className="kpi-value tnum" style={{ color: totalBalance >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
             {fmtSigned(totalBalance)}
           </div>
-          <div className="kpi-delta">{rows.length} funcionário(s)</div>
+          <div className="kpi-delta">{t('hbank.emp_count').replace('{n}', String(rows.length))}</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Positivos</div>
           <div className="kpi-value tnum">{positive}</div>
-          <div className="kpi-delta up"><IconArrowUp size={11}/> a favor do funcionário</div>
+          <div className="kpi-delta up"><IconArrowUp size={11}/> {t('hbank.in_favor')}</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Negativos</div>
@@ -125,7 +125,7 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
       {/* Saldos por funcionário */}
       <div className="card">
         <div className="card-head">
-          <div className="card-title">Saldos por funcionário</div>
+          <div className="card-title">{t('hbank.by_emp')}</div>
         </div>
         {rows.length === 0 ? (
           <div className="empty"><div className="title">{t('hbank.none_emp')}</div></div>
