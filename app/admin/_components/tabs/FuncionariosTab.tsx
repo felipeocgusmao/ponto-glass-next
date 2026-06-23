@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment } from 'react'
+import { useState, Fragment, useEffect } from 'react'
 import type { Employee } from '@/lib/types'
 import { avatarInitials } from '@/lib/utils'
 import { empColor } from '../../_lib/helpers'
@@ -8,6 +8,208 @@ import { useLang } from '@/lib/LangContext'
 import { IconUserPlus, IconSearch, IconDownload } from '../icons'
 import { ImportEmployeesCard } from './ImportEmployeesCard'
 import { Modal } from '../Modal'
+
+interface ShiftTemplate {
+  id: string
+  name: string
+  workday_hours: number
+  lunch_break_minutes: number
+  expected_start: string | null
+  expected_end: string | null
+  shift_start: string
+}
+
+function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
+  const [templates, setTemplates] = useState<ShiftTemplate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [name, setName] = useState('')
+  const [workdayHours, setWorkdayHours] = useState('8')
+  const [lunchMin, setLunchMin] = useState('60')
+  const [expectedStart, setExpectedStart] = useState('')
+  const [expectedEnd, setExpectedEnd] = useState('')
+  const [shiftStart, setShiftStart] = useState('00:00')
+  const [creating, setCreating] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [applyModal, setApplyModal] = useState<ShiftTemplate | null>(null)
+  const [selectedEmps, setSelectedEmps] = useState<string[]>([])
+  const [applying, setApplying] = useState(false)
+  const [applyMsg, setApplyMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [err, setErr] = useState('')
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/shift-templates')
+      if (res.ok) setTemplates(await res.json())
+    } catch { /* silent */ }
+    finally { setLoading(false) }
+  }
+
+  useEffect(() => { load() }, [])
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault(); setErr(''); setCreating(true)
+    try {
+      const res = await fetch('/api/shift-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, workday_hours: workdayHours, lunch_break_minutes: lunchMin, expected_start: expectedStart || null, expected_end: expectedEnd || null, shift_start: shiftStart }),
+      })
+      if (res.ok) {
+        setName(''); setExpectedStart(''); setExpectedEnd(''); setShiftStart('00:00')
+        setShowCreate(false)
+        await load()
+      } else {
+        const d = await res.json(); setErr(d.error ?? 'Erro ao criar template')
+      }
+    } catch { setErr('Erro de conexão') }
+    finally { setCreating(false) }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Remover este template de turno?')) return
+    await fetch(`/api/shift-templates?id=${id}`, { method: 'DELETE' })
+    setTemplates(prev => prev.filter(t => t.id !== id))
+  }
+
+  const handleApply = async () => {
+    if (!applyModal || !selectedEmps.length) return
+    setApplying(true); setApplyMsg(null)
+    try {
+      const res = await fetch('/api/shift-templates/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateId: applyModal.id, employeeIds: selectedEmps }),
+      })
+      const d = await res.json()
+      if (res.ok) setApplyMsg({ ok: true, text: `Template aplicado a ${d.applied} funcionário(s).` })
+      else setApplyMsg({ ok: false, text: d.error ?? 'Erro ao aplicar' })
+    } catch { setApplyMsg({ ok: false, text: 'Erro de conexão' }) }
+    finally { setApplying(false) }
+  }
+
+  return (
+    <>
+      {applyModal && (
+        <Modal title={`Aplicar "${applyModal.name}"`} onClose={() => { setApplyModal(null); setSelectedEmps([]); setApplyMsg(null) }} width={460}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
+              Selecione os funcionários que receberão as configurações do template:
+              <strong> {applyModal.workday_hours}h/dia, {applyModal.lunch_break_minutes}min almoço</strong>
+              {applyModal.expected_start && `, entrada ${applyModal.expected_start}`}
+              {applyModal.expected_end && `, saída ${applyModal.expected_end}`}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 260, overflowY: 'auto' }}>
+              {employees.filter(e => e.active !== false).map(emp => (
+                <label key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 'var(--r-sm)', cursor: 'pointer', background: selectedEmps.includes(emp.id) ? 'var(--accent-soft, rgba(99,102,241,0.1))' : 'transparent' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedEmps.includes(emp.id)}
+                    onChange={e => setSelectedEmps(prev => e.target.checked ? [...prev, emp.id] : prev.filter(id => id !== emp.id))}
+                  />
+                  <span style={{ fontSize: 13 }}>{emp.name}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={() => setSelectedEmps(employees.filter(e => e.active !== false).map(e => e.id))}>Selecionar todos</button>
+              <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={() => setSelectedEmps([])}>Limpar</button>
+            </div>
+            {applyMsg && <div className={`alert-inline ${applyMsg.ok ? 'ok' : 'err'}`}>{applyMsg.text}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn primary" disabled={applying || !selectedEmps.length} onClick={handleApply} style={{ flex: 1, justifyContent: 'center' }}>
+                {applying ? 'A aplicar…' : `Aplicar a ${selectedEmps.length} funcionário(s)`}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      <div className="card">
+        <div className="card-head">
+          <div className="card-title">Templates de turno</div>
+          <button className="btn ghost sm" onClick={() => setShowCreate(v => !v)}>
+            {showCreate ? 'Cancelar' : '+ Novo template'}
+          </button>
+        </div>
+
+        {showCreate && (
+          <div className="card-body" style={{ borderBottom: '1px solid var(--border)' }}>
+            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="form-grid-2">
+                <div className="field">
+                  <label>Nome do template</label>
+                  <input value={name} onChange={e => setName(e.target.value)} placeholder="ex: Turno manhã" className="input" required />
+                </div>
+                <div className="field">
+                  <label>Jornada</label>
+                  <select value={workdayHours} onChange={e => setWorkdayHours(e.target.value)} className="input">
+                    {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => <option key={h} value={h}>{h}h</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="form-grid-2">
+                <div className="field">
+                  <label>Pausa almoço</label>
+                  <select value={lunchMin} onChange={e => setLunchMin(e.target.value)} className="input">
+                    <option value="0">Sem almoço</option>
+                    <option value="15">15 min</option>
+                    <option value="30">30 min</option>
+                    <option value="45">45 min</option>
+                    <option value="60">60 min</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Início de turno</label>
+                  <input type="time" value={shiftStart} onChange={e => setShiftStart(e.target.value)} className="input" />
+                </div>
+              </div>
+              <div className="form-grid-2">
+                <div className="field">
+                  <label>Entrada esperada (opcional)</label>
+                  <input type="time" value={expectedStart} onChange={e => setExpectedStart(e.target.value)} className="input" />
+                </div>
+                <div className="field">
+                  <label>Saída esperada (opcional)</label>
+                  <input type="time" value={expectedEnd} onChange={e => setExpectedEnd(e.target.value)} className="input" />
+                </div>
+              </div>
+              {err && <div className="alert-inline err">{err}</div>}
+              <button type="submit" disabled={creating} className="btn primary" style={{ alignSelf: 'flex-start' }}>
+                {creating ? 'A criar…' : 'Criar template'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        <div className="card-body">
+          {loading && <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>A carregar…</div>}
+          {!loading && templates.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Nenhum template criado ainda.</div>
+          )}
+          {!loading && templates.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {templates.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
+                      {t.workday_hours}h · {t.lunch_break_minutes}min almoço
+                      {t.expected_start && ` · entrada ${t.expected_start}`}
+                      {t.expected_end && ` · saída ${t.expected_end}`}
+                    </div>
+                  </div>
+                  <button className="btn ghost sm" onClick={() => { setApplyModal(t); setSelectedEmps([]); setApplyMsg(null) }}>Aplicar</button>
+                  <button className="btn danger sm" onClick={() => handleDelete(t.id)}>Remover</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
 
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
   const { t } = useLang()
@@ -343,6 +545,9 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
       </div>
 
       {showImport && <ImportEmployeesCard onDone={onRefresh} onClose={() => setShowImport(false)} />}
+
+      {/* Shift templates */}
+      <ShiftTemplatesCard employees={employees} />
 
       {/* Filter bar */}
       <div className="card">

@@ -152,6 +152,9 @@ export default function PontoPage() {
   // punch-out confirmation
   const [confirmingOut, setConfirmingOut] = useState(false)
 
+  // auto-exit banner
+  const [autoExitBanner, setAutoExitBanner] = useState<string | null>(null)
+
   // reminder
   const [reminderDismissed, setReminderDismissed] = useState(false)
   const [corrDate, setCorrDate] = useState('')
@@ -493,6 +496,43 @@ export default function PontoPage() {
     setReminderDismissed(false)
   }, [records])
 
+  // ── Auto punch-out by geofencing ───────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return
+    const { state: ws } = getWorkState(records.filter(r => r.employee_id === user.id))
+    if (ws !== 'working') return
+    if (user.geo_mode !== 'required') return
+    if (user.workplace_lat == null) return
+
+    function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+      const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    }
+
+    const iv = setInterval(async () => {
+      if (document.visibilityState !== 'visible') return
+      const geo = await getGeo()
+      if (!geo) return
+      const distM = haversineKm(user.workplace_lat!, user.workplace_lng!, geo.lat, geo.lng) * 1000
+      const maxDist = (user.max_distance_meters ?? 200) * 1.5
+      if (distM > maxDist) {
+        try {
+          const res = await fetch('/api/punch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'saída', auto_exit: true, latitude: geo.lat, longitude: geo.lng }),
+          })
+          if (res.ok) {
+            setAutoExitBanner('Saída automática registada — você saiu da área de trabalho.')
+            loadRecords()
+          }
+        } catch { /* non-critical */ }
+      }
+    }, 300_000)
+    return () => clearInterval(iv)
+  }, [user, records, loadRecords])
+
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
     setTheme(next)
@@ -733,6 +773,24 @@ export default function PontoPage() {
               {!isOnline ? t('ponto.offline') : t('ponto.queue_synced').replace('{n}', String(queueCount)).replace('!', '')}
               {!isOnline && queueCount > 0 && <span style={{ color: 'var(--fg-muted)', marginLeft: 4 }}>· {queueCount} pendente{queueCount !== 1 ? 's' : ''}</span>}
             </span>
+          </div>
+        )}
+
+        {/* ── AUTO EXIT BANNER ─────────────────────────────────────────────── */}
+        {autoExitBanner && (
+          <div style={{
+            background: 'rgba(234,179,8,0.12)',
+            border: '1px solid var(--warning, #ca8a04)',
+            borderRadius: 'var(--r-md)',
+            padding: '10px 14px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            marginBottom: 8,
+          }}>
+            <span style={{ fontSize: 16 }}>📍</span>
+            <div style={{ flex: 1, fontSize: 13, color: 'var(--fg)' }}>{autoExitBanner}</div>
+            <button onClick={() => setAutoExitBanner(null)} className="btn ghost sm" style={{ fontSize: 11, flexShrink: 0 }}>
+              Fechar
+            </button>
           </div>
         )}
 

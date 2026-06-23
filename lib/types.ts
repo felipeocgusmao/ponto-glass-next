@@ -66,6 +66,9 @@ export interface EmployeeProfile extends JWTUser {
   lunch_break_minutes: number
   hourly_rate: number | null
   geo_mode: 'required' | 'optional' | 'disabled'
+  workplace_lat?: number | null
+  workplace_lng?: number | null
+  max_distance_meters?: number | null
   email: string | null
   lock_profile?: boolean
   theme?: 'dark' | 'light'

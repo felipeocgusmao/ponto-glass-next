@@ -124,6 +124,17 @@ export async function POST(request: NextRequest) {
     'employee_login', null, { ip, username: employee.username }
   )
 
+  void (async () => {
+    try {
+      await supabase.from('login_sessions').insert({
+        tenant_id: (employee as { tenant_id?: string }).tenant_id ?? tenantId,
+        employee_id: employee.id,
+        ip,
+        user_agent: request.headers.get('user-agent') ?? '',
+      })
+    } catch { /* graceful — table may not exist yet */ }
+  })()
+
   const res = NextResponse.json({ success: true, role: employee.role })
   res.cookies.set('ponto_token', token, {
     httpOnly: true,

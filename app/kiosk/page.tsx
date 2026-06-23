@@ -83,6 +83,13 @@ export default function KioskPage() {
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [qrEmp, setQrEmp] = useState<Employee | null>(null)
 
+  // Photo capture
+  const [photoEnabled, setPhotoEnabled] = useState(false)
+  const [photoData, setPhotoData] = useState<string | null>(null)
+  const [photoStream, setPhotoStream] = useState<MediaStream | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
   const [now, setNow] = useState(new Date())
   const recsSeq = useRef(0)
 
@@ -136,7 +143,36 @@ export default function KioskPage() {
     setSelected(emp)
   }
 
-  const closeModal = () => { setSelected(null); setResult(null) }
+  const stopPhotoStream = () => {
+    if (photoStream) { photoStream.getTracks().forEach(t => t.stop()); setPhotoStream(null) }
+    setPhotoEnabled(false)
+    setPhotoData(null)
+  }
+
+  const closeModal = () => { stopPhotoStream(); setSelected(null); setResult(null) }
+
+  const enableCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'user' } })
+      if (stream) {
+        setPhotoStream(stream)
+        setPhotoEnabled(true)
+        setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream }, 50)
+      }
+    } catch { /* camera not available */ }
+  }
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    canvas.width = 320
+    canvas.height = 240
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(video, 0, 0, 320, 240)
+    setPhotoData(canvas.toDataURL('image/jpeg', 0.5))
+  }
 
   const confirmPunch = async () => {
     if (!selected || punching) return
@@ -153,6 +189,16 @@ export default function KioskPage() {
         const rec: PunchRecord = await res.json()
         setTodayRecs(prev => [...prev.filter(r => r.id !== rec.id), rec])
         setResult({ ok: true, msg: t('kiosk.success') })
+
+        // Upload photo if captured
+        if (photoData && rec.id) {
+          void fetch('/api/kiosk-photos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordId: rec.id, photoData }),
+          }).catch(() => {})
+        }
+
         const seq = ++recsSeq.current
         const updated = await fetch('/api/records?today=true')
         if (updated.ok) {
@@ -328,6 +374,34 @@ export default function KioskPage() {
                   {t(opt.labelKey as Parameters<typeof t>[0])}
                 </button>
               ))}
+            </div>
+
+            {/* Photo capture */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', marginBottom: photoEnabled ? 10 : 0 }}>
+                <input
+                  type="checkbox"
+                  checked={photoEnabled}
+                  onChange={e => { if (e.target.checked) enableCamera(); else stopPhotoStream() }}
+                />
+                Tirar foto
+              </label>
+              {photoEnabled && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                  {!photoData ? (
+                    <>
+                      <video ref={videoRef} autoPlay playsInline muted style={{ width: 160, height: 120, borderRadius: 8, background: 'var(--surface-2)', objectFit: 'cover' }} />
+                      <button className="btn ghost sm" onClick={capturePhoto}>Capturar</button>
+                    </>
+                  ) : (
+                    <>
+                      <img src={photoData} alt="Foto capturada" style={{ width: 160, height: 120, borderRadius: 8, objectFit: 'cover' }} />
+                      <button className="btn ghost sm" onClick={() => setPhotoData(null)}>Nova foto</button>
+                    </>
+                  )}
+                  <canvas ref={canvasRef} style={{ display: 'none' }} />
+                </div>
+              )}
             </div>
 
             {result && (

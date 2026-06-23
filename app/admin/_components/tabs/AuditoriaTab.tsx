@@ -7,6 +7,21 @@ import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
 import { IconRefresh, IconSearch, IconDownload } from '../icons'
 
+function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
+  return (
+    <div
+      className="drawer-overlay"
+      onClick={onClose}
+      style={{ zIndex: 80, display: 'grid', placeItems: 'center' }}
+    >
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--sidebar-bg)', borderRadius: 12, padding: 16, maxWidth: 380 }}>
+        <img src={url} alt="Foto do registo" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+        <button onClick={onClose} className="btn ghost" style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}>Fechar</button>
+      </div>
+    </div>
+  )
+}
+
 function fmtRelative(iso: string): string {
   const now = Date.now()
   const t = new Date(iso).getTime()
@@ -25,6 +40,22 @@ export function AuditoriaTab() {
   const [actionFilter, setActionFilter] = useState('all')
   const [actorFilter, setActorFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [photoModal, setPhotoModal] = useState<{ url: string } | null>(null)
+  const [loadingPhotoId, setLoadingPhotoId] = useState<string | null>(null)
+
+  const fetchPhoto = async (log: AuditLog) => {
+    const recordId = (log.details as Record<string, unknown> | null)?.record_id ?? log.target_id
+    if (!recordId) return
+    setLoadingPhotoId(log.id)
+    try {
+      const res = await fetch(`/api/kiosk-photos?recordId=${recordId}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.photo_data) setPhotoModal({ url: data.photo_data })
+      }
+    } catch { /* silent */ }
+    finally { setLoadingPhotoId(null) }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -88,6 +119,8 @@ export function AuditoriaTab() {
 
   return (
     <>
+      {photoModal && <PhotoModal url={photoModal.url} onClose={() => setPhotoModal(null)} />}
+
       {/* Page header */}
       <div className="page-head">
         <div>
@@ -153,6 +186,7 @@ export function AuditoriaTab() {
                 <th>Ação</th>
                 <th>Alvo</th>
                 <th>Detalhes</th>
+                <th style={{ width: 36 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -167,8 +201,21 @@ export function AuditoriaTab() {
                     <div className="mono muted" style={{ fontSize: 11 }}>{log.action}</div>
                   </td>
                   <td style={{ fontSize: 13 }}>{log.target_name || <span className="muted">—</span>}</td>
-                  <td className="muted mono" style={{ fontSize: 11.5, wordBreak: 'break-all', maxWidth: 320 }}>
+                  <td className="muted mono" style={{ fontSize: 11.5, wordBreak: 'break-all', maxWidth: 280 }}>
                     {fmtDetails(log.details) || '—'}
+                  </td>
+                  <td style={{ width: 36, textAlign: 'center' }}>
+                    {log.action.includes('punch') && (
+                      <button
+                        className="btn ghost sm icon"
+                        title="Ver foto do registo"
+                        style={{ fontSize: 13, opacity: loadingPhotoId === log.id ? 0.5 : 1 }}
+                        disabled={loadingPhotoId === log.id}
+                        onClick={() => fetchPhoto(log)}
+                      >
+                        {loadingPhotoId === log.id ? '…' : '📷'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

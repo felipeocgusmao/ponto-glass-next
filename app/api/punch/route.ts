@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
 
-  const { type, employeeId: targetId, latitude, longitude, queuedAt } = await request.json()
+  const { type, employeeId: targetId, latitude, longitude, queuedAt, auto_exit } = await request.json()
   if (!isValidPunchType(type))
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
 
@@ -140,20 +140,25 @@ export async function POST(request: NextRequest) {
     if (empData) {
       empShiftStart = empData.shift_start ?? '00:00'
 
-      // Geofencing only when the migration is in place and the columns exist.
-      // When the columns are missing we fall through to the basic geo_mode check.
-      const geoCheck = geofenceAvailable
-        ? validateGeofence({
-            geoMode: (empData as { geo_mode?: string | null }).geo_mode as 'required' | 'optional' | 'disabled' | null,
-            latitude, longitude,
-            workplaceLat: (empData as { workplace_lat?: number | null }).workplace_lat,
-            workplaceLng: (empData as { workplace_lng?: number | null }).workplace_lng,
-            maxDistanceMeters: (empData as { max_distance_meters?: number | null }).max_distance_meters,
-          })
-        : validateGeofence({ geoMode: empData.geo_mode as 'required' | 'optional' | 'disabled' | null, latitude, longitude })
+      // When auto_exit is true for a 'saída', skip geofence validation (employee already left)
+      const skipGeocheck = auto_exit === true && type === 'saída'
 
-      if (!geoCheck.ok)
-        return NextResponse.json({ error: geoCheck.error }, { status: geoCheck.status })
+      if (!skipGeocheck) {
+        // Geofencing only when the migration is in place and the columns exist.
+        // When the columns are missing we fall through to the basic geo_mode check.
+        const geoCheck = geofenceAvailable
+          ? validateGeofence({
+              geoMode: (empData as { geo_mode?: string | null }).geo_mode as 'required' | 'optional' | 'disabled' | null,
+              latitude, longitude,
+              workplaceLat: (empData as { workplace_lat?: number | null }).workplace_lat,
+              workplaceLng: (empData as { workplace_lng?: number | null }).workplace_lng,
+              maxDistanceMeters: (empData as { max_distance_meters?: number | null }).max_distance_meters,
+            })
+          : validateGeofence({ geoMode: empData.geo_mode as 'required' | 'optional' | 'disabled' | null, latitude, longitude })
+
+        if (!geoCheck.ok)
+          return NextResponse.json({ error: geoCheck.error }, { status: geoCheck.status })
+      }
     }
   }
 
@@ -186,6 +191,7 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (onBehalf) await logAudit(user, 'punch_on_behalf', { id: empId, name: empName }, { type })
+  if (!onBehalf && auto_exit === true) await logAudit(user, 'punch_auto_exit', { id: empId, name: empName }, { type, auto_exit: true })
 
   // Fire-and-forget: notify the employee if today's worked hours just hit their daily target.
   if (!onBehalf && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
