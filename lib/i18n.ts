@@ -433,6 +433,21 @@ const t = {
 
     // ── Missing exit banner ───────────────────────────────────────────────
     'banner.missing_exit':       '⚠ {n} dia(s) sem saída registada',
+
+    // ── Calendar weekdays & legend ────────────────────────────────────────
+    'cal.wd.mon': 'Seg',
+    'cal.wd.tue': 'Ter',
+    'cal.wd.wed': 'Qua',
+    'cal.wd.thu': 'Qui',
+    'cal.wd.fri': 'Sex',
+    'cal.wd.sat': 'Sáb',
+    'cal.wd.sun': 'Dom',
+    'cal.legend.worked':   'Trabalhado',
+    'cal.legend.absent':   'Ausente',
+    'cal.legend.holiday':  'Feriado/Folga',
+    'cal.legend.weekend':  'Fim de semana',
+    'cal.exc.holiday':     'Feriado',
+    'cal.exc.day_off':     'Folga',
   },
 
   'pt-BR': {
@@ -841,6 +856,21 @@ const t = {
 
     // ── Missing exit banner ───────────────────────────────────────────────
     'banner.missing_exit':       '⚠ {n} dia(s) sem saída registrada',
+
+    // ── Calendar weekdays & legend ────────────────────────────────────────
+    'cal.wd.mon': 'Seg',
+    'cal.wd.tue': 'Ter',
+    'cal.wd.wed': 'Qua',
+    'cal.wd.thu': 'Qui',
+    'cal.wd.fri': 'Sex',
+    'cal.wd.sat': 'Sáb',
+    'cal.wd.sun': 'Dom',
+    'cal.legend.worked':   'Trabalhado',
+    'cal.legend.absent':   'Ausente',
+    'cal.legend.holiday':  'Feriado/Folga',
+    'cal.legend.weekend':  'Fim de semana',
+    'cal.exc.holiday':     'Feriado',
+    'cal.exc.day_off':     'Folga',
   },
 
   'en': {
@@ -1249,6 +1279,21 @@ const t = {
 
     // ── Missing exit banner ───────────────────────────────────────────────
     'banner.missing_exit':       '⚠ {n} day(s) missing clock-out',
+
+    // ── Calendar weekdays & legend ────────────────────────────────────────
+    'cal.wd.mon': 'Mon',
+    'cal.wd.tue': 'Tue',
+    'cal.wd.wed': 'Wed',
+    'cal.wd.thu': 'Thu',
+    'cal.wd.fri': 'Fri',
+    'cal.wd.sat': 'Sat',
+    'cal.wd.sun': 'Sun',
+    'cal.legend.worked':   'Worked',
+    'cal.legend.absent':   'Absent',
+    'cal.legend.holiday':  'Holiday / Day off',
+    'cal.legend.weekend':  'Weekend',
+    'cal.exc.holiday':     'Holiday',
+    'cal.exc.day_off':     'Day off',
   },
 
   'es': {
@@ -1657,6 +1702,21 @@ const t = {
 
     // ── Missing exit banner ───────────────────────────────────────────────
     'banner.missing_exit':       '⚠ {n} día(s) sin fichar salida',
+
+    // ── Calendar weekdays & legend ────────────────────────────────────────
+    'cal.wd.mon': 'Lun',
+    'cal.wd.tue': 'Mar',
+    'cal.wd.wed': 'Mié',
+    'cal.wd.thu': 'Jue',
+    'cal.wd.fri': 'Vie',
+    'cal.wd.sat': 'Sáb',
+    'cal.wd.sun': 'Dom',
+    'cal.legend.worked':   'Trabajado',
+    'cal.legend.absent':   'Ausente',
+    'cal.legend.holiday':  'Festivo/Día libre',
+    'cal.legend.weekend':  'Fin de semana',
+    'cal.exc.holiday':     'Festivo',
+    'cal.exc.day_off':     'Día libre',
   },
 } as const
 
