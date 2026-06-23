@@ -51,6 +51,8 @@ export default function AdminPage() {
   const [showCmdK, setShowCmdK] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const [theme, setTheme] = useState('dark')
+  const [accent, setAccentState] = useState('indigo')
+  const [font, setFontState] = useState('inter')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [pendingCorrections, setPendingCorrections] = useState(0)
@@ -74,6 +76,19 @@ export default function AdminPage() {
     setTheme(next)
     document.documentElement.setAttribute('data-theme', next)
     localStorage.setItem('pg.theme', next)
+  }
+
+  const changeAccent = (a: string) => {
+    setAccentState(a)
+    document.documentElement.setAttribute('data-accent', a)
+    localStorage.setItem('pg.accent', a)
+  }
+
+  const changeFont = (f: string) => {
+    setFontState(f)
+    if (f === 'inter') document.documentElement.removeAttribute('data-font')
+    else document.documentElement.setAttribute('data-font', f)
+    localStorage.setItem('pg.font', f)
   }
 
   const toggleCollapse = () => {
@@ -121,6 +136,10 @@ export default function AdminPage() {
       setTheme(savedTheme)
       document.documentElement.setAttribute('data-theme', savedTheme)
     }
+    const savedAccent = localStorage.getItem('pg.accent')
+    if (savedAccent) { setAccentState(savedAccent); document.documentElement.setAttribute('data-accent', savedAccent) }
+    const savedFont = localStorage.getItem('pg.font')
+    if (savedFont) { setFontState(savedFont) }
     const savedCollapsed = localStorage.getItem('pg.sidebar-collapsed') === 'true'
     if (savedCollapsed) {
       setSidebarCollapsed(true)
@@ -191,7 +210,11 @@ export default function AdminPage() {
       {showSettings && (
         <SettingsModal
           theme={theme}
+          accent={accent}
+          font={font}
           onToggleTheme={toggleTheme}
+          onChangeAccent={changeAccent}
+          onChangeFont={changeFont}
           onChangePwd={() => { setShowSettings(false); setShowPwd(true) }}
           onLogout={handleLogout}
           onRevokeOtherSessions={handleRevokeOtherSessions}
