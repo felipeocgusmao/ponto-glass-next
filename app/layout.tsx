@@ -54,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Lora:ital,wght@0,400;0,600;1,400&display=swap"
           rel="stylesheet"
         />
       </head>
@@ -65,7 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Analytics />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('pg.theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js')`,
+            __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t)r.setAttribute('data-theme',t);var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);}catch(e){}})();if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js')`,
           }}
         />
       </body>

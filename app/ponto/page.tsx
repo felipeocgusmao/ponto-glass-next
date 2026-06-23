@@ -106,6 +106,8 @@ export default function PontoPage() {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [now, setNow] = useState<Date | null>(null)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [accent, setAccentState] = useState('indigo')
+  const [font, setFontState] = useState('inter')
   const [punching, setPunching] = useState(false)
   const [toast, setToast] = useState('')
   const [fetchError, setFetchError] = useState(false)
@@ -476,6 +478,10 @@ export default function PontoPage() {
   useEffect(() => {
     const saved = localStorage.getItem('pg.theme') as 'dark' | 'light' | null
     if (saved) setTheme(saved)
+    const savedAccent = localStorage.getItem('pg.accent')
+    if (savedAccent) setAccentState(savedAccent)
+    const savedFont = localStorage.getItem('pg.font')
+    if (savedFont) setFontState(savedFont)
   }, [])
 
   useEffect(() => {
@@ -539,6 +545,19 @@ export default function PontoPage() {
     document.documentElement.setAttribute('data-theme', next)
     localStorage.setItem('pg.theme', next)
     fetch('/api/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: next }) }).catch(() => {})
+  }
+
+  const changeAccent = (a: string) => {
+    setAccentState(a)
+    document.documentElement.setAttribute('data-accent', a)
+    localStorage.setItem('pg.accent', a)
+  }
+
+  const changeFont = (f: string) => {
+    setFontState(f)
+    if (f === 'inter') document.documentElement.removeAttribute('data-font')
+    else document.documentElement.setAttribute('data-font', f)
+    localStorage.setItem('pg.font', f)
   }
 
   const showToast = (msg: string) => {
@@ -730,7 +749,11 @@ export default function PontoPage() {
       {showSettings && (
         <SettingsModal
           theme={theme}
+          accent={accent}
+          font={font}
           onToggleTheme={toggleTheme}
+          onChangeAccent={changeAccent}
+          onChangeFont={changeFont}
           onChangePwd={() => { setTab('perfil'); setShowSettings(false) }}
           onLogout={handleLogout}
           onClose={() => setShowSettings(false)}
