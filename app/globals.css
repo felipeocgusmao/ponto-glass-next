@@ -525,21 +525,21 @@ select.input { padding-right: 24px; appearance: none; background-image: url("dat
 /* ─── Detail drawer ─── */
 .drawer-overlay {
   position: fixed; inset: 0; z-index: 50; animation: pg-fadeIn 0.15s ease;
-  background: rgba(0,0,0,0.18);
-  backdrop-filter: blur(6px) saturate(1.4);
-  -webkit-backdrop-filter: blur(6px) saturate(1.4);
+  background: rgba(0,0,0,0.06);
+  backdrop-filter: blur(14px) saturate(1.6);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
 }
-[data-theme="dark"] .drawer-overlay { background: rgba(0,0,0,0.42); }
+[data-theme="dark"] .drawer-overlay { background: rgba(0,0,0,0.10); }
 @keyframes pg-fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .drawer {
   position: fixed; top: 0; right: 0; bottom: 0; width: 480px; max-width: 92vw;
-  background: rgba(255,255,255,0.94); border-left: 1px solid var(--border); z-index: 51;
+  background: rgba(255,255,255,0.72); border-left: 1px solid rgba(255,255,255,0.25); z-index: 51;
   display: flex; flex-direction: column; box-shadow: var(--shadow-lg);
   animation: pg-slideIn 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(40px) saturate(2.2);
+  -webkit-backdrop-filter: blur(40px) saturate(2.2);
 }
-[data-theme="dark"] .drawer { background: rgba(13,14,16,0.88); }
+[data-theme="dark"] .drawer { background: rgba(13,14,16,0.68); border-left-color: rgba(255,255,255,0.07); }
 @keyframes pg-slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .drawer-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
 .drawer-body { flex: 1; overflow: auto; padding: 20px; }
@@ -782,19 +782,19 @@ select.input { padding-right: 24px; appearance: none; background-image: url("dat
 /* ─── Command palette ─── */
 .cmdk-overlay {
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: flex-start center; padding-top: 14vh;
-  background: rgba(0,0,0,0.22);
-  backdrop-filter: blur(8px) saturate(1.5);
-  -webkit-backdrop-filter: blur(8px) saturate(1.5);
+  background: rgba(0,0,0,0.06);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
 }
-[data-theme="dark"] .cmdk-overlay { background: rgba(0,0,0,0.52); }
+[data-theme="dark"] .cmdk-overlay { background: rgba(0,0,0,0.10); }
 .cmdk {
   width: 100%; max-width: 580px;
-  background: rgba(252,252,253,0.92); border: 1px solid var(--border);
+  background: rgba(252,252,253,0.72); border: 1px solid rgba(255,255,255,0.3);
   border-radius: var(--r-lg); box-shadow: var(--shadow-lg); overflow: hidden;
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(40px) saturate(2.2);
+  -webkit-backdrop-filter: blur(40px) saturate(2.2);
 }
-[data-theme="dark"] .cmdk { background: rgba(19,20,23,0.88); }
+[data-theme="dark"] .cmdk { background: rgba(19,20,23,0.68); border-color: rgba(255,255,255,0.07); }
 .cmdk-input { width: 100%; height: 48px; padding: 0 16px; font-size: 14px; background: transparent; border: 0; border-bottom: 1px solid var(--border); outline: none; color: var(--fg); }
 .cmdk-list { max-height: 360px; overflow: auto; padding: 6px; }
 .cmdk-section { padding: 6px 10px 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle); font-weight: 600; }
