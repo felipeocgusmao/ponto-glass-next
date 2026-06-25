@@ -9,6 +9,9 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  // Extend the page edge-to-edge so the background gradient fills the notch /
+  // home-indicator safe areas instead of leaving solid black bars on iOS.
+  viewportFit: 'cover',
 }
 
 export const metadata: Metadata = {
