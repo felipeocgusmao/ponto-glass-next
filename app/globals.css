@@ -219,7 +219,8 @@ ul, ol { list-style: none; }
 }
 [data-theme="dark"] .sidebar-overlay { background: rgba(0,0,0,0.18); }
 [data-theme="dark"] .sidebar { background: rgba(255,255,255,0.04); }
-/* When drawer is open and sidebar is in collapsed state, show labels */
+/* When drawer is open and sidebar is in collapsed state, restore full width and show labels */
+.app[data-collapsed="true"] .sidebar.mobile-open { width: 240px; }
 .app[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
 .app[data-collapsed="true"] .sidebar.mobile-open .sb-item-label,
 .app[data-collapsed="true"] .sidebar.mobile-open .sb-item-badge,
