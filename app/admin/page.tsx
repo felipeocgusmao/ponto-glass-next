@@ -41,6 +41,7 @@ const CorrecoesTab  = dynamic(() => import('./_components/tabs/CorrecoesTab').th
 const EmpresasTab   = dynamic(() => import('./_components/tabs/EmpresasTab').then(m => ({ default: m.EmpresasTab })), { loading: TabSkeleton })
 const AlertasTab    = dynamic(() => import('./_components/tabs/AlertasTab').then(m => ({ default: m.AlertasTab })), { loading: TabSkeleton })
 const IntegracoesTab = dynamic(() => import('./_components/tabs/IntegracoesTab').then(m => ({ default: m.IntegracoesTab })), { loading: TabSkeleton })
+const AusenciasTab   = dynamic(() => import('./_components/tabs/AusenciasTab').then(m => ({ default: m.AusenciasTab })), { loading: TabSkeleton })
 
 export default function AdminPage() {
   const [user, setUser] = useState<EmployeeProfile | null>(null)
@@ -266,6 +267,7 @@ export default function AdminPage() {
             {tab === 'feriados'     && <FeriadosTab />}
             {tab === 'relatorios'   && <RelatoriosTab employees={activeEmployees} />}
             {tab === 'correcoes'    && <CorrecoesTab onAction={refreshPendingCount} />}
+            {tab === 'ausencias'    && <AusenciasTab employees={activeEmployees} />}
             {tab === 'auditoria'    && user.role === 'admin' && <AuditoriaTab />}
             {tab === 'empresas'     && user.super_admin === true && <EmpresasTab />}
             {tab === 'alertas'      && user.role === 'admin' && <AlertasTab />}

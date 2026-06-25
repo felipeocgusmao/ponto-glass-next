@@ -7,6 +7,17 @@ import { useLang } from '@/lib/LangContext'
 import type { TranslationKey } from '@/lib/i18n'
 import { IconRefresh } from '../icons'
 
+interface CompensationRequest {
+  id: string
+  employee_name: string
+  date: string
+  hours_requested: number
+  reason: string
+  status: 'pending' | 'approved' | 'rejected'
+  reviewer_note: string | null
+  created_at: string
+}
+
 function fmtTs(ts: string) {
   const d = new Date(ts)
   return d.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -28,6 +39,14 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
   const [bulkMsg, setBulkMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [actErr, setActErr] = useState('')
 
+  // Compensation requests
+  const [compItems, setCompItems] = useState<CompensationRequest[]>([])
+  const [compLoading, setCompLoading] = useState(true)
+  const [compActionId, setCompActionId] = useState<string | null>(null)
+  const [compRejectNote, setCompRejectNote] = useState('')
+  const [compRejectTarget, setCompRejectTarget] = useState<string | null>(null)
+  const [compActErr, setCompActErr] = useState('')
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -37,7 +56,16 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
     finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  const loadComp = useCallback(async () => {
+    setCompLoading(true)
+    try {
+      const res = await fetch('/api/compensation-requests')
+      if (res.ok) setCompItems(await res.json())
+    } catch { /* silent */ }
+    finally { setCompLoading(false) }
+  }, [])
+
+  useEffect(() => { load(); loadComp() }, [load, loadComp])
 
   const act = async (id: string, action: 'approve' | 'reject', note?: string) => {
     setActionId(id)
@@ -87,8 +115,29 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
       : { ok: false, text: `${ok} aprovada(s), ${fail} falharam. Tenta novamente.` })
   }
 
+  const actComp = async (id: string, action: 'approve' | 'reject', note?: string) => {
+    setCompActionId(id); setCompActErr('')
+    try {
+      const res = await fetch(`/api/compensation-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, note }),
+      })
+      if (res.ok) {
+        setCompRejectTarget(null); setCompRejectNote('')
+        await loadComp()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setCompActErr(d.error ?? t('corr.err.generic'))
+      }
+    } catch { setCompActErr(t('corr.err.connect')) }
+    finally { setCompActionId(null) }
+  }
+
   const pending = items.filter(i => i.status === 'pending')
   const resolved = items.filter(i => i.status !== 'pending')
+  const compPending = compItems.filter(i => i.status === 'pending')
+  const compResolved = compItems.filter(i => i.status !== 'pending')
 
   const pageHead = (
     <div className="page-head">
@@ -235,8 +284,8 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
                     {t(('punch.' + cr.req_type) as TranslationKey) ?? cr.req_type} · {fmtDate(cr.req_date)} · {new Date(cr.req_timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                   {cr.reviewer_note && (
-                    <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 2, fontStyle: 'italic' }}>
-                      {t('corr.reviewer_note')}: &ldquo;{cr.reviewer_note}&rdquo;
+                    <div style={{ marginTop: 4, padding: '5px 9px', background: cr.status === 'rejected' ? 'rgba(239,68,68,0.07)' : 'var(--surface-2)', borderRadius: 'var(--r-sm)', borderLeft: `2px solid ${cr.status === 'rejected' ? 'var(--danger-fg)' : 'var(--accent)'}`, fontSize: 11, color: cr.status === 'rejected' ? 'var(--danger-fg)' : 'var(--fg-muted)' }}>
+                      {t('corr.reviewer_note')}: {cr.reviewer_note}
                     </div>
                   )}
                 </div>
@@ -248,6 +297,91 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
           </div>
         </div>
       )}
+
+      {/* ── COMPENSATION REQUESTS ────────────────────────────────────────── */}
+      <div className="card">
+        <div style={{ padding: '16px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <SL style={{ margin: 0 }}>{t('admin.comp.title')} {compPending.length > 0 && `· ${compPending.length}`}</SL>
+            <button className="btn" onClick={loadComp}><IconRefresh size={13}/></button>
+          </div>
+
+          {compActErr && <div className="alert-inline err" style={{ marginBottom: 8 }}>{compActErr}</div>}
+
+          {compLoading
+            ? <div style={{ color: 'var(--fg-muted)', fontSize: 13 }}>{t('common.loading')}</div>
+            : compPending.length === 0
+              ? <div className="alert-inline ok">{t('admin.comp.none_pending')}</div>
+              : compPending.map(cr => (
+                <div key={cr.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{cr.employee_name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 2 }}>
+                        {fmtDate(cr.date)} · {cr.hours_requested}h
+                      </div>
+                      {cr.reason && <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 4, fontStyle: 'italic' }}>&ldquo;{cr.reason}&rdquo;</div>}
+                      <div style={{ fontSize: 10, color: 'var(--fg-subtle)', marginTop: 4 }}>
+                        {t('admin.comp.requested_at')} {fmtTs(cr.created_at)}
+                      </div>
+                    </div>
+                    <span className="chip warn" style={{ fontSize: 10, flexShrink: 0 }}>{t('comp.status.pending')}</span>
+                  </div>
+                  {compRejectTarget === cr.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <input
+                        className="input"
+                        placeholder={t('admin.comp.reject_note')}
+                        value={compRejectNote}
+                        onChange={e => setCompRejectNote(e.target.value)}
+                        style={{ fontSize: 12 }}
+                      />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn danger sm" disabled={!!compActionId} onClick={() => actComp(cr.id, 'reject', compRejectNote)} style={{ flex: 1, justifyContent: 'center' }}>
+                          {compActionId === cr.id ? t('admin.comp.rejecting') : t('admin.comp.confirm_reject')}
+                        </button>
+                        <button className="btn ghost sm" onClick={() => setCompRejectTarget(null)}>{t('common.cancel')}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn primary sm" disabled={!!compActionId} onClick={() => actComp(cr.id, 'approve')} style={{ flex: 1, justifyContent: 'center' }}>
+                        {compActionId === cr.id ? t('admin.comp.approving') : '✓ ' + t('common.approve')}
+                      </button>
+                      <button className="btn ghost sm" disabled={!!compActionId} onClick={() => { setCompRejectTarget(cr.id); setCompRejectNote('') }} style={{ flex: 1, justifyContent: 'center' }}>
+                        {'✕ ' + t('common.reject')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+          }
+
+          {compResolved.length > 0 && (
+            <>
+              <SL style={{ marginTop: 20 }}>{t('admin.comp.history')}</SL>
+              {compResolved.map(cr => (
+                <div key={cr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{cr.employee_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
+                      {fmtDate(cr.date)} · {cr.hours_requested}h
+                    </div>
+                    {cr.reviewer_note && (
+                      <div style={{ marginTop: 4, padding: '5px 9px', background: cr.status === 'rejected' ? 'rgba(239,68,68,0.07)' : 'var(--surface-2)', borderRadius: 'var(--r-sm)', borderLeft: `2px solid ${cr.status === 'rejected' ? 'var(--danger-fg)' : 'var(--accent)'}`, fontSize: 11, color: cr.status === 'rejected' ? 'var(--danger-fg)' : 'var(--fg-muted)' }}>
+                        {t('corr.reviewer_note')}: {cr.reviewer_note}
+                      </div>
+                    )}
+                  </div>
+                  <span className={`chip ${cr.status === 'approved' ? 'success' : 'danger'}`} style={{ fontSize: 10, flexShrink: 0 }}>
+                    {cr.status === 'approved' ? t('comp.status.approved') : t('comp.status.rejected')}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
     </>
   )
 }

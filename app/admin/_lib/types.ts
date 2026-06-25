@@ -1,6 +1,6 @@
 'use client'
 
-export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes' | 'empresas' | 'alertas' | 'integracoes'
+export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes' | 'empresas' | 'alertas' | 'integracoes' | 'ausencias'
 
 // Appended to ALL_TABS only for super-admins (platform operators).
 export const SUPER_ADMIN_TABS: { id: Tab; label: string }[] = [
@@ -15,6 +15,7 @@ export const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'correcoes',    label: 'Correções'    },
   { id: 'funcionarios', label: 'Equipe'       },
   { id: 'banco',        label: 'Banco'        },
+  { id: 'ausencias',    label: 'Ausências'    },
   { id: 'feriados',     label: 'Feriados'     },
   { id: 'relatorios',   label: 'Relatório'    },
   { id: 'alertas',      label: 'Alertas'      },
