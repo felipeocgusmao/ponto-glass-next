@@ -56,17 +56,28 @@ export default function EmpSidebar({
       <div className="sb-head">
         <div className="sb-logo" role="img" aria-label="PontoGlass" />
         <span className="sb-brand">PontoGlass</span>
-        <button
-          className="sb-collapse"
-          onClick={onToggleCollapse}
-          title={collapsed ? 'Expandir' : 'Recolher'}
-          aria-label={collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
-          aria-expanded={!collapsed}
-        >
-          <span style={{ display: 'flex', transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-            <IconChevronsLeft size={14} />
-          </span>
-        </button>
+        {mobileOpen ? (
+          <button
+            className="sb-collapse"
+            onClick={onMobileClose}
+            title={t('common.close')}
+            aria-label={t('common.close')}
+          >
+            <span style={{ display: 'flex', fontSize: 16, lineHeight: 1, fontWeight: 300 }}>×</span>
+          </button>
+        ) : (
+          <button
+            className="sb-collapse"
+            onClick={onToggleCollapse}
+            title={collapsed ? 'Expandir' : 'Recolher'}
+            aria-label={collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+            aria-expanded={!collapsed}
+          >
+            <span style={{ display: 'flex', transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+              <IconChevronsLeft size={14} />
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="sb-nav" style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>

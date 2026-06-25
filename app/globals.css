@@ -537,9 +537,10 @@ select.input { padding-right: 24px; appearance: none; background-image: url("dat
 @keyframes pg-pulse { 0% { transform: scale(0.6); opacity: 1; } 100% { transform: scale(2.2); opacity: 0; } }
 
 /* ─── Status row ─── */
-.status-row { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.status-row { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.15s, backdrop-filter 0.15s; }
 .status-row:last-child { border-bottom: 0; }
-.status-row:hover { background: var(--hover); }
+.status-row:hover { background: rgba(255,255,255,0.18); backdrop-filter: blur(8px) saturate(1.6); }
+html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); backdrop-filter: blur(8px) saturate(1.4); }
 /* Phone: the fixed-width columns sum to ~456px which can't fit in a 375px
    viewport — hide the progress bar (least information), tighten the time and
    earnings columns, and shrink the gap so everything stays inside the card. */

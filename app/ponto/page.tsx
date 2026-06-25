@@ -19,6 +19,7 @@ type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes' | 'perfil'
 type CorrectionStatus = 'pending' | 'approved' | 'rejected'
 interface CorrReq { id: string; req_type: string; req_timestamp: string; req_date: string; reason: string | null; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
 
+// Fallback map used only when t() key lookup fails (e.g. SSR without context)
 const PUNCH_LABEL_PT: Record<string, string> = {
   entrada: 'Entrada', 'saída': 'Saída',
   inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço',
@@ -533,7 +534,7 @@ export default function PontoPage() {
             body: JSON.stringify({ type: 'saída', auto_exit: true, latitude: geo.lat, longitude: geo.lng }),
           })
           if (res.ok) {
-            setAutoExitBanner('Saída automática registada — você saiu da área de trabalho.')
+            setAutoExitBanner(t('emp.auto_exit'))
             loadRecords()
           }
         } catch { /* non-critical */ }
@@ -838,7 +839,7 @@ export default function PontoPage() {
             <span style={{ fontSize: 16 }}>📍</span>
             <div style={{ flex: 1, fontSize: 13, color: 'var(--fg)' }}>{autoExitBanner}</div>
             <button onClick={() => setAutoExitBanner(null)} className="btn ghost sm" style={{ fontSize: 11, flexShrink: 0 }}>
-              Fechar
+              {t('common.close')}
             </button>
           </div>
         )}
@@ -1002,7 +1003,7 @@ export default function PontoPage() {
               const totalW = days7.length * W + (days7.length - 1) * GAP
               return (
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 8 }}>Últimos 7 dias</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 8 }}>{t('emp.last_7_days')}</div>
                   <svg width="100%" viewBox={`0 0 ${totalW} ${H + LABEL_H}`} style={{ overflow: 'visible', display: 'block' }}>
                     {/* target line */}
                     <line
@@ -1040,12 +1041,12 @@ export default function PontoPage() {
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <button onClick={goPrevMonth} aria-label="Mês anterior"
+                  <button onClick={goPrevMonth} aria-label={t('emp.prev_month')}
                     style={{ background: 'var(--surface-2)', border: 'none', cursor: 'pointer', padding: '2px 9px', borderRadius: 4, fontSize: 13, color: 'var(--fg-muted)' }}>‹</button>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', minWidth: 104, textAlign: 'center' }}>
                     {histMonthLabel}
                   </div>
-                  <button onClick={goNextMonth} disabled={isCurrentHistMonth} aria-label="Próximo mês"
+                  <button onClick={goNextMonth} disabled={isCurrentHistMonth} aria-label={t('emp.next_month')}
                     style={{ background: 'var(--surface-2)', border: 'none', cursor: isCurrentHistMonth ? 'default' : 'pointer', padding: '2px 9px', borderRadius: 4, fontSize: 13, color: 'var(--fg-muted)', opacity: isCurrentHistMonth ? 0.4 : 1 }}>›</button>
                 </div>
                 <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 6, padding: '2px 3px', gap: 1 }}>
@@ -1135,7 +1136,7 @@ export default function PontoPage() {
                           <span style={{ fontSize: 13, fontWeight: 600, color: isToday ? 'var(--accent)' : 'var(--fg)', textTransform: 'capitalize' }}>
                             {dt.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
                           </span>
-                          {isToday && <span className="chip accent" style={{ fontSize: 9, marginLeft: 6 }}>hoje</span>}
+                          {isToday && <span className="chip accent" style={{ fontSize: 9, marginLeft: 6 }}>{t('emp.today_chip')}</span>}
                         </div>
                         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)', color: dayMin > 0 ? 'var(--fg)' : 'var(--fg-subtle)' }}>
                           {dayMin > 0 ? fmtCentesimal(dayMin) : '—'}
@@ -1347,10 +1348,10 @@ export default function PontoPage() {
                     style={{ width: '100%', justifyContent: 'center' }}
                     onClick={async () => {
                       await fetch('/api/auth/revoke-other-sessions', { method: 'POST' })
-                      showToast('Outras sessões terminadas.')
+                      showToast(t('emp.sessions_revoked'))
                     }}
                   >
-                    Terminar outras sessões
+                    {t('emp.revoke_sessions')}
                   </button>
                 </div>
               </div>
