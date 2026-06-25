@@ -16,7 +16,7 @@ html {
 html[data-theme="dark"] {
   background:
     radial-gradient(ellipse 62% 50% at 10% 15%, rgba(124,140,248,0.45) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 45% at 90% 85%, rgba(167,139,250,0.38) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 90% 100%, rgba(167,139,250,0.35) 0%, transparent 70%),
     radial-gradient(ellipse 40% 30% at 52% 48%, rgba(34,211,238,0.18) 0%, transparent 65%),
     #08090b;
 }
@@ -664,7 +664,7 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 /* Sidebar, overlay, hamburger are already mobile-first in base; only layout
    tweaks specific to very small screens belong here. */
 @media (max-width: 768px) {
-  .topbar { padding: 0 12px; gap: 8px; }
+  .topbar { padding: env(safe-area-inset-top, 0px) 12px 0; gap: 8px; }
   .page { padding: 14px; gap: 12px; }
   .form-grid-2 { grid-template-columns: 1fr; }
   .form-grid-3 { grid-template-columns: 1fr 1fr; }
