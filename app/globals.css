@@ -631,9 +631,20 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
   .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
   .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
   .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
-  /* Top-align the card on mobile — centered grid cuts off the top when content overflows */
-  .emp-main { padding: 16px 12px; align-items: start; }
-  .emp-card { padding: 24px 16px 20px; border-radius: var(--r-lg); }
+  /* Replace the desktop grid-centering layout with a plain flex column on mobile.
+     place-items:center (from the base rule) keeps justify-items:center even after
+     align-items:start is overridden, which clips the right side in narrow webviews. */
+  .emp-shell { overflow: hidden; }
+  .emp-content { min-width: 0; overflow-x: hidden; }
+  .emp-main { display: flex; flex-direction: column; align-items: stretch; padding: 16px 12px; overflow-x: hidden; }
+  .emp-card { padding: 24px 16px 20px; border-radius: var(--r-lg); max-width: 100%; overflow-x: hidden; }
+  /* Scale the clock so it never overflows on very narrow screens */
+  .emp-clock-time { font-size: clamp(40px, 11vw, 64px); }
+  /* Prevent stats column from blowing out the progress grid */
+  .emp-stats { min-width: 0; }
+  .emp-stat-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Shrink the progress ring slightly so the two-column grid has more breathing room */
+  .emp-ring { width: 90px; height: 90px; }
 }
 
 /* ─── Mobile layout (≤ 768px) ─── */
