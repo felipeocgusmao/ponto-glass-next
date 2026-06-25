@@ -15,9 +15,9 @@ html {
 }
 html[data-theme="dark"] {
   background:
-    radial-gradient(ellipse 62% 50% at 10% 15%, rgba(124,140,248,0.26) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 45% at 90% 85%, rgba(167,139,250,0.20) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 30% at 52% 48%, rgba(34,211,238,0.10) 0%, transparent 65%),
+    radial-gradient(ellipse 62% 50% at 10% 15%, rgba(124,140,248,0.45) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 45% at 90% 85%, rgba(167,139,250,0.38) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 52% 48%, rgba(34,211,238,0.18) 0%, transparent 65%),
     #08090b;
 }
 
@@ -202,7 +202,7 @@ ul, ol { list-style: none; }
   backdrop-filter: blur(28px) saturate(2.0);
   -webkit-backdrop-filter: blur(28px) saturate(2.0);
 }
-[data-theme="dark"] .sidebar { background: rgba(8,9,11,0.52); }
+[data-theme="dark"] .sidebar { background: rgba(255,255,255,0.04); }
 .sb-head {
   display: flex; align-items: center; gap: 10px;
   padding: 14px;
@@ -295,7 +295,7 @@ ul, ol { list-style: none; }
   backdrop-filter: blur(20px) saturate(1.6);
   -webkit-backdrop-filter: blur(20px) saturate(1.6);
 }
-[data-theme="dark"] .topbar { background: rgba(8,9,11,0.55); }
+[data-theme="dark"] .topbar { background: rgba(255,255,255,0.04); }
 .breadcrumbs { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg-muted); }
 .breadcrumbs .crumb { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: var(--r-sm); }
 .breadcrumbs .crumb:hover { background: var(--hover); color: var(--fg); }
@@ -427,7 +427,7 @@ ul, ol { list-style: none; }
   backdrop-filter: blur(28px) saturate(2.0);
   -webkit-backdrop-filter: blur(28px) saturate(2.0);
 }
-[data-theme="dark"] .card { background: rgba(8,9,11,0.42); }
+[data-theme="dark"] .card { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
 .card-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border);
@@ -448,7 +448,7 @@ ul, ol { list-style: none; }
   backdrop-filter: blur(28px) saturate(2.0);
   -webkit-backdrop-filter: blur(28px) saturate(2.0);
 }
-[data-theme="dark"] .kpi { background: rgba(8,9,11,0.42); }
+[data-theme="dark"] .kpi { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
 .kpi-label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; color: var(--fg-muted); }
 .kpi-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 /* flex (not inline-flex) + wrap so multiple chips on a narrow card move to a
@@ -795,7 +795,7 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
   backdrop-filter: blur(20px) saturate(1.6);
   -webkit-backdrop-filter: blur(20px) saturate(1.6);
 }
-[data-theme="dark"] .emp-topbar { background: rgba(8,9,11,0.68); }
+[data-theme="dark"] .emp-topbar { background: rgba(255,255,255,0.04); }
 .emp-topbar-hamburger {
   width: 32px; height: 32px; display: none; place-items: center;
   border-radius: var(--r-sm); color: var(--fg-subtle); flex-shrink: 0;
@@ -825,7 +825,7 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
   backdrop-filter: blur(28px) saturate(2.0);
   -webkit-backdrop-filter: blur(28px) saturate(2.0);
 }
-[data-theme="dark"] .emp-card { background: rgba(8,9,11,0.42); }
+[data-theme="dark"] .emp-card { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
 .emp-greeting { text-align: center; }
 .emp-greeting-hi { font-size: 16px; color: var(--fg-muted); font-weight: 400; }
 .emp-greeting-date { font-size: 12.5px; color: var(--fg-subtle); margin-top: 2px; }
