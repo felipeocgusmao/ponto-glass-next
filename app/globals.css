@@ -602,6 +602,38 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 }
 .topbar-hamburger:hover { background: var(--hover); color: var(--fg); }
 
+/* ─── Employee shell mobile (≤ 1024px) — catches phones in landscape too ─── */
+@media (max-width: 1024px) {
+  .emp-shell { grid-template-columns: 1fr; }
+  .emp-topbar-hamburger { display: grid; }
+  .emp-shell .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
+    z-index: 100; transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-lg);
+  }
+  .emp-shell .sidebar.mobile-open { transform: translateX(0); }
+  /* Overlay backdrop for emp drawer */
+  .emp-shell .sidebar-overlay {
+    position: fixed; inset: 0; z-index: 99;
+    background: rgba(0,0,0,0.08);
+    backdrop-filter: blur(10px) saturate(1.5);
+    -webkit-backdrop-filter: blur(10px) saturate(1.5);
+    animation: pg-fadeIn 0.2s ease;
+  }
+  [data-theme="dark"] .emp-shell .sidebar-overlay { background: rgba(0,0,0,0.18); }
+  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
+  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-label,
+  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-badge,
+  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-section-label,
+  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user-meta { display: block; }
+  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item { justify-content: flex-start; padding: 6px 10px; }
+  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
+  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
+  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
+  .emp-main { padding: 16px 12px; }
+}
+
 /* ─── Mobile layout (≤ 768px) ─── */
 @media (max-width: 768px) {
   .app { grid-template-columns: 1fr; }
@@ -622,18 +654,6 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
   .app[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
   .app[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
   .app[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
-  /* emp-shell mobile */
-  .emp-shell { grid-template-columns: 1fr; }
-  .emp-topbar-hamburger { display: grid; }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-label,
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-badge,
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-section-label,
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user-meta { display: block; }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item { justify-content: flex-start; padding: 6px 10px; }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
   .sidebar-overlay {
     position: fixed; inset: 0; z-index: 99;
     background: rgba(0,0,0,0.08);
