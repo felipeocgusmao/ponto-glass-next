@@ -746,23 +746,19 @@ export default function PontoPage() {
   }
 
   if (fetchError) return (
-    <div className="emp-shell">
-      <main className="emp-main">
-        <div className="emp-card" style={{ textAlign: 'center', gap: 16 }}>
-          <div className="muted">{t('error.connect')}</div>
-          <button onClick={() => { setFetchError(false); loadUser(); loadRecords() }} className="btn primary">
-            {t('common.retry')}
-          </button>
-        </div>
-      </main>
+    <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--bg)' }}>
+      <div className="card" style={{ padding: 32, textAlign: 'center', maxWidth: 340 }}>
+        <div style={{ color: 'var(--fg-muted)', marginBottom: 16 }}>{t('error.connect')}</div>
+        <button onClick={() => { setFetchError(false); loadUser(); loadRecords() }} className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>
+          {t('common.retry')}
+        </button>
+      </div>
     </div>
   )
 
   if (!user) return (
-    <div className="emp-shell">
-      <main className="emp-main">
-        <div style={{ fontSize: 40, opacity: 0.2, fontFamily: 'var(--font-mono)', color: 'var(--fg)' }}>…</div>
-      </main>
+    <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--bg)' }}>
+      <div className="tnum mono" style={{ fontSize: 32, color: 'var(--fg-dim)' }}>…</div>
     </div>
   )
 
@@ -822,7 +818,7 @@ export default function PontoPage() {
   const goNextMonth = () => setHistYM(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })
 
   return (
-    <div className="emp-shell" data-collapsed={sidebarCollapsed ? 'true' : undefined}>
+    <div className="app" data-collapsed={sidebarCollapsed ? 'true' : undefined}>
       {toast && <div className="toast">{toast}</div>}
 
       {showSettings && (
@@ -839,6 +835,10 @@ export default function PontoPage() {
         />
       )}
 
+      {sidebarMobileOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarMobileOpen(false)} />
+      )}
+
       <EmpSidebar
         tab={tab}
         setTab={setTab}
@@ -851,14 +851,10 @@ export default function PontoPage() {
         badges={{ correcoes: corrBadge, ponto: queueCount }}
       />
 
-      {sidebarMobileOpen && (
-        <div className="sidebar-overlay" onClick={() => setSidebarMobileOpen(false)} />
-      )}
-
-      <div className="emp-content">
-        <header className="emp-topbar">
+      <div className="main">
+        <div className="topbar">
           <button
-            className="emp-topbar-hamburger"
+            className="topbar-hamburger"
             onClick={() => setSidebarMobileOpen(true)}
             aria-label="Abrir menu"
           >
@@ -879,9 +875,9 @@ export default function PontoPage() {
             </div>
             <div className={`avatar size-30 av-c${empColor(user.id)}`}>{avatarInitials(user.name)}</div>
           </button>
-        </header>
+        </div>
 
-      <main className="emp-main">
+        <div className="page">
 
         {/* ── OFFLINE / QUEUE BANNER ────────────────────────────────────── */}
         {(!isOnline || queueCount > 0) && (
@@ -1506,7 +1502,7 @@ export default function PontoPage() {
             )}
           </div>
         )}
-      </main>
+        </div>
       </div>
 
       {/* ── PUNCH-OUT CONFIRMATION ──────────────────────────────────────────── */}
