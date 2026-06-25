@@ -181,19 +181,22 @@ ul, ol { list-style: none; }
 [data-font="mono"] { --font-sans: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace; }
 [data-font="editorial"] { --font-sans: 'Lora', ui-serif, Georgia, 'Times New Roman', serif; --text-sm: 13.5px; }
 
-/* ─── Layout ─── */
+/* ─── Layout — mobile-first: drawer sidebar, full-width content ─── */
 .app {
   display: grid;
-  grid-template-columns: var(--sidebar-w, 240px) 1fr;
+  grid-template-columns: 1fr; /* sidebar always a drawer; never in grid by default */
   height: 100vh;
   height: 100dvh;
   background: transparent;
-  transition: grid-template-columns 0.2s ease;
 }
 .app[data-collapsed="true"] { --sidebar-w: 56px; }
 
-/* ─── Sidebar ─── */
+/* ─── Sidebar — always a fixed drawer by default ─── */
 .sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w, 240px);
+  z-index: 100; transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   background: rgba(248,248,250,0.68);
@@ -202,7 +205,27 @@ ul, ol { list-style: none; }
   backdrop-filter: blur(28px) saturate(2.0);
   -webkit-backdrop-filter: blur(28px) saturate(2.0);
 }
+.sidebar.mobile-open { transform: translateX(0); }
+/* Overlay backdrop for drawer */
+.sidebar-overlay {
+  position: fixed; inset: 0; z-index: 99;
+  background: rgba(0,0,0,0.08);
+  backdrop-filter: blur(10px) saturate(1.5);
+  -webkit-backdrop-filter: blur(10px) saturate(1.5);
+  animation: pg-fadeIn 0.2s ease;
+}
+[data-theme="dark"] .sidebar-overlay { background: rgba(0,0,0,0.18); }
 [data-theme="dark"] .sidebar { background: rgba(255,255,255,0.04); }
+/* When drawer is open and sidebar is in collapsed state, show labels */
+.app[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
+.app[data-collapsed="true"] .sidebar.mobile-open .sb-item-label,
+.app[data-collapsed="true"] .sidebar.mobile-open .sb-item-badge,
+.app[data-collapsed="true"] .sidebar.mobile-open .sb-section-label,
+.app[data-collapsed="true"] .sidebar.mobile-open .sb-user-meta { display: block; }
+.app[data-collapsed="true"] .sidebar.mobile-open .sb-item { justify-content: flex-start; padding: 6px 10px; }
+.app[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
+.app[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
+.app[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
 .sb-head {
   display: flex; align-items: center; gap: 10px;
   padding: 14px;
@@ -302,7 +325,7 @@ ul, ol { list-style: none; }
 .breadcrumbs .crumb.current { color: var(--fg); font-weight: 500; }
 .breadcrumbs .sep { color: var(--fg-dim); }
 .topbar-search {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+  margin-left: auto; display: none; align-items: center; gap: 8px; /* hidden on mobile; restored at ≥1280px */
   height: 28px; padding: 0 10px; border-radius: var(--r-sm);
   background: var(--surface-2); border: 1px solid var(--border);
   color: var(--fg-subtle); font-size: 12.5px; cursor: pointer; min-width: 200px;
@@ -594,89 +617,77 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 
-/* ─── Mobile hamburger ─── */
+/* ─── Mobile hamburger — always visible (mobile-first; hidden on desktop ≥ 1280px) ─── */
 .topbar-hamburger {
-  display: none; width: 32px; height: 32px;
+  display: grid; width: 32px; height: 32px;
   place-items: center; border-radius: var(--r-sm);
   color: var(--fg-muted); flex-shrink: 0;
 }
 .topbar-hamburger:hover { background: var(--hover); color: var(--fg); }
 
-/* ─── Employee shell mobile (≤ 1024px) — catches phones in landscape too ─── */
-@media (max-width: 1024px) {
-  .emp-shell { grid-template-columns: 1fr; }
-  .emp-topbar-hamburger { display: grid; }
+/* ─── Employee shell sidebar — always a fixed drawer regardless of screen size.
+     Embedded webviews (Teams, WKWebView) may report viewport > 1024px even on a
+     phone, so a max-width media query is not reliable. We default to the drawer
+     pattern and only restore the persistent sidebar on genuine wide screens. ─── */
+.emp-shell .sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
+  z-index: 100; transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-lg);
+}
+.emp-shell .sidebar.mobile-open { transform: translateX(0); }
+.emp-shell .sidebar-overlay {
+  position: fixed; inset: 0; z-index: 99;
+  background: rgba(0,0,0,0.08);
+  backdrop-filter: blur(10px) saturate(1.5);
+  -webkit-backdrop-filter: blur(10px) saturate(1.5);
+  animation: pg-fadeIn 0.2s ease;
+}
+[data-theme="dark"] .emp-shell .sidebar-overlay { background: rgba(0,0,0,0.18); }
+/* When the drawer is open and the sidebar was in collapsed state, show labels */
+.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
+.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-label,
+.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-badge,
+.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-section-label,
+.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user-meta { display: block; }
+.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item { justify-content: flex-start; padding: 6px 10px; }
+.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
+.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
+.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
+
+/* ─── Desktop layout at ≥ 1280px — restores persistent sidebar for both shells ─── */
+@media (min-width: 1280px) {
+  /* Admin panel: restore in-flow sidebar */
+  .app { grid-template-columns: var(--sidebar-w, 240px) 1fr; transition: grid-template-columns 0.2s ease; }
+  .app .sidebar { position: relative; transform: none; box-shadow: none; height: 100vh; height: 100dvh; transition: none; }
+  .sidebar-overlay { display: none; }
+  .topbar-hamburger { display: none; }
+  .topbar-search { display: inline-flex; }
+
+  /* Employee shell: restore in-flow sidebar */
+  .emp-shell {
+    grid-template-columns: var(--sidebar-w, 240px) 1fr;
+    transition: grid-template-columns 0.2s ease;
+  }
   .emp-shell .sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
-    z-index: 100; transform: translateX(-100%);
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: var(--shadow-lg);
+    position: relative; transform: none; box-shadow: none;
+    height: 100vh; height: 100dvh; transition: none;
   }
-  .emp-shell .sidebar.mobile-open { transform: translateX(0); }
-  /* Overlay backdrop for emp drawer */
-  .emp-shell .sidebar-overlay {
-    position: fixed; inset: 0; z-index: 99;
-    background: rgba(0,0,0,0.08);
-    backdrop-filter: blur(10px) saturate(1.5);
-    -webkit-backdrop-filter: blur(10px) saturate(1.5);
-    animation: pg-fadeIn 0.2s ease;
+  .emp-topbar-hamburger { display: none; }
+  .emp-main { display: grid; place-items: center; padding: 32px 20px; }
+  .emp-card {
+    max-width: 520px; padding: 36px 32px 28px;
+    border-radius: var(--r-xl);
   }
-  [data-theme="dark"] .emp-shell .sidebar-overlay { background: rgba(0,0,0,0.18); }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-label,
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-badge,
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-section-label,
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user-meta { display: block; }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item { justify-content: flex-start; padding: 6px 10px; }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
-  .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
-  /* Replace the desktop grid-centering layout with a plain flex column on mobile.
-     place-items:center (from the base rule) keeps justify-items:center even after
-     align-items:start is overridden, which clips the right side in narrow webviews. */
-  .emp-shell { overflow: hidden; }
-  .emp-content { min-width: 0; overflow-x: hidden; }
-  .emp-main { display: flex; flex-direction: column; align-items: stretch; padding: 16px 12px; overflow-x: hidden; }
-  .emp-card { padding: 24px 16px 20px; border-radius: var(--r-lg); max-width: 100%; overflow-x: hidden; }
-  /* Scale the clock so it never overflows on very narrow screens */
-  .emp-clock-time { font-size: clamp(40px, 11vw, 64px); }
-  /* Prevent stats column from blowing out the progress grid */
-  .emp-stats { min-width: 0; }
-  .emp-stat-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* Shrink the progress ring slightly so the two-column grid has more breathing room */
-  .emp-ring { width: 90px; height: 90px; }
+  .emp-clock-time { font-size: 64px; }
+  .emp-ring { width: 110px; height: 110px; }
+  .emp-stat-label { white-space: normal; overflow: visible; text-overflow: clip; }
 }
 
-/* ─── Mobile layout (≤ 768px) ─── */
+/* ─── Small-screen adjustments (≤ 768px) ─── */
+/* Sidebar, overlay, hamburger are already mobile-first in base; only layout
+   tweaks specific to very small screens belong here. */
 @media (max-width: 768px) {
-  .app { grid-template-columns: 1fr; }
-  .sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
-    z-index: 100; transform: translateX(-100%);
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: var(--shadow-lg);
-  }
-  .sidebar.mobile-open { transform: translateX(0); }
-  /* In mobile drawer mode, ignore the desktop collapsed state so labels always show. */
-  .app[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
-  .app[data-collapsed="true"] .sidebar.mobile-open .sb-item-label,
-  .app[data-collapsed="true"] .sidebar.mobile-open .sb-item-badge,
-  .app[data-collapsed="true"] .sidebar.mobile-open .sb-section-label,
-  .app[data-collapsed="true"] .sidebar.mobile-open .sb-user-meta { display: block; }
-  .app[data-collapsed="true"] .sidebar.mobile-open .sb-item { justify-content: flex-start; padding: 6px 10px; }
-  .app[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
-  .app[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
-  .app[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
-  .sidebar-overlay {
-    position: fixed; inset: 0; z-index: 99;
-    background: rgba(0,0,0,0.08);
-    backdrop-filter: blur(10px) saturate(1.5);
-    -webkit-backdrop-filter: blur(10px) saturate(1.5);
-    animation: pg-fadeIn 0.2s ease;
-  }
-  [data-theme="dark"] .sidebar-overlay { background: rgba(0,0,0,0.18); }
-  .topbar-hamburger { display: grid; }
-  .topbar-search { display: none; }
   .topbar { padding: 0 12px; gap: 8px; }
   .page { padding: 14px; gap: 12px; }
   .form-grid-2 { grid-template-columns: 1fr; }
@@ -790,17 +801,16 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 @keyframes pg-slideUp { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes pg-spin { to { transform: rotate(360deg); } }
 
-/* ─── Employee shell ─── */
+/* ─── Employee shell — same layout model as .app (no position:fixed) ─── */
 .emp-shell {
-  position: fixed; inset: 0; z-index: 1;
   display: grid;
-  grid-template-columns: var(--sidebar-w, 240px) 1fr;
+  grid-template-columns: 1fr; /* sidebar is always a fixed drawer; never in grid */
   height: 100vh; height: 100dvh;
   background: var(--bg-app);
-  transition: grid-template-columns 0.2s ease;
+  overflow: hidden;
 }
 .emp-shell[data-collapsed="true"] { --sidebar-w: 56px; }
-.emp-content { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.emp-content { display: flex; flex-direction: column; overflow: hidden; min-height: 0; min-width: 0; }
 .emp-topbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 16px 0 8px; border-bottom: 1px solid var(--border);
@@ -810,7 +820,7 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 }
 [data-theme="dark"] .emp-topbar { background: rgba(255,255,255,0.04); }
 .emp-topbar-hamburger {
-  width: 32px; height: 32px; display: none; place-items: center;
+  width: 32px; height: 32px; display: grid; place-items: center; /* always visible */
   border-radius: var(--r-sm); color: var(--fg-subtle); flex-shrink: 0;
 }
 .emp-topbar-hamburger:hover { background: var(--hover); color: var(--fg); }
@@ -818,9 +828,10 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 .emp-user-info { text-align: right; line-height: 1.2; }
 .emp-user-name { font-size: 13px; font-weight: 550; color: var(--fg); }
 .emp-user-role { font-size: 11px; color: var(--fg-subtle); }
-.emp-main { flex: 1; overflow: auto; display: grid; place-items: center; padding: 32px 20px; }
+/* Mobile-first main: flex column, full width, no grid centering */
+.emp-main { flex: 1; overflow: auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: stretch; padding: 16px 12px; }
 
-/* emp-shell collapsed sidebar rules (mirror .app[data-collapsed="true"]) */
+/* emp-shell collapsed sidebar rules (only relevant on desktop ≥ 1280px) */
 .emp-shell[data-collapsed="true"] .sb-brand,
 .emp-shell[data-collapsed="true"] .sb-item-label,
 .emp-shell[data-collapsed="true"] .sb-item-badge,
@@ -831,13 +842,21 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 .emp-shell[data-collapsed="true"] .sb-collapse { width: 32px; height: 32px; }
 .emp-shell[data-collapsed="true"] .sb-item { justify-content: center; padding: 6px; }
 .emp-shell[data-collapsed="true"] .sb-user { justify-content: center; }
+/* Mobile-first card: full width, compact padding */
 .emp-card {
-  width: 100%; max-width: 520px; background: rgba(255,255,255,0.52); border: 1px solid var(--border);
-  border-radius: var(--r-xl); padding: 36px 32px 28px; box-shadow: var(--shadow-sm);
-  display: flex; flex-direction: column; gap: 28px;
+  width: 100%; max-width: 100%; background: rgba(255,255,255,0.52); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 24px 16px 20px; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 28px; overflow-x: hidden;
   backdrop-filter: blur(28px) saturate(2.0);
   -webkit-backdrop-filter: blur(28px) saturate(2.0);
 }
+/* Clock scales to fit any width */
+.emp-clock-time { font-size: clamp(40px, 11vw, 64px); font-weight: 500; letter-spacing: -0.04em; line-height: 1; color: var(--fg); display: flex; align-items: baseline; }
+/* Stats column must not blow out the progress grid */
+.emp-stats { min-width: 0; }
+.emp-stat-label { font-size: 12px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Smaller ring on mobile */
+.emp-ring { width: 90px; height: 90px; flex-shrink: 0; }
 [data-theme="dark"] .emp-card { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
 .emp-greeting { text-align: center; }
 .emp-greeting-hi { font-size: 16px; color: var(--fg-muted); font-weight: 400; }
