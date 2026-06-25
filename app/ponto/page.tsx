@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
 import { CalendarView } from './_components/CalendarView'
+import EmpSidebar from './_components/EmpSidebar'
 import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, fmtCentesimal, fmtCentesimalSigned, fmtEur, roundToQuarter, openPayslip, businessDate, empColor, avatarInitials } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
@@ -112,6 +113,8 @@ export default function PontoPage() {
   const [toast, setToast] = useState('')
   const [fetchError, setFetchError] = useState(false)
   const [tab, setTab] = useState<Tab>('ponto')
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   // history tab state
   const [historyRecs, setHistoryRecs] = useState<PunchRecord[]>([])
@@ -743,7 +746,7 @@ export default function PontoPage() {
   const goNextMonth = () => setHistYM(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })
 
   return (
-    <div className="emp-shell">
+    <div className="emp-shell" data-collapsed={sidebarCollapsed ? 'true' : undefined}>
       {toast && <div className="toast">{toast}</div>}
 
       {showSettings && (
@@ -760,26 +763,49 @@ export default function PontoPage() {
         />
       )}
 
-      <header className="emp-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="sb-logo" style={{ width: 26, height: 26, borderRadius: 6 }} role="img" aria-label="PontoGlass" />
-          <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: '-0.01em' }}>PontoGlass</div>
-        </div>
-        <button
-          className="emp-user-menu"
-          onClick={() => setShowSettings(true)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 8 }}
-          title="Configurações"
-        >
-          <div className="emp-user-info">
-            <div className="emp-user-name">{user.name.split(' ').slice(0, 2).join(' ')}</div>
-            <div className="emp-user-role">@{user.username}</div>
-          </div>
-          <div className={`avatar size-30 av-c${empColor(user.id)}`}>{avatarInitials(user.name)}</div>
-        </button>
-      </header>
+      <EmpSidebar
+        tab={tab}
+        setTab={setTab}
+        user={user}
+        onOpenSettings={() => setShowSettings(true)}
+        mobileOpen={sidebarMobileOpen}
+        onMobileClose={() => setSidebarMobileOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(c => !c)}
+        badges={{ correcoes: corrBadge, ponto: queueCount }}
+      />
 
-      <main className="emp-main" style={{ paddingBottom: 72 }}>
+      {sidebarMobileOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarMobileOpen(false)} />
+      )}
+
+      <div className="emp-content">
+        <header className="emp-topbar">
+          <button
+            className="emp-topbar-hamburger"
+            onClick={() => setSidebarMobileOpen(true)}
+            aria-label="Abrir menu"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+          <div style={{ flex: 1 }} />
+          <button
+            className="emp-user-menu"
+            onClick={() => setShowSettings(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 8 }}
+            title="Configurações"
+          >
+            <div className="emp-user-info">
+              <div className="emp-user-name">{user.name.split(' ').slice(0, 2).join(' ')}</div>
+              <div className="emp-user-role">@{user.username}</div>
+            </div>
+            <div className={`avatar size-30 av-c${empColor(user.id)}`}>{avatarInitials(user.name)}</div>
+          </button>
+        </header>
+
+      <main className="emp-main">
 
         {/* ── OFFLINE / QUEUE BANNER ────────────────────────────────────── */}
         {(!isOnline || queueCount > 0) && (
@@ -1332,6 +1358,7 @@ export default function PontoPage() {
           </div>
         )}
       </main>
+      </div>
 
       {/* ── PUNCH-OUT CONFIRMATION ──────────────────────────────────────────── */}
       {confirmingOut && (
@@ -1361,56 +1388,6 @@ export default function PontoPage() {
           </div>
         </div>
       )}
-
-      {/* ── BOTTOM TAB BAR ──────────────────────────────────────────────────── */}
-      <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, height: 64,
-        background: 'var(--sidebar-bg)', borderTop: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-        backdropFilter: 'blur(12px)', zIndex: 50,
-      }}>
-        {([
-          { id: 'ponto',     labelKey: 'tab.meu_ponto' as const,  Icon: ClockIcon },
-          { id: 'historico', labelKey: 'tab.registros' as const,  Icon: HistoryIcon },
-          { id: 'banco',     labelKey: 'tab.banco' as const,      Icon: BankIcon },
-          { id: 'correcoes', labelKey: 'tab.correcoes' as const,  Icon: EditIcon },
-          { id: 'perfil',    labelKey: 'tab.perfil' as const,     Icon: UserIcon },
-        ] as const).map(({ id, labelKey, Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            style={{
-              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-              background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0',
-              color: tab === id ? 'var(--accent)' : 'var(--fg-muted)',
-              transition: 'color 0.15s',
-            }}
-          >
-            <div style={{ position: 'relative', display: 'inline-flex' }}>
-              <Icon size={20} />
-              {id === 'ponto' && queueCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: -3, right: -5,
-                  minWidth: 14, height: 14, borderRadius: 7,
-                  background: 'var(--warning, #ca8a04)', color: '#fff',
-                  fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '0 3px', lineHeight: 1,
-                }}>{queueCount}</span>
-              )}
-              {id === 'correcoes' && corrBadge > 0 && (
-                <span style={{
-                  position: 'absolute', top: -3, right: -5,
-                  minWidth: 14, height: 14, borderRadius: 7,
-                  background: 'var(--danger-fg)', color: '#fff',
-                  fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '0 3px', lineHeight: 1,
-                }}>{corrBadge}</span>
-              )}
-            </div>
-            <span style={{ fontSize: 10, fontWeight: tab === id ? 600 : 400, letterSpacing: '0.02em' }}>{t(labelKey)}</span>
-          </button>
-        ))}
-      </nav>
     </div>
   )
 }
