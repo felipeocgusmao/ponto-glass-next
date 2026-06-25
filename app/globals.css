@@ -631,7 +631,9 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
   .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
   .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
   .emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
-  .emp-main { padding: 16px 12px; }
+  /* Top-align the card on mobile — centered grid cuts off the top when content overflows */
+  .emp-main { padding: 16px 12px; align-items: start; }
+  .emp-card { padding: 24px 16px 20px; border-radius: var(--r-lg); }
 }
 
 /* ─── Mobile layout (≤ 768px) ─── */
