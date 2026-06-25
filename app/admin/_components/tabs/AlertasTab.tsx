@@ -15,6 +15,8 @@ export function AlertasTab() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [testSending, setTestSending] = useState(false)
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   // Local form state (in hours for UX, stored as minutes)
   const [bankHours, setBankHours] = useState('')
@@ -151,6 +153,34 @@ export function AlertasTab() {
                 {saving ? t('alertas.saving') : t('alertas.save_btn')}
               </button>
               <button className="btn ghost" onClick={load} disabled={loading}>{t('common.cancel')}</button>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{t('alertas.test_btn')}</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
+                {t('alertas.note_text')}
+              </div>
+              {testMsg && <div className={`alert-inline ${testMsg.ok ? 'ok' : 'err'}`} style={{ marginBottom: 10 }}>{testMsg.text}</div>}
+              <button
+                className="btn"
+                disabled={testSending}
+                onClick={async () => {
+                  setTestSending(true); setTestMsg(null)
+                  try {
+                    const res = await fetch('/api/tenant-settings/test-notification', { method: 'POST' })
+                    if (res.status === 404) {
+                      setTestMsg({ ok: false, text: t('alertas.test_no_sub') })
+                    } else if (res.ok) {
+                      setTestMsg({ ok: true, text: t('alertas.test_sent') })
+                    } else {
+                      setTestMsg({ ok: false, text: t('alertas.test_err') })
+                    }
+                  } catch { setTestMsg({ ok: false, text: t('alertas.test_err') }) }
+                  finally { setTestSending(false) }
+                }}
+              >
+                {testSending ? t('common.loading') : t('alertas.test_btn')}
+              </button>
             </div>
 
             <div style={{ padding: '12px 16px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--fg-muted)' }}>

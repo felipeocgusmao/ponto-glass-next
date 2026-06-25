@@ -109,14 +109,218 @@ function TimesheetApprovalSection({ employees }: { employees: Employee[] }) {
   )
 }
 
-const PAGE_SIZE = 25
-type RangePreset = 'today' | '7d' | '14d' | '30d' | 'all' | 'custom'
-
 function pad(n: number) { return String(n).padStart(2, '0') }
 function ymd(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
 function shiftDays(base: string, days: number) {
   const d = new Date(base + 'T12:00:00'); d.setDate(d.getDate() + days); return ymd(d)
 }
+
+// ── Bulk entry modal ──────────────────────────────────────────────────────────
+
+const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const DEFAULT_SCHEDULE = [
+  { type: 'entrada',       time: '09:00' },
+  { type: 'inicio_almoco', time: '12:00' },
+  { type: 'fim_almoco',    time: '13:00' },
+  { type: 'saída',         time: '18:00' },
+]
+
+function BulkModal({ employees, onClose, onCreated }: {
+  employees: Employee[]
+  onClose: () => void
+  onCreated: () => void
+}) {
+  const { t } = useLang()
+  const today = businessDate()
+  const [empId, setEmpId]       = useState('')
+  const [dateFrom, setDateFrom] = useState(today)
+  const [dateTo, setDateTo]     = useState(today)
+  const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5]) // Mon-Fri default
+  const [schedule, setSchedule] = useState(DEFAULT_SCHEDULE.map(s => ({ ...s })))
+  const [saving, setSaving]     = useState(false)
+  const [err, setErr]           = useState('')
+  const [ok, setOk]             = useState('')
+
+  // Count how many days will be created
+  const previewDays = (() => {
+    if (!dateFrom || !dateTo || dateFrom > dateTo) return 0
+    let count = 0
+    const cur = new Date(dateFrom + 'T12:00:00')
+    const end = new Date(dateTo + 'T12:00:00')
+    while (cur <= end) {
+      if (weekdays.includes(cur.getDay())) count++
+      cur.setDate(cur.getDate() + 1)
+    }
+    return count
+  })()
+  const previewRecords = previewDays * schedule.length
+
+  const toggleWeekday = (d: number) =>
+    setWeekdays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort())
+
+  const updateScheduleTime = (i: number, time: string) =>
+    setSchedule(prev => prev.map((s, idx) => idx === i ? { ...s, time } : s))
+
+  const updateScheduleType = (i: number, type: string) =>
+    setSchedule(prev => prev.map((s, idx) => idx === i ? { ...s, type } : s))
+
+  const addRow = () =>
+    setSchedule(prev => [...prev, { type: 'entrada', time: '09:00' }])
+
+  const removeRow = (i: number) =>
+    setSchedule(prev => prev.filter((_, idx) => idx !== i))
+
+  const handleSubmit = async () => {
+    setErr(''); setOk('')
+    if (!empId)                       return setErr(t('reg.bulk_err.no_emp'))
+    if (!dateFrom || !dateTo || dateFrom > dateTo) return setErr(t('reg.bulk_err.no_dates'))
+    if (weekdays.length === 0)        return setErr(t('reg.bulk_err.no_days'))
+    if (schedule.length === 0)        return setErr(t('reg.bulk_err.no_punch'))
+
+    setSaving(true)
+    try {
+      const records: { employeeId: string; type: string; timestamp: string }[] = []
+      const cur = new Date(dateFrom + 'T12:00:00')
+      const end = new Date(dateTo + 'T12:00:00')
+      while (cur <= end) {
+        if (weekdays.includes(cur.getDay())) {
+          const dateStr = ymd(cur)
+          for (const row of schedule) {
+            const [h, m] = row.time.split(':').map(Number)
+            const ts = new Date(cur)
+            ts.setHours(h, m, 0, 0)
+            records.push({ employeeId: empId, type: row.type, timestamp: ts.toISOString() })
+          }
+        }
+        cur.setDate(cur.getDate() + 1)
+      }
+
+      const res = await fetch('/api/records/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setOk(t('reg.bulk_success').replace('{n}', String(data.created ?? records.length)))
+        onCreated()
+        setTimeout(onClose, 1500)
+      } else {
+        setErr(data.error ?? t('error.connect'))
+      }
+    } catch { setErr(t('error.connect')) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="card" style={{
+        width: '100%', maxWidth: 540, maxHeight: '90vh', overflowY: 'auto',
+        display: 'flex', flexDirection: 'column', gap: 0,
+      }}>
+        <div className="card-head" style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--surface)' }}>
+          <div className="card-title">{t('reg.bulk_title')}</div>
+          <button onClick={onClose} className="btn ghost sm">✕</button>
+        </div>
+
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Employee */}
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>{t('reg.employee')}</label>
+            <select value={empId} onChange={e => setEmpId(e.target.value)} className="input">
+              <option value="">{t('reg.select')}</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </div>
+
+          {/* Date range */}
+          <div className="form-grid-2">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>{t('reg.bulk_date_from')}</label>
+              <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); if (e.target.value > dateTo) setDateTo(e.target.value) }} className="input" />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>{t('reg.bulk_date_to')}</label>
+              <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); if (e.target.value < dateFrom) setDateFrom(e.target.value) }} className="input" />
+            </div>
+          </div>
+
+          {/* Weekday picker */}
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 6 }}>{t('reg.bulk_weekdays')}</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {WEEKDAY_LABELS.map((label, i) => (
+                <button
+                  key={i}
+                  onClick={() => toggleWeekday(i)}
+                  className={weekdays.includes(i) ? 'btn primary sm' : 'btn ghost sm'}
+                  style={{ minWidth: 36, fontWeight: weekdays.includes(i) ? 700 : 400 }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Daily schedule */}
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 6 }}>{t('reg.bulk_schedule')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {schedule.map((row, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <select value={row.type} onChange={e => updateScheduleType(i, e.target.value)} className="input" style={{ flex: 1 }}>
+                    <option value="entrada">{t('punch.entrada')}</option>
+                    <option value="saída">{t('punch.saída')}</option>
+                    <option value="inicio_almoco">{t('punch.inicio_almoco')}</option>
+                    <option value="fim_almoco">{t('punch.fim_almoco')}</option>
+                    <option value="pausa_cafe">{t('punch.pausa_cafe')}</option>
+                    <option value="retorno_cafe">{t('punch.retorno_cafe')}</option>
+                  </select>
+                  <input
+                    type="time"
+                    value={row.time}
+                    onChange={e => updateScheduleTime(i, e.target.value)}
+                    className="input"
+                    style={{ width: 90 }}
+                  />
+                  <button onClick={() => removeRow(i)} className="btn ghost sm" style={{ flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+              <button onClick={addRow} className="btn ghost sm" style={{ alignSelf: 'flex-start' }}>+ {t('reg.add_btn')}</button>
+            </div>
+          </div>
+
+          {/* Preview */}
+          {previewDays > 0 && schedule.length > 0 && (
+            <div style={{ padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 13 }}>
+              {t('reg.bulk_preview').replace('{n}', String(previewRecords)).replace('{d}', String(previewDays))}
+            </div>
+          )}
+
+          {err && <div className="alert-inline err">{err}</div>}
+          {ok  && <div className="alert-inline ok">{ok}</div>}
+
+          <button
+            onClick={handleSubmit}
+            disabled={saving || previewRecords === 0}
+            className="btn primary"
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            {saving ? t('reg.bulk_creating') : t('reg.bulk_submit')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const PAGE_SIZE = 25
+type RangePreset = 'today' | '7d' | '14d' | '30d' | 'all' | 'custom'
+
 function presetRange(p: RangePreset, today: string): { from: string; to: string } | null {
   if (p === 'today') return { from: today, to: today }
   if (p === '7d')    return { from: shiftDays(today, -6),  to: today }
@@ -158,6 +362,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
   const [commentText, setCommentText] = useState('')
   const [commentSaving, setCommentSaving] = useState(false)
   const [page, setPage] = useState(1)
+  const [showBulk, setShowBulk] = useState(false)
 
   const toLocalInput = (ts: string) => {
     const d = new Date(ts)
@@ -480,10 +685,22 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
       {/* Timesheet approvals */}
       <TimesheetApprovalSection employees={employees} />
 
+      {/* Bulk modal */}
+      {showBulk && (
+        <BulkModal
+          employees={employees}
+          onClose={() => setShowBulk(false)}
+          onCreated={() => { load(); window.dispatchEvent(new Event('pg:records-changed')) }}
+        />
+      )}
+
       {/* Add new record */}
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SL>{t('reg.new_record')}</SL>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <SL>{t('reg.new_record')}</SL>
+            <button className="btn sm" onClick={() => setShowBulk(true)}>{t('reg.bulk_btn')}</button>
+          </div>
           <div className="field">
             <label>{t('reg.employee')}</label>
             <select value={newEmpId} onChange={e => setNewEmpId(e.target.value)} className="input">

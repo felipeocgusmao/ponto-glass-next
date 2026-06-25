@@ -63,6 +63,12 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
 
   useEffect(() => { load() }, [load])
 
+  // Auto-refresh every 60 seconds
+  useEffect(() => {
+    const id = setInterval(load, 60_000)
+    return () => clearInterval(id)
+  }, [load])
+
   useEffect(() => {
     if (employees.length === 0) return
     const fetchAll = async () => {
@@ -215,9 +221,12 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
   }), [empData])
 
   const PUNCH_LABEL: Record<string, string> = {
-    entrada: 'Entrada', 'saída': 'Saída',
-    inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço',
-    pausa_cafe: 'Pausa café', retorno_cafe: 'Retorno café',
+    entrada:       t('punch.entrada'),
+    'saída':       t('punch.saída'),
+    inicio_almoco: t('punch.inicio_almoco'),
+    fim_almoco:    t('punch.fim_almoco'),
+    pausa_cafe:    t('punch.pausa_cafe'),
+    retorno_cafe:  t('punch.retorno_cafe'),
   }
   const PUNCH_TONE: Record<string, string> = {
     entrada: 'success', 'saída': '', inicio_almoco: 'warn',
@@ -266,7 +275,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
         </div>
         <div className="page-actions">
           <button className="btn" onClick={load}>
-            <IconRefresh size={13} /> {t('common.retry').replace('Tentar novamente', 'Atualizar')}
+            <IconRefresh size={13} /> {t('dash.refresh_btn')}
           </button>
         </div>
       </div>
@@ -275,24 +284,24 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
       <div className="kpi-grid">
         {/* 1 - Working now */}
         <div className="kpi">
-          <div className="kpi-label"><IconPulse size={12} /> Trabalhando agora</div>
+          <div className="kpi-label"><IconPulse size={12} /> {t('dash.working_now')}</div>
           <div className="kpi-value tnum">
             {working}
             <span style={{ fontSize: 14, color: 'var(--fg-subtle)', fontWeight: 500 }}> / {employees.length}</span>
           </div>
           <div className="kpi-delta" style={{ gap: 6 }}>
-            {onBreak > 0 && <span className="chip warn dot">{onBreak} em pausa</span>}
+            {onBreak > 0 && <span className="chip warn dot">{onBreak} {t('dash.on_break')}</span>}
             {absent > 0 && <span className="chip outline">{absent} {t('dash.no_reg')}</span>}
           </div>
         </div>
 
         {/* 2 - Hours today */}
         <div className="kpi">
-          <div className="kpi-label"><IconClock size={12} /> Horas registadas hoje</div>
+          <div className="kpi-label"><IconClock size={12} /> {t('dash.hours_today')}</div>
           <div className="kpi-value tnum">{fmtMin(totalMinToday)}</div>
           <div className={`kpi-delta${todayVsAvg >= 0 ? ' up' : ' down'}`}>
             {todayVsAvg >= 0 ? <IconArrowUp size={11}/> : <IconArrowDown size={11}/>}
-            {fmtMin(Math.abs(todayVsAvg))} vs. média
+            {fmtMin(Math.abs(todayVsAvg))} {t('dash.vs_avg')}
           </div>
           <div className="kpi-spark">
             <Sparkline values={chartValues} />
@@ -301,22 +310,22 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
 
         {/* 3 - Cost today */}
         <div className="kpi">
-          <div className="kpi-label"><IconEuro size={12} /> Custos do dia</div>
+          <div className="kpi-label"><IconEuro size={12} /> {t('dash.cost_today')}</div>
           <div className="kpi-value tnum">{fmtCost(totalEarnings)}</div>
           <div className="kpi-delta">
-            Estimativa · {employees.filter(e => e.hourly_rate).length} c/ valor/h
+            {t('dash.cost_est').replace('{n}', String(employees.filter(e => e.hourly_rate).length))}
           </div>
         </div>
 
         {/* 4 - Hour bank */}
         <div className="kpi">
-          <div className="kpi-label"><IconBank size={12} /> Banco de horas</div>
+          <div className="kpi-label"><IconBank size={12} /> {t('dash.hour_bank')}</div>
           <div className="kpi-value tnum" style={{ color: totalBank >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
             {totalBank >= 0 ? '+' : ''}{fmtMin(totalBank)}
           </div>
           <div className="kpi-delta" style={{ gap: 6 }}>
-            {positiveBank > 0 && <span className="chip success">{positiveBank} positivos</span>}
-            {negativeBank > 0 && <span className="chip danger">{negativeBank} negativos</span>}
+            {positiveBank > 0 && <span className="chip success">{positiveBank} {t('dash.positives')}</span>}
+            {negativeBank > 0 && <span className="chip danger">{negativeBank} {t('dash.negatives')}</span>}
           </div>
         </div>
       </div>
@@ -327,8 +336,8 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
         <div className="card">
           <div className="card-head">
             <div>
-              <div className="card-title">Atividade ao vivo</div>
-              <div className="card-sub">Atualiza ao recarregar</div>
+              <div className="card-title">{t('dash.live_activity')}</div>
+              <div className="card-sub">{t('dash.refresh_btn')}</div>
             </div>
           </div>
           <div className="card-body flush">
@@ -345,10 +354,10 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                       <div className="cell-emp-info">
                         <div className="cell-emp-name">{emp.name}</div>
                         <div className="cell-emp-sub">
-                          {state === 'working' && since && <>desde {since}{stateFromPriorDay && <span style={{ color: 'var(--warning-fg)' }}> · sem saída anterior</span>}</>}
-                          {state === 'lunch'   && since && <>almoço desde {since}{stateFromPriorDay && ' (ontem)'}</>}
-                          {state === 'coffee'  && since && <>pausa café desde {since}{stateFromPriorDay && ' (ontem)'}</>}
-                          {state === 'off' && since && <>saiu às {since}</>}
+                          {state === 'working' && since && <>{t('dash.since')} {since}{stateFromPriorDay && <span style={{ color: 'var(--warning-fg)' }}> · {t('dash.no_prev_exit')}</span>}</>}
+                          {state === 'lunch'   && since && <>{t('dash.since')} {since}{stateFromPriorDay && ` ${t('dash.yesterday')}`}</>}
+                          {state === 'coffee'  && since && <>{t('dash.since')} {since}{stateFromPriorDay && ` ${t('dash.yesterday')}`}</>}
+                          {state === 'off' && since && <>{t('dash.left_at')} {since}</>}
                           {recs.length === 0 && <>{t('dash.no_reg_today')}</>}
                         </div>
                       </div>
@@ -362,10 +371,10 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                       </div>
                     </div>
                     <div data-col="chip" style={{ width: 90, flexShrink: 0 }}>
-                      {state === 'working' && <span className="chip success">Ativo</span>}
-                      {state === 'lunch'   && <span className="chip warn">Almoço</span>}
-                      {state === 'coffee'  && <span className="chip warn">Pausa</span>}
-                      {state === 'off' && recs.length > 0 && <span className="chip outline">Saiu</span>}
+                      {state === 'working' && <span className="chip success">{t('dash.state.active')}</span>}
+                      {state === 'lunch'   && <span className="chip warn">{t('dash.state.lunch')}</span>}
+                      {state === 'coffee'  && <span className="chip warn">{t('dash.state.coffee')}</span>}
+                      {state === 'off' && recs.length > 0 && <span className="chip outline">{t('dash.state.off')}</span>}
                       {recs.length === 0 && <span className="chip outline">—</span>}
                     </div>
                     <div data-col="earnings" style={{ width: 80, textAlign: 'right', flexShrink: 0 }} className="tnum muted">
@@ -382,12 +391,12 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
           {/* Upcoming events */}
           <div className="card">
             <div className="card-head">
-              <div className="card-title">Próximos eventos</div>
+              <div className="card-title">{t('dash.upcoming')}</div>
             </div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {upcoming.length === 0 ? (
                 <div style={{ fontSize: 12.5, color: 'var(--fg-muted)' }}>
-                  Nenhum feriado ou folga nos próximos 30 dias.
+                  {t('dash.no_upcoming')}
                 </div>
               ) : (
                 upcoming.map(exc => {
@@ -405,7 +414,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500 }}>{exc.description}</div>
                         <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
-                          {exc.type === 'holiday' ? 'Feriado' : exc.employee_id ? 'Folga individual' : 'Folga empresa'}
+                          {exc.type === 'holiday' ? t('dash.exc.holiday') : exc.employee_id ? t('dash.exc.individual') : t('dash.exc.company')}
                         </div>
                       </div>
                     </div>
@@ -419,7 +428,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
           {alertsCount > 0 && (
             <div className="card">
               <div className="card-head">
-                <div className="card-title">Atenção</div>
+                <div className="card-title">{t('dash.alerts')}</div>
                 <span className="chip warn">{alertsCount}</span>
               </div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -433,9 +442,9 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                         background: 'var(--warning)',
                       }} />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{emp.name} chegou {lateLabel} atrasado</div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{emp.name} {t('dash.arrived_late').replace('{label}', lateLabel)}</div>
                         <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
-                          bateu às {arrivedAt} · esperado {expectedAt}
+                          {t('dash.punched_at').replace('{time}', arrivedAt).replace('{expected}', expectedAt)}
                         </div>
                       </div>
                     </div>
@@ -450,7 +459,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{emp.name} {t('dash.no_reg_today')}</div>
                       <div style={{ fontSize: 11.5, color: 'var(--fg-subtle)' }}>
-                        Nenhuma batida registada
+                        {t('dash.no_punch_row')}
                       </div>
                     </div>
                   </div>
@@ -466,7 +475,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
         {/* Bar chart */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="card-head">
-            <div className="card-title">Horas trabalhadas · últimos {chartDays.length} dias úteis</div>
+            <div className="card-title">{t('dash.chart_title').replace('{n}', String(chartDays.length))}</div>
           </div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', flex: 1 }}>
             {/* Split the chart into a bars row (flex:1 → has a resolvable height for the % bars)
@@ -515,7 +524,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
         {/* Recent punches */}
         <div className="card">
           <div className="card-head">
-            <div className="card-title">Últimas batidas</div>
+            <div className="card-title">{t('dash.last_punches')}</div>
           </div>
           <div className="card-body flush">
             {recentPunches.length === 0 ? (
