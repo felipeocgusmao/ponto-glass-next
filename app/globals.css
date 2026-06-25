@@ -199,6 +199,9 @@ ul, ol { list-style: none; }
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
+  /* Clear the notch so the brand row isn't hidden under the status bar
+     (env() resolves to 0 on screens without safe areas). */
+  padding-top: env(safe-area-inset-top, 0px);
   background: rgba(248,248,250,0.68);
   border-right: 1px solid var(--border);
   overflow: hidden;
@@ -312,7 +315,15 @@ ul, ol { list-style: none; }
 .main { display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .topbar {
   display: flex; align-items: center; gap: 12px;
-  padding: 0 18px; height: 49px;
+  padding: 0 18px;
+  /* Pad past the status bar / notch and grow the bar so its frosted glass
+     extends edge-to-edge under the iOS safe area (no black bar at the top). */
+  padding-top: env(safe-area-inset-top, 0px);
+  height: calc(49px + env(safe-area-inset-top, 0px));
+  /* The bar (and its overflowing notifications popover) owns a stacking context
+     that sits above the page; without this, cards with backdrop-filter paint
+     on top of the dropdown. */
+  position: relative; z-index: 50;
   border-bottom: 1px solid var(--border);
   background: rgba(250,250,252,0.75); flex-shrink: 0;
   backdrop-filter: blur(20px) saturate(1.6);
@@ -397,7 +408,8 @@ ul, ol { list-style: none; }
 @media (max-width: 560px) {
   .notif-pop {
     position: fixed;
-    top: 56px;          /* topbar height (49px) + 6px gap + 1px border */
+    /* topbar height (49px) + 6px gap + 1px border, below the notch */
+    top: calc(56px + env(safe-area-inset-top, 0px));
     left: 8px; right: 8px;
     width: auto; max-width: none;
   }
@@ -407,6 +419,8 @@ ul, ol { list-style: none; }
 /* ─── Page ─── */
 .page {
   flex: 1; overflow: auto; padding: var(--section-pad);
+  /* Keep the last cards clear of the home-indicator safe area. */
+  padding-bottom: calc(var(--section-pad) + env(safe-area-inset-bottom, 0px));
   display: flex; flex-direction: column; gap: var(--section-pad); min-width: 0; min-height: 0;
 }
 .page > * { flex-shrink: 0; }
@@ -625,36 +639,6 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 }
 .topbar-hamburger:hover { background: var(--hover); color: var(--fg); }
 
-/* ─── Employee shell sidebar — always a fixed drawer regardless of screen size.
-     Embedded webviews (Teams, WKWebView) may report viewport > 1024px even on a
-     phone, so a max-width media query is not reliable. We default to the drawer
-     pattern and only restore the persistent sidebar on genuine wide screens. ─── */
-.emp-shell .sidebar {
-  position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
-  z-index: 100; transform: translateX(-100%);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--shadow-lg);
-}
-.emp-shell .sidebar.mobile-open { transform: translateX(0); }
-.emp-shell .sidebar-overlay {
-  position: fixed; inset: 0; z-index: 99;
-  background: rgba(0,0,0,0.08);
-  backdrop-filter: blur(10px) saturate(1.5);
-  -webkit-backdrop-filter: blur(10px) saturate(1.5);
-  animation: pg-fadeIn 0.2s ease;
-}
-[data-theme="dark"] .emp-shell .sidebar-overlay { background: rgba(0,0,0,0.18); }
-/* When the drawer is open and the sidebar was in collapsed state, show labels */
-.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
-.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-label,
-.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item-badge,
-.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-section-label,
-.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user-meta { display: block; }
-.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-item { justify-content: flex-start; padding: 6px 10px; }
-.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-user { justify-content: flex-start; }
-.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-head { padding: 14px 18px; justify-content: flex-start; }
-.emp-shell[data-collapsed="true"] .sidebar.mobile-open .sb-collapse { display: none; }
-
 /* ─── Desktop layout at ≥ 1280px — restores persistent sidebar for both shells ─── */
 @media (min-width: 1280px) {
   /* Admin panel: restore in-flow sidebar */
@@ -664,19 +648,10 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
   .topbar-hamburger { display: none; }
   .topbar-search { display: inline-flex; }
 
-  /* Employee shell: restore in-flow sidebar */
-  .emp-shell {
-    grid-template-columns: var(--sidebar-w, 240px) 1fr;
-    transition: grid-template-columns 0.2s ease;
-  }
-  .emp-shell .sidebar {
-    position: relative; transform: none; box-shadow: none;
-    height: 100vh; height: 100dvh; transition: none;
-  }
-  .emp-topbar-hamburger { display: none; }
-  .emp-main { display: grid; place-items: center; padding: 32px 20px; }
+  /* Employee ponto card now lives in .page (a flex column); centre it on wide
+     screens instead of stretching the full content width. */
   .emp-card {
-    max-width: 520px; padding: 36px 32px 28px;
+    max-width: 520px; margin-inline: auto; padding: 36px 32px 28px;
     border-radius: var(--r-xl);
   }
   .emp-clock-time { font-size: 64px; }
@@ -801,47 +776,13 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 @keyframes pg-slideUp { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes pg-spin { to { transform: rotate(360deg); } }
 
-/* ─── Employee shell — same layout model as .app (no position:fixed) ─── */
-.emp-shell {
-  display: grid;
-  grid-template-columns: 1fr; /* sidebar is always a fixed drawer; never in grid */
-  height: 100vh; height: 100dvh;
-  background: var(--bg-app);
-  overflow: hidden;
-}
-.emp-shell[data-collapsed="true"] { --sidebar-w: 56px; }
-.emp-content { display: flex; flex-direction: column; overflow: hidden; min-height: 0; min-width: 0; }
-.emp-topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 16px 0 8px; border-bottom: 1px solid var(--border);
-  background: rgba(250,250,252,0.75); flex-shrink: 0; height: 49px; gap: 8px;
-  backdrop-filter: blur(20px) saturate(1.6);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-}
-[data-theme="dark"] .emp-topbar { background: rgba(255,255,255,0.04); }
-.emp-topbar-hamburger {
-  width: 32px; height: 32px; display: grid; place-items: center; /* always visible */
-  border-radius: var(--r-sm); color: var(--fg-subtle); flex-shrink: 0;
-}
-.emp-topbar-hamburger:hover { background: var(--hover); color: var(--fg); }
+/* ─── Employee topbar user menu (the ponto page reuses the shared .app /
+   .main / .topbar / .page shell; only these content pieces are bespoke) ─── */
 .emp-user-menu { display: flex; align-items: center; gap: 12px; }
 .emp-user-info { text-align: right; line-height: 1.2; }
 .emp-user-name { font-size: 13px; font-weight: 550; color: var(--fg); }
 .emp-user-role { font-size: 11px; color: var(--fg-subtle); }
-/* Mobile-first main: flex column, full width, no grid centering */
-.emp-main { flex: 1; overflow: auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: stretch; padding: 16px 12px; }
 
-/* emp-shell collapsed sidebar rules (only relevant on desktop ≥ 1280px) */
-.emp-shell[data-collapsed="true"] .sb-brand,
-.emp-shell[data-collapsed="true"] .sb-item-label,
-.emp-shell[data-collapsed="true"] .sb-item-badge,
-.emp-shell[data-collapsed="true"] .sb-section-label,
-.emp-shell[data-collapsed="true"] .sb-user-meta { display: none; }
-.emp-shell[data-collapsed="true"] .sb-head { padding: 14px 12px; justify-content: center; }
-.emp-shell[data-collapsed="true"] .sb-logo { display: none; }
-.emp-shell[data-collapsed="true"] .sb-collapse { width: 32px; height: 32px; }
-.emp-shell[data-collapsed="true"] .sb-item { justify-content: center; padding: 6px; }
-.emp-shell[data-collapsed="true"] .sb-user { justify-content: center; }
 /* Mobile-first card: full width, compact padding */
 .emp-card {
   width: 100%; max-width: 100%; background: rgba(255,255,255,0.52); border: 1px solid var(--border);
