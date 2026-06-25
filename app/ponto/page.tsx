@@ -18,6 +18,7 @@ type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes' | 'perfil'
 
 type CorrectionStatus = 'pending' | 'approved' | 'rejected'
 interface CorrReq { id: string; req_type: string; req_timestamp: string; req_date: string; reason: string | null; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
+interface CompReq { id: string; date: string; hours_requested: number; reason: string; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
 
 // Fallback map used only when t() key lookup fails (e.g. SSR without context)
 const PUNCH_LABEL_PT: Record<string, string> = {
@@ -134,6 +135,19 @@ export default function PontoPage() {
   const [bankBalance, setBankBalance] = useState<number | null>(null)
   const [bankLoading, setBankLoading] = useState(false)
   const [bankLoaded, setBankLoaded] = useState(false)
+
+  // compensation request state (inside banco tab)
+  const [compList, setCompList] = useState<CompReq[]>([])
+  const [compLoaded, setCompLoaded] = useState(false)
+  const [compLoading, setCompLoading] = useState(false)
+  const [compDate, setCompDate] = useState('')
+  const [compHours, setCompHours] = useState('')
+  const [compReason, setCompReason] = useState('')
+  const [compSubmitting, setCompSubmitting] = useState(false)
+  const [compMsg, setCompMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  // geolocation distance state
+  const [geoDistance, setGeoDistance] = useState<number | null>(null)
 
   // corrections tab state
   const [corrList, setCorrList] = useState<CorrReq[]>([])
@@ -264,8 +278,43 @@ export default function PontoPage() {
     finally { setCorrLoading(false) }
   }, [corrLoaded])
 
+  const loadCompensation = useCallback(async () => {
+    if (compLoaded) return
+    setCompLoading(true)
+    try {
+      const res = await fetch('/api/compensation-requests')
+      if (res.ok) { setCompList(await res.json()); setCompLoaded(true) }
+    } catch { /* keep */ }
+    finally { setCompLoading(false) }
+  }, [compLoaded])
+
+  const submitCompensation = async () => {
+    if (!compHours || parseFloat(compHours) <= 0) { setCompMsg({ ok: false, text: t('comp.hours_req') }); return }
+    if (!compDate) { setCompMsg({ ok: false, text: t('comp.date_req') }); return }
+    if (!compReason.trim()) { setCompMsg({ ok: false, text: t('comp.reason_req') }); return }
+    setCompSubmitting(true); setCompMsg(null)
+    try {
+      const res = await fetch('/api/compensation-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: compDate, hours_requested: parseFloat(compHours), reason: compReason.trim() }),
+      })
+      if (res.ok) {
+        setCompMsg({ ok: true, text: t('comp.success') })
+        setCompHours(''); setCompReason('')
+        setCompLoaded(false)
+        await loadCompensation()
+      } else {
+        const d = await res.json()
+        setCompMsg({ ok: false, text: d.error ?? t('comp.err.generic') })
+      }
+    } catch { setCompMsg({ ok: false, text: t('comp.err.connect') }) }
+    finally { setCompSubmitting(false) }
+  }
+
   const submitCorrection = async () => {
     if (!corrDate || !corrTime || !corrType) return
+    if (!corrReason.trim()) { setCorrMsg({ ok: false, text: t('corr.reason_req') }); return }
     setCorrSubmitting(true); setCorrMsg(null)
     try {
       // Convert the chosen local wall-clock to a UTC instant, exactly like real punches
@@ -326,7 +375,9 @@ export default function PontoPage() {
   useEffect(() => { if (user) setProfileEmail(user.email ?? '') }, [user])
   useEffect(() => {
     const n = new Date()
-    setCorrDate(businessDate(n))
+    const today = businessDate(n)
+    setCorrDate(today)
+    setCompDate(today)
     setCorrTime(`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`)
   }, [])
 
@@ -361,6 +412,30 @@ export default function PontoPage() {
     }, 30_000)
     return () => clearInterval(iv)
   }, [loadRecords])
+
+  // Real-time geolocation distance indicator (30s interval when user has a workplace set)
+  useEffect(() => {
+    if (!user || !user.workplace_lat || user.geo_mode === 'disabled') return
+
+    function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+      const R = 6371000
+      const dLat = (lat2 - lat1) * Math.PI / 180
+      const dLng = (lng2 - lng1) * Math.PI / 180
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    }
+
+    const update = async () => {
+      if (document.visibilityState !== 'visible') return
+      const geo = await getGeo()
+      if (!geo) return
+      setGeoDistance(Math.round(haversineM(user.workplace_lat!, user.workplace_lng!, geo.lat, geo.lng)))
+    }
+
+    update()
+    const iv = setInterval(update, 30_000)
+    return () => clearInterval(iv)
+  }, [user])
 
   // Push notifications: 15-min warning + overtime alert.
   // Runs on its own 60s interval so it does not re-run on every clock tick.
@@ -490,9 +565,9 @@ export default function PontoPage() {
 
   useEffect(() => {
     if (tab === 'historico') loadHistory()
-    if (tab === 'banco') loadBank()
+    if (tab === 'banco') { loadBank(); loadCompensation() }
     if (tab === 'correcoes') loadCorrections()
-  }, [tab, loadHistory, loadBank, loadCorrections])
+  }, [tab, loadHistory, loadBank, loadCorrections, loadCompensation])
 
   useEffect(() => {
     if (tab !== 'correcoes' || !corrLoaded) return
@@ -952,6 +1027,22 @@ export default function PontoPage() {
               )}
             </div>
 
+            {/* Geolocation distance indicator */}
+            {geoDistance !== null && user.workplace_lat != null && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 11, color: geoDistance <= (user.max_distance_meters ?? 200) ? 'var(--success-fg)' : 'var(--fg-muted)',
+                justifyContent: 'center', marginBottom: 4,
+              }}>
+                <span>📍</span>
+                <span>
+                  {geoDistance <= (user.max_distance_meters ?? 200)
+                    ? t('geo.inside')
+                    : t('geo.distance_m').replace('{n}', String(geoDistance))}
+                </span>
+              </div>
+            )}
+
             <div className="emp-history">
               <div className="emp-history-head">
                 <span>{t('ponto.today_history')}</span>
@@ -1190,6 +1281,59 @@ export default function PontoPage() {
             {!bankLoading && bankBalance === null && (
               <div className="alert-inline info">{t('bank.load_error')}</div>
             )}
+
+            {/* ── Compensation request form ──────────────────────────────── */}
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 20, paddingTop: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 14 }}>
+                {t('comp.title')}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div className="field" style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('comp.date')}</label>
+                    <input type="date" className="input" value={compDate} onChange={e => setCompDate(e.target.value)} max={businessDate()} />
+                  </div>
+                  <div className="field" style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('comp.hours')}</label>
+                    <input type="number" min="0.5" max="24" step="0.5" className="input" value={compHours} onChange={e => setCompHours(e.target.value)} placeholder="ex: 2" />
+                  </div>
+                </div>
+                <div className="field">
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('comp.reason')} <span style={{ color: 'var(--danger-fg)' }}>*</span></label>
+                  <input type="text" className="input" value={compReason} onChange={e => setCompReason(e.target.value)} placeholder={t('comp.reason_ph').replace('{date}', compDate || '—')} />
+                </div>
+                {compMsg && <div className={`alert-inline ${compMsg.ok ? 'ok' : 'err'}`}>{compMsg.text}</div>}
+                <button className="btn-emp primary-big" onClick={submitCompensation} disabled={compSubmitting}>
+                  {compSubmitting ? t('comp.submitting') : t('comp.submit')}
+                </button>
+              </div>
+
+              {compLoading && <div className="alert-inline info">{t('common.loading')}</div>}
+
+              {compLoaded && compList.length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 10 }}>
+                    {t('comp.my_requests')}
+                  </div>
+                  {compList.map(cr => (
+                    <div key={cr.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500 }}>{cr.date.split('-').reverse().join('/')} · {cr.hours_requested}h</span>
+                        <span className={`chip ${cr.status === 'approved' ? 'success' : cr.status === 'rejected' ? 'danger' : 'warn'}`} style={{ fontSize: 10 }}>
+                          {t(`comp.status.${cr.status}` as Parameters<typeof t>[0])}
+                        </span>
+                      </div>
+                      {cr.reason && <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontStyle: 'italic' }}>&ldquo;{cr.reason}&rdquo;</div>}
+                      {cr.reviewer_note && (
+                        <div style={{ marginTop: 6, padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', borderLeft: '2px solid var(--accent)', fontSize: 11, color: 'var(--fg-muted)' }}>
+                          {t('comp.reviewer_note')}: {cr.reviewer_note}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
           </div>
         )}
         {/* ── CORREÇÕES TAB ─────────────────────────────────────────────── */}
@@ -1255,7 +1399,11 @@ export default function PontoPage() {
                         </span>
                       </div>
                       {cr.reason && <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontStyle: 'italic' }}>&ldquo;{cr.reason}&rdquo;</div>}
-                      {cr.reviewer_note && <div style={{ fontSize: 11, color: 'var(--danger-fg)', marginTop: 2 }}>{t('corr.reviewer_note')}: &ldquo;{cr.reviewer_note}&rdquo;</div>}
+                      {cr.reviewer_note && (
+                        <div style={{ marginTop: 6, padding: '6px 10px', background: cr.status === 'rejected' ? 'rgba(239,68,68,0.08)' : 'var(--surface-2)', borderRadius: 'var(--r-sm)', borderLeft: `2px solid ${cr.status === 'rejected' ? 'var(--danger-fg)' : 'var(--accent)'}`, fontSize: 11, color: cr.status === 'rejected' ? 'var(--danger-fg)' : 'var(--fg-muted)' }}>
+                          {t('corr.reviewer_note')}: {cr.reviewer_note}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

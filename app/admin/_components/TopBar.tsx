@@ -17,6 +17,7 @@ const PAGE_TITLES: Record<Tab, string> = {
   correcoes:    'tab.correcoes',
   funcionarios: 'tab.funcionarios',
   banco:        'tab.banco',
+  ausencias:    'tab.ausencias',
   feriados:     'tab.feriados',
   relatorios:   'tab.relatorios',
   auditoria:    'tab.auditoria',

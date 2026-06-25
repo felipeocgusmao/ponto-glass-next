@@ -20,6 +20,13 @@ export function IntegracoesTab() {
   const [adding, setAdding] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  // Kiosk token state
+  const [kioskToken, setKioskToken] = useState<string | null>(null)
+  const [kioskLoading, setKioskLoading] = useState(true)
+  const [kioskGenerating, setKioskGenerating] = useState(false)
+  const [kioskErr, setKioskErr] = useState<string | null>(null)
+  const [kioskCopied, setKioskCopied] = useState(false)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -29,7 +36,35 @@ export function IntegracoesTab() {
     finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  const loadKiosk = useCallback(async () => {
+    setKioskLoading(true)
+    try {
+      const res = await fetch('/api/kiosk/token')
+      if (res.ok) { const d = await res.json(); setKioskToken(d.token ?? null) }
+    } catch { /* silent */ }
+    finally { setKioskLoading(false) }
+  }, [])
+
+  const generateToken = async () => {
+    setKioskGenerating(true); setKioskErr(null)
+    try {
+      const res = await fetch('/api/kiosk/token', { method: 'POST' })
+      if (res.ok) { const d = await res.json(); setKioskToken(d.token) }
+      else setKioskErr(t('kiosk.admin.err'))
+    } catch { setKioskErr(t('kiosk.admin.err')) }
+    finally { setKioskGenerating(false) }
+  }
+
+  const copyKioskUrl = () => {
+    if (!kioskToken) return
+    const url = `${window.location.origin}/kiosk?token=${kioskToken}`
+    navigator.clipboard.writeText(url).then(() => {
+      setKioskCopied(true)
+      setTimeout(() => setKioskCopied(false), 2000)
+    })
+  }
+
+  useEffect(() => { load(); loadKiosk() }, [load, loadKiosk])
 
   const add = async () => {
     if (!newUrl.startsWith('https://')) { setMsg({ ok: false, text: t('integ.url_https') }); return }
@@ -113,6 +148,43 @@ export function IntegracoesTab() {
           <div style={{ fontSize: 12, color: 'var(--fg-muted)', padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)' }}>
             {t('integ.hint')}
           </div>
+        </div>
+      </div>
+
+      {/* Kiosk token */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13 }}>{t('kiosk.admin.title')}</div>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>{t('kiosk.admin.desc')}</div>
+          {kioskLoading ? (
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>{t('common.loading')}</div>
+          ) : kioskToken ? (
+            <>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 4 }}>{t('kiosk.admin.link_label')}</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <code style={{ fontSize: 12, padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', wordBreak: 'break-all', flex: 1 }}>
+                    {typeof window !== 'undefined' ? `${window.location.origin}/kiosk?token=${kioskToken}` : `/kiosk?token=${kioskToken}`}
+                  </code>
+                  <button className="btn ghost sm" onClick={copyKioskUrl}>
+                    {kioskCopied ? t('kiosk.admin.copied') : '📋'}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <button className="btn ghost sm" onClick={generateToken} disabled={kioskGenerating}>
+                  {kioskGenerating ? t('kiosk.admin.generating') : t('kiosk.admin.regenerate')}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div>
+              <button className="btn primary" onClick={generateToken} disabled={kioskGenerating}>
+                {kioskGenerating ? t('kiosk.admin.generating') : t('kiosk.admin.generate')}
+              </button>
+            </div>
+          )}
+          {kioskErr && <div className="alert-inline err">{kioskErr}</div>}
         </div>
       </div>
 

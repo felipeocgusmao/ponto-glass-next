@@ -27,6 +27,7 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   correcoes:    <IconEdit size={15} />,
   funcionarios: <IconUsers size={15} />,
   banco:        <IconBank size={15} />,
+  ausencias:    <IconUsers size={15} />,
   feriados:     <IconCalendar size={15} />,
   relatorios:   <IconBar size={15} />,
   auditoria:    <IconAudit size={15} />,

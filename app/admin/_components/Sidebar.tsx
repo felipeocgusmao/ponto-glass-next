@@ -19,6 +19,7 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   correcoes:    <IconEdit />,
   funcionarios: <IconUsers />,
   banco:        <IconBank />,
+  ausencias:    <IconUsers />,
   feriados:     <IconCalendar />,
   relatorios:   <IconBar />,
   auditoria:    <IconAudit />,
@@ -41,7 +42,7 @@ const NAV_GROUPS: { key: string; labels: Record<Lang, string>; tabs: Tab[] }[] =
   {
     key: 'analise',
     labels: { 'pt-PT': 'Análise', 'pt-BR': 'Análise', 'en': 'Analysis', 'es': 'Análisis' },
-    tabs: ['relatorios', 'auditoria'],
+    tabs: ['relatorios', 'ausencias', 'auditoria'],
   },
   {
     key: 'sistema',
