@@ -31,6 +31,15 @@ const PUNCH_TONE: Record<string, string> = {
   'saída': 'danger', inicio_almoco: 'warn', pausa_cafe: 'warn',
 }
 
+// Topbar breadcrumb labels per tab (mirrors the admin panel's title chip).
+const TAB_TITLES: Record<Tab, 'tab.meu_ponto' | 'tab.registros' | 'tab.banco' | 'tab.correcoes' | 'tab.perfil'> = {
+  ponto:     'tab.meu_ponto',
+  historico: 'tab.registros',
+  banco:     'tab.banco',
+  correcoes: 'tab.correcoes',
+  perfil:    'tab.perfil',
+}
+
 function getWorkState(recs: PunchRecord[]): { state: WorkState; since: string | null } {
   if (!recs.length) return { state: 'absent', since: null }
   const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -862,6 +871,13 @@ export default function PontoPage() {
               <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
             </svg>
           </button>
+          <div className="breadcrumbs">
+            <span className="crumb">PontoGlass</span>
+            <span className="sep">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </span>
+            <span className="crumb current">{t(TAB_TITLES[tab])}</span>
+          </div>
           <div style={{ flex: 1 }} />
           <button
             className="emp-user-menu"
