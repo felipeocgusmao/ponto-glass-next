@@ -22,7 +22,7 @@ export async function createJWT(payload: JWTUser): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('8h')
+    .setExpirationTime('30d')
     .sign(getSecret())
 }
 

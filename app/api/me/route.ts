@@ -3,8 +3,20 @@ import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
 import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
-import { createPasswordResetToken } from '@/lib/auth'
+import { createJWT, createPasswordResetToken } from '@/lib/auth'
 import { sendEmailVerification } from '@/lib/email'
+
+const SESSION_MAX_AGE = 60 * 60 * 24 * 30
+
+function setSessionCookie(res: NextResponse, token: string) {
+  res.cookies.set('ponto_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: SESSION_MAX_AGE,
+    path: '/',
+  })
+}
 
 export async function GET() {
   const token = cookies().get('ponto_token')?.value
@@ -13,6 +25,13 @@ export async function GET() {
   let user: ApiUser
   try { user = await verifyApiAuth(token) }
   catch { return NextResponse.json({ error: 'Invalid token' }, { status: 401 }) }
+
+  // Sliding session: reissue the cookie on every successful /api/me call so the
+  // 30-day window resets from last active use rather than from initial login.
+  const fresh = await createJWT({
+    id: user.id, name: user.name, username: user.username,
+    role: user.role, tenant_id: user.tenant_id,
+  }).catch(() => null)
 
   // Try the extended profile first; if a newer column is missing from the DB
   // (migration not applied), fall back to the basic set so the user can still
@@ -23,7 +42,11 @@ export async function GET() {
     .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
     .maybeSingle()
-  if (ext.data) return NextResponse.json(ext.data)
+  if (ext.data) {
+    const res = NextResponse.json(ext.data)
+    if (fresh) setSessionCookie(res, fresh)
+    return res
+  }
 
   const basic = await supabase
     .from('employees')
@@ -32,7 +55,9 @@ export async function GET() {
     .eq('id', user.id)
     .maybeSingle()
   if (!basic.data) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
-  return NextResponse.json(basic.data)
+  const res = NextResponse.json(basic.data)
+  if (fresh) setSessionCookie(res, fresh)
+  return res
 }
 
 export async function PATCH(request: NextRequest) {
