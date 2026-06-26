@@ -139,6 +139,42 @@ export default function PontoPage() {
   )
   const { state: stateMemo, since: sinceMemo } = useMemo(() => getWorkState(myRecsMemo), [myRecsMemo])
 
+  // History tab helpers — must be before early returns (rules of hooks)
+  const lunchBreakMin = user?.lunch_break_minutes ?? 60
+  const { byDay, sortedDays, totalMonthMin, absentDays } = useMemo(() => {
+    const byDay = new Map<string, PunchRecord[]>()
+    historyRecs.forEach(r => {
+      if (!byDay.has(r.date)) byDay.set(r.date, [])
+      byDay.get(r.date)!.push(r)
+    })
+    const sortedDays = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a))
+    const totalMonthMin = sortedDays.reduce((sum, date) => {
+      const recs = byDay.get(date)!
+      const exact = calcNetMinutes(recs, lunchBreakMin)
+      return sum + roundToQuarter(exact)
+    }, 0)
+    const absentDays: string[] = (() => {
+      if (!historyLoaded || (historyRecs.length === 0 && sortedDays.length === 0)) return []
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const { year, month } = histYM
+      const firstOfMonth = `${year}-${pad(month + 1)}-01`
+      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+      const monthEnd = `${year}-${pad(month + 1)}-${pad(lastDay)}`
+      const today = businessDate()
+      const cur = new Date(firstOfMonth + 'T12:00:00')
+      const end = new Date((monthEnd > today ? today : monthEnd) + 'T12:00:00')
+      const absent: string[] = []
+      while (cur <= end) {
+        const d = cur.getDay()
+        const iso = cur.toISOString().split('T')[0]
+        if (d !== 0 && d !== 6 && !byDay.has(iso) && !historyExceptions.includes(iso)) absent.push(iso)
+        cur.setDate(cur.getDate() + 1)
+      }
+      return absent
+    })()
+    return { byDay, sortedDays, totalMonthMin, absentDays }
+  }, [historyRecs, histYM, historyLoaded, historyExceptions, lunchBreakMin])
+
   // Extracted hooks
   const { geoDistance } = useGeofence({
     user, records, loadRecords,
@@ -566,41 +602,6 @@ export default function PontoPage() {
   const mm = now ? String(now.getMinutes()).padStart(2, '0') : '--'
   const ss = now ? String(now.getSeconds()).padStart(2, '0') : '--'
   const greeting = now && now.getHours() < 12 ? t('ponto.greeting.morning') : now && now.getHours() < 19 ? t('ponto.greeting.afternoon') : t('ponto.greeting.evening')
-
-  // ── History tab helpers ──────────────────────────────────────────────────────
-  const { byDay, sortedDays, totalMonthMin, absentDays } = useMemo(() => {
-    const byDay = new Map<string, PunchRecord[]>()
-    historyRecs.forEach(r => {
-      if (!byDay.has(r.date)) byDay.set(r.date, [])
-      byDay.get(r.date)!.push(r)
-    })
-    const sortedDays = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a))
-    const totalMonthMin = sortedDays.reduce((sum, date) => {
-      const recs = byDay.get(date)!
-      const exact = calcNetMinutes(recs, user.lunch_break_minutes)
-      return sum + roundToQuarter(exact)
-    }, 0)
-    const absentDays: string[] = (() => {
-      if (!historyLoaded || (historyRecs.length === 0 && sortedDays.length === 0)) return []
-      const pad = (n: number) => String(n).padStart(2, '0')
-      const { year, month } = histYM
-      const firstOfMonth = `${year}-${pad(month + 1)}-01`
-      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
-      const monthEnd = `${year}-${pad(month + 1)}-${pad(lastDay)}`
-      const today = businessDate()
-      const cur = new Date(firstOfMonth + 'T12:00:00')
-      const end = new Date((monthEnd > today ? today : monthEnd) + 'T12:00:00')
-      const absent: string[] = []
-      while (cur <= end) {
-        const d = cur.getDay()
-        const iso = cur.toISOString().split('T')[0]
-        if (d !== 0 && d !== 6 && !byDay.has(iso) && !historyExceptions.includes(iso)) absent.push(iso)
-        cur.setDate(cur.getDate() + 1)
-      }
-      return absent
-    })()
-    return { byDay, sortedDays, totalMonthMin, absentDays }
-  }, [historyRecs, histYM, historyLoaded, historyExceptions, user.lunch_break_minutes])
 
   const _todayBiz = businessDate()
   const isCurrentHistMonth = histYM.year === Number(_todayBiz.slice(0, 4)) && histYM.month === Number(_todayBiz.slice(5, 7)) - 1
