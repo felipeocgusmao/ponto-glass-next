@@ -23,7 +23,7 @@ flowchart LR
 
 - **Edge middleware** — valida apenas a assinatura do JWT (sem DB), redireciona não-autenticados para `/login`, encaminha por role (`admin`/`manager` → `/admin`, `employee` → `/ponto`).
 - **API routes** — verificação completa via `verifyApiAuth` (sig + utilizador ativo + `sessions_valid_from` ≥ `iat` do token).
-- **Supabase** — única fonte de verdade. As routes correm com a `service_role` key, RLS desativada por simplicidade (proteção é feita por role via middleware + apiAuth).
+- **Supabase** — única fonte de verdade. As routes correm com a `service_role` key (que ignora RLS). Isolamento entre tenants é feito por filtragem `.eq('tenant_id', ...)` em cada query. RLS está habilitada como defesa em profundidade para o role `anon` — ver [`docs/SECURITY.md`](./SECURITY.md#row-level-security-rls).
 - **Vercel Cron** — endpoints `/api/cron/absence-check` e `/api/cron/missing-exit` protegidos por `Bearer ${CRON_SECRET}`.
 - **GitHub Actions Cron** — `/api/cron/entry-reminder` chamado a cada 5 min em dias úteis (Vercel Hobby não suporta cron sub-diário; ver `.github/workflows/entry-reminder.yml`).
 
@@ -91,8 +91,8 @@ sequenceDiagram
   L->>DB: SELECT * FROM employees WHERE username=? AND active=true
   DB-->>L: row + password_hash
   L->>L: bcrypt.compare
-  L->>L: createJWT (HS256, 8h, iat=now)
-  L-->>U: Set-Cookie: ponto_token (httpOnly, secure, sameSite=lax, maxAge=8h)
+  L->>L: createJWT (HS256, 30d, iat=now)
+  L-->>U: Set-Cookie: ponto_token (httpOnly, secure, sameSite=lax, maxAge=30d)
   U->>U: router.push(role==employee ? /ponto : /admin)
 ```
 
@@ -468,7 +468,7 @@ A escolha inicial é detectada via `navigator.language` na primeira visita.
 | Edge middleware só com signature | Latência mínima, sem DB hops por request |
 | Verificação completa só nas API routes | Custo aceitável (já há query ao DB), permite revogação fina |
 | Service role key só no servidor | Cliente nunca tem permissões diretas no DB |
-| Sem RLS no Postgres | Simplicidade — proteção é centralizada nas API routes |
+| RLS habilitada para `anon`, ignorada pelo `service_role` server-side | Defesa em profundidade sem alterar queries existentes — ver [SECURITY.md](./SECURITY.md#row-level-security-rls) |
 | Records.date no fuso local | Relatórios consistentes para a empresa, independente do fuso do servidor |
 | Lunch deduction só após saída | Display ao vivo mostra tempo bruto (não confunde o trabalhador) |
 | Soft delete de funcionários | Preserva histórico de records e audit logs |
