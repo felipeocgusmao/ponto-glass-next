@@ -12,6 +12,8 @@ import { PerfilTab } from './_components/PerfilTab'
 import { calcNetMinutes, roundToQuarter, businessDate, empColor, avatarInitials, getWorkState, calcLiveMin } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
+import { apiFetch } from '@/lib/apiFetch'
+import { ErrorBoundary } from '@/app/_components/ErrorBoundary'
 import SettingsModal from '@/app/admin/_components/SettingsModal'
 import { usePunchData } from './_lib/usePunchData'
 import { useThemeSettings } from '@/lib/hooks/useThemeSettings'
@@ -109,6 +111,9 @@ export default function PontoPage() {
 
   // punch-out confirmation
   const [confirmingOut, setConfirmingOut] = useState(false)
+
+  // persistent inline error after a failed punch (clears on next success)
+  const [punchError, setPunchError] = useState<string | null>(null)
 
   // auto-exit banner
   const [autoExitBanner, setAutoExitBanner] = useState<string | null>(null)
@@ -495,7 +500,7 @@ export default function PontoPage() {
     setRecords(prev => [...prev, optimisticRec])
 
     try {
-      const res = await fetch('/api/punch', {
+      const res = await apiFetch('/api/punch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, ...(geo ? { latitude: geo.lat, longitude: geo.lng } : {}) }),
@@ -505,12 +510,15 @@ export default function PontoPage() {
         // Replace optimistic record with the authoritative server record
         setRecords(prev => [...prev.filter(r => r.id !== tempId), rec])
         setHistoryLoaded(false)
+        setPunchError(null)
         showToast(type === 'entrada' ? t('ponto.registered_in') : type === 'saída' ? t('ponto.registered_out') : t(`punch.${type}` as Parameters<typeof t>[0]))
         loadRecords()
       } else {
         setRecords(prev => prev.filter(r => r.id !== tempId))
         const d = await res.json()
-        showToast(d.error ?? 'Erro ao registrar')
+        const errMsg = d.error ?? t('ponto.connect_error')
+        setPunchError(errMsg)
+        showToast(errMsg)
       }
     } catch {
       setRecords(prev => prev.filter(r => r.id !== tempId))
@@ -767,6 +775,7 @@ export default function PontoPage() {
 
         {/* ── TAB CONTENT (key forces remount for enter animation) ─────────── */}
         <div key={tab} className="tab-fade" role="tabpanel" id={`tabpanel-${tab}`} aria-label={t(TAB_TITLES[tab])}>
+        <ErrorBoundary>
         {/* ── PONTO TAB ─────────────────────────────────────────────────────── */}
         {tab === 'ponto' && (
           <PontoTab
@@ -776,6 +785,7 @@ export default function PontoPage() {
             hh={hh} mm={mm} ss={ss} greeting={greeting}
             myRecs={myRecs} punching={punching} punch={punch}
             geoDistance={geoDistance} setConfirmingOut={setConfirmingOut}
+            punchError={punchError} onDismissPunchError={() => setPunchError(null)}
           />
         )}
 
@@ -833,6 +843,7 @@ export default function PontoPage() {
             showToast={showToast}
           />
         )}
+        </ErrorBoundary>
         </div>
         </div>
       </div>

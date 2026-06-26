@@ -69,9 +69,11 @@ interface Props {
   punch: (type: PunchType) => void
   geoDistance: number | null
   setConfirmingOut: (v: boolean) => void
+  punchError: string | null
+  onDismissPunchError: () => void
 }
 
-export const PontoTab = memo(function PontoTab({ user, state, since, liveMin, targetMin: _targetMin, pct, remaining, overtime, earnings, hh, mm, ss, greeting, myRecs, punching, punch, geoDistance, setConfirmingOut }: Props) {
+export const PontoTab = memo(function PontoTab({ user, state, since, liveMin, targetMin: _targetMin, pct, remaining, overtime, earnings, hh, mm, ss, greeting, myRecs, punching, punch, geoDistance, setConfirmingOut, punchError, onDismissPunchError }: Props) {
   const { t } = useLang()
   const isPastStart = (() => {
     const now = new Date()
@@ -158,6 +160,26 @@ export const PontoTab = memo(function PontoTab({ user, state, since, liveMin, ta
           </button>
         )}
       </div>
+
+      {punchError && (
+        <div role="alert" style={{
+          display: 'flex', alignItems: 'flex-start', gap: 8,
+          background: 'rgba(239,68,68,0.08)',
+          border: '1px solid var(--danger-fg)',
+          borderRadius: 'var(--r-md)',
+          padding: '8px 12px',
+          marginBottom: 8,
+          fontSize: 12,
+        }}>
+          <span style={{ color: 'var(--danger-fg)', flexShrink: 0, marginTop: 1 }}>✕</span>
+          <span style={{ flex: 1, color: 'var(--fg)' }}>{punchError}</span>
+          <button
+            onClick={onDismissPunchError}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', padding: 0, fontSize: 14, lineHeight: 1, flexShrink: 0 }}
+            aria-label="Fechar erro"
+          >×</button>
+        </div>
+      )}
 
       {geoDistance !== null && user.workplace_lat != null && (
         <div style={{
