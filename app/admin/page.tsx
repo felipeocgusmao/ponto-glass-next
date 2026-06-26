@@ -133,10 +133,20 @@ export default function AdminPage() {
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('pg.theme')
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.setAttribute('data-theme', savedTheme)
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const applyTheme = (t: string) => {
+      setTheme(t)
+      document.documentElement.setAttribute('data-theme', t)
     }
+    if (savedTheme) {
+      applyTheme(savedTheme)
+    } else {
+      applyTheme(mq.matches ? 'dark' : 'light')
+    }
+    const handleColorScheme = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem('pg.theme')) applyTheme(e.matches ? 'dark' : 'light')
+    }
+    mq.addEventListener('change', handleColorScheme)
     const savedAccent = localStorage.getItem('pg.accent')
     if (savedAccent) { setAccentState(savedAccent); document.documentElement.setAttribute('data-accent', savedAccent) }
     const savedFont = localStorage.getItem('pg.font')
@@ -152,7 +162,7 @@ export default function AdminPage() {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') refreshPendingCount()
     }, 60_000)
-    return () => clearInterval(interval)
+    return () => { clearInterval(interval); mq.removeEventListener('change', handleColorScheme) }
   }, [loadUser, loadEmployees, refreshPendingCount])
 
   // Sync data-collapsed attribute on app element
