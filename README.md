@@ -128,6 +128,171 @@ Cada peça foi escolhida com intenção:
 
 ---
 
+## ◈ quickstart
+
+> Tempo estimado: 10–15 minutos para ter o ambiente local a correr.
+
+### Requisitos
+
+- Node.js 20+ e npm
+- Conta [Supabase](https://supabase.com) (gratuita serve)
+- (Opcional) Conta [Vercel](https://vercel.com) para deploy
+
+### 1. Clonar e instalar
+
+```bash
+git clone https://github.com/felipeocgusmao/ponto-glass-next.git
+cd ponto-glass-next
+npm install
+```
+
+### 2. Variáveis de ambiente
+
+```bash
+cp .env.example .env.local
+```
+
+Edite `.env.local` e preencha **no mínimo** as variáveis obrigatórias:
+
+| Variável | Obrigatória | Onde encontrar |
+|----------|:-----------:|----------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase → Project Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase → Project Settings → API |
+| `JWT_SECRET` | ✅ | `openssl rand -base64 32` |
+| `NEXT_PUBLIC_BUSINESS_TZ` | ✅ | Ex: `Europe/Lisbon`, `America/Sao_Paulo` |
+| `INITIAL_ADMIN_PASSWORD` | ✅ (1ª vez) | Qualquer senha ≥ 8 caracteres |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | ⚠️ Prod | Vercel KV ou Upstash Redis |
+| `CRON_SECRET` | ⚠️ Prod | `openssl rand -base64 32` |
+| `RECOVERY_SECRET` | Recomendado | `openssl rand -base64 32` |
+
+> Ver [`.env.example`](.env.example) para todas as variáveis com comentários detalhados.
+
+### 3. Base de dados (Supabase)
+
+No painel Supabase, vá a **SQL Editor** e execute o schema completo:
+
+```bash
+# Conteúdo do ficheiro:
+cat supabase/schema.sql
+```
+
+Cole e execute no SQL Editor do Supabase. O schema cria todas as tabelas, índices e activa RLS.
+
+> **Migrações incrementais:** se já tem uma instalação anterior, os ficheiros em `supabase/migrations/` contêm os deltas numerados. Execute na ordem do nome do ficheiro.
+
+### 4. Primeiro arranque e admin inicial
+
+```bash
+npm run dev
+```
+
+Aceda a `http://localhost:3000`. Com `INITIAL_ADMIN_PASSWORD` definido e a base vazia, o sistema cria automaticamente o utilizador `admin` na primeira chamada à API.
+
+Faça login com:
+- **Utilizador:** o valor de `INITIAL_ADMIN_USERNAME` (default: `admin`)
+- **Senha:** o valor de `INITIAL_ADMIN_PASSWORD`
+
+> ⚠️ **Depois do primeiro login**, remova `INITIAL_ADMIN_PASSWORD` do ambiente (ou deixe-o em branco). Troque a senha dentro do sistema e configure o e-mail do admin em Funcionários → Editar.
+
+### 5. Comandos úteis
+
+```bash
+npm run dev        # servidor de desenvolvimento (http://localhost:3000)
+npm run build      # build de produção
+npm run test       # testes unitários (Vitest)
+npm run test:e2e   # testes E2E (Playwright) — requer servidor em execução
+npm run lint       # ESLint
+```
+
+### 6. Deploy na Vercel
+
+```bash
+npm i -g vercel
+vercel login
+vercel --prod
+```
+
+Ou ligue o repositório em [vercel.com/new](https://vercel.com/new) e configure as variáveis de ambiente em **Project → Settings → Environment Variables** (copie de `.env.example`).
+
+> **Crons:** adicione as entradas em `vercel.json` → `"crons"` e defina `CRON_SECRET`. Os endpoints ficam em `/api/cron/*`.
+
+---
+
+### Serviços opcionais
+
+<details>
+<summary><strong>Push Notifications (VAPID)</strong></summary>
+
+```bash
+# Gerar par de chaves VAPID
+node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(), null, 2))"
+```
+
+Copie `publicKey` → `NEXT_PUBLIC_VAPID_PUBLIC_KEY` e `privateKey` → `VAPID_PRIVATE_KEY`.  
+Defina `VAPID_EMAIL=mailto:admin@suaempresa.com`.
+
+</details>
+
+<details>
+<summary><strong>E-mail (SMTP / Microsoft Graph)</strong></summary>
+
+**SMTP (Gmail):**
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=seuemail@gmail.com
+SMTP_PASS=<app password>   # myaccount.google.com → Segurança → App passwords
+SMTP_FROM=PontoGlass <noreply@suaempresa.com>
+NEXT_PUBLIC_APP_URL=https://ponto-glass-next.vercel.app
+```
+
+**Microsoft Graph (sem licença por caixa):**  
+Azure AD → App Registrations → permissão `Mail.Send` → Client Credentials.  
+Preencha `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_SENDER_EMAIL`.  
+Quando as 4 variáveis MS estão presentes, o Graph tem prioridade sobre SMTP.
+
+</details>
+
+<details>
+<summary><strong>Rate Limiting distribuído (obrigatório em produção)</strong></summary>
+
+Sem KV/Redis, o rate limit é **por instância**. Em produção no Vercel (multi-instância) isso não protege.
+
+**Vercel KV:** Dashboard → Storage → KV → Create → a integração define `KV_REST_API_URL` e `KV_REST_API_TOKEN` automaticamente.
+
+**Upstash Redis:** [upstash.com](https://upstash.com) → Create Database → copie `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`.
+
+</details>
+
+<details>
+<summary><strong>Sentry</strong></summary>
+
+1. Crie projeto em [sentry.io](https://sentry.io)
+2. Copie o DSN → `NEXT_PUBLIC_SENTRY_DSN`
+3. Para source maps em CI: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
+
+</details>
+
+---
+
+### Troubleshooting
+
+| Sintoma | Causa provável | Solução |
+|---------|---------------|---------|
+| Login recusa sempre | `JWT_SECRET` ausente ou diferente entre instâncias | Defina uma string fixa ≥ 32 chars |
+| "Unauthorized" depois de login | Cookie `httpOnly` bloqueado (HTTP em dev) | Use `https://` ou `localhost` |
+| Admin não criado no 1º arranque | `INITIAL_ADMIN_PASSWORD` não estava definido quando a base foi criada | Defina a variável e apague a tabela `employees` para re-seed |
+| Notificações push não chegam | VAPID mal configurado | Verifique se `NEXT_PUBLIC_VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` formam um par gerado juntos |
+| E-mail não enviado | SMTP/Graph sem credenciais | Verifique `SMTP_HOST`+`SMTP_PASS` ou as 4 vars `MS_*` |
+| Rate limit bypass em produção | Sem KV/Redis | Configure `KV_REST_API_URL`+`TOKEN` (Vercel KV) ou Upstash |
+| Cron não dispara | `CRON_SECRET` ausente ou endpoint inacessível | Confirme a variável e teste `curl -H "Authorization: Bearer $CRON_SECRET" /api/cron/absence-check` |
+| Erro de CORS / tenant errado | `NEXT_PUBLIC_TENANT_ROOT_DOMAIN` mal configurado | Deixe em branco para single-tenant; ver `docs/TENANTS.md` para multi-tenant |
+| Build falha no Vercel | Variável de ambiente ausente | Confirme todas as vars obrigatórias em Project Settings → Environment Variables |
+
+<br/>
+
+---
+
 ## ◈ funcionalidades
 
 ```
