@@ -148,8 +148,8 @@ describe('TOTP backup codes', () => {
 describe('isCsrfSafe', () => {
   beforeEach(() => {
     vi.resetModules()
-    process.env.NEXT_PUBLIC_APP_URL = 'https://pontoglass.app'
-    process.env.NODE_ENV = 'production'
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://pontoglass.app')
+    vi.stubEnv('NODE_ENV', 'production')
   })
 
   it('allows requests with no Origin header (direct API calls)', async () => {

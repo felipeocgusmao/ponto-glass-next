@@ -86,6 +86,7 @@ export function TotpSection() {
           <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
             {t('totp.enroll_hint')}
           </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           {qr && <img src={qr} alt="QR code" width={180} height={180} style={{ borderRadius: 8, alignSelf: 'center' }} />}
           <div className="mono" style={{ fontSize: 10, color: 'var(--fg-subtle)', wordBreak: 'break-all', textAlign: 'center' }}>
             {t('totp.manual_key')} {secret}
