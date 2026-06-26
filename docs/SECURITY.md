@@ -29,7 +29,7 @@ A defesa cobre 1-3. Para (4) o controlo é organizacional (rotação de chaves, 
 ### JWT
 
 - **Algoritmo**: HS256 (`jose@^5`). Edge-compatible (não usa Node crypto APIs).
-- **Validade**: 8 horas (`setExpirationTime('8h')`).
+- **Validade**: 30 dias (`setExpirationTime('30d')`). Sessão deslizante — cada chamada a `/api/me` re-emite um token fresco com `iat=now` e `exp=now+30d`, pelo que utilizadores ativos nunca expiram.
 - **Payload**: `{ id, name, username, role, iat, exp }`.
 - **Segredo**: `JWT_SECRET` (≥ 32 caracteres). Configurado em env, nunca commitado.
 
@@ -40,7 +40,7 @@ res.cookies.set('ponto_token', token, {
   httpOnly: true,              // JavaScript não consegue ler (mitiga XSS)
   secure: process.env.NODE_ENV === 'production',  // só HTTPS em produção
   sameSite: 'lax',             // protege CSRF em requests cross-site
-  maxAge: 60 * 60 * 8,         // 8h em segundos
+  maxAge: 60 * 60 * 24 * 30,  // 30 dias; renovado a cada /api/me (sliding session)
   path: '/',
 })
 ```

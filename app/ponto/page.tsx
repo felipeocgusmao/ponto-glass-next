@@ -19,6 +19,7 @@ import { usePunchData } from './_lib/usePunchData'
 import { useThemeSettings } from '@/lib/hooks/useThemeSettings'
 import { usePushNotifications } from './_lib/usePushNotifications'
 import { useGeofence } from './_lib/useGeofence'
+import { useEmployeeHistory } from './_lib/useEmployeeHistory'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes' | 'perfil'
@@ -61,18 +62,7 @@ export default function PontoPage() {
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
-  // history tab state
-  const [historyRecs, setHistoryRecs] = useState<PunchRecord[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
-  const [historyLoaded, setHistoryLoaded] = useState(false)
-  const [historyExceptions, setHistoryExceptions] = useState<string[]>([])
-  const [historyExceptionsFull, setHistoryExceptionsFull] = useState<DayException[]>([])
-  const [calendarView, setCalendarView] = useState(false)
-  // Which month the history tab shows (month is 0-indexed). Defaults to the current business month.
-  const [histYM, setHistYM] = useState(() => {
-    const today = businessDate()
-    return { year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) - 1 }
-  })
+  // history tab — state and data managed by dedicated hook
 
   // bank tab state
   const [bankBalance, setBankBalance] = useState<number | null>(null)
@@ -144,41 +134,17 @@ export default function PontoPage() {
   )
   const { state: stateMemo, since: sinceMemo } = useMemo(() => getWorkState(myRecsMemo), [myRecsMemo])
 
-  // History tab helpers — must be before early returns (rules of hooks)
+  // History tab — must be before early returns (rules of hooks)
   const lunchBreakMin = user?.lunch_break_minutes ?? 60
-  const { byDay, sortedDays, totalMonthMin, absentDays } = useMemo(() => {
-    const byDay = new Map<string, PunchRecord[]>()
-    historyRecs.forEach(r => {
-      if (!byDay.has(r.date)) byDay.set(r.date, [])
-      byDay.get(r.date)!.push(r)
-    })
-    const sortedDays = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a))
-    const totalMonthMin = sortedDays.reduce((sum, date) => {
-      const recs = byDay.get(date)!
-      const exact = calcNetMinutes(recs, lunchBreakMin)
-      return sum + roundToQuarter(exact)
-    }, 0)
-    const absentDays: string[] = (() => {
-      if (!historyLoaded || (historyRecs.length === 0 && sortedDays.length === 0)) return []
-      const pad = (n: number) => String(n).padStart(2, '0')
-      const { year, month } = histYM
-      const firstOfMonth = `${year}-${pad(month + 1)}-01`
-      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
-      const monthEnd = `${year}-${pad(month + 1)}-${pad(lastDay)}`
-      const today = businessDate()
-      const cur = new Date(firstOfMonth + 'T12:00:00')
-      const end = new Date((monthEnd > today ? today : monthEnd) + 'T12:00:00')
-      const absent: string[] = []
-      while (cur <= end) {
-        const d = cur.getDay()
-        const iso = cur.toISOString().split('T')[0]
-        if (d !== 0 && d !== 6 && !byDay.has(iso) && !historyExceptions.includes(iso)) absent.push(iso)
-        cur.setDate(cur.getDate() + 1)
-      }
-      return absent
-    })()
-    return { byDay, sortedDays, totalMonthMin, absentDays }
-  }, [historyRecs, histYM, historyLoaded, historyExceptions, lunchBreakMin])
+  const {
+    historyRecs, historyLoading, historyLoaded,
+    historyExceptionsFull,
+    byDay, sortedDays, totalMonthMin, absentDays,
+    histYM, histMonthLabel, isCurrentHistMonth,
+    calendarView, setCalendarView,
+    goPrevMonth, goNextMonth,
+    loadHistory,
+  } = useEmployeeHistory({ lunchBreakMin })
 
   // Extracted hooks
   const { geoDistance } = useGeofence({
@@ -186,34 +152,6 @@ export default function PontoPage() {
     onAutoExit: (msg) => setAutoExitBanner(msg),
   })
   usePushNotifications({ user, records, t: t as (key: string) => string })
-
-  const loadHistory = useCallback(async () => {
-    setHistoryLoading(true)
-    try {
-      const pad = (n: number) => String(n).padStart(2, '0')
-      const { year, month } = histYM
-      const from = `${year}-${pad(month + 1)}-01`
-      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
-      const monthEnd = `${year}-${pad(month + 1)}-${pad(lastDay)}`
-      // Don't query past today for the current month (records.date is the business-tz day).
-      const today = businessDate()
-      const to = monthEnd > today ? today : monthEnd
-      const [res, excRes] = await Promise.all([
-        fetch(`/api/reports?from=${from}&to=${to}`),
-        fetch(`/api/day-exceptions?from=${from}&to=${to}`),
-      ])
-      if (res.ok) {
-        setHistoryRecs((await res.json()).data)
-        if (excRes.ok) {
-          const exc: DayException[] = await excRes.json()
-          setHistoryExceptions(exc.map(e => e.date))
-          setHistoryExceptionsFull(exc)
-        }
-        setHistoryLoaded(true)
-      }
-    } catch { /* keep */ }
-    finally { setHistoryLoading(false) }
-  }, [histYM])
 
   const loadBank = useCallback(async () => {
     if (bankLoaded) return
@@ -610,12 +548,6 @@ export default function PontoPage() {
   const mm = now ? String(now.getMinutes()).padStart(2, '0') : '--'
   const ss = now ? String(now.getSeconds()).padStart(2, '0') : '--'
   const greeting = now && now.getHours() < 12 ? t('ponto.greeting.morning') : now && now.getHours() < 19 ? t('ponto.greeting.afternoon') : t('ponto.greeting.evening')
-
-  const _todayBiz = businessDate()
-  const isCurrentHistMonth = histYM.year === Number(_todayBiz.slice(0, 4)) && histYM.month === Number(_todayBiz.slice(5, 7)) - 1
-  const histMonthLabel = new Date(histYM.year, histYM.month, 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
-  const goPrevMonth = () => setHistYM(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })
-  const goNextMonth = () => setHistYM(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })
 
   return (
     <div className="app" data-collapsed={sidebarCollapsed ? 'true' : undefined}>
