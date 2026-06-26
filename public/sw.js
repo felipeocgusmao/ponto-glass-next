@@ -1,14 +1,12 @@
-const CACHE = 'pontoglass-v5'
-const STATIC = ['/login']
+const CACHE = 'pontoglass-v6'
+const STATIC_PRECACHE = ['/login', '/offline']
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    // cache: 'reload' bypasses the HTTP cache so the precached /login is
-    // always the freshly-deployed copy, not whatever the browser had from
-    // a previous visit. Without it, an iOS Safari user can stay stuck on
-    // an old login shell for hours after a deploy.
+    // cache: 'reload' bypasses HTTP cache so precached shells are always fresh.
     caches.open(CACHE)
-      .then(c => c.addAll(STATIC.map(url => new Request(url, { cache: 'reload' }))))
+      .then(c => c.addAll(STATIC_PRECACHE.map(url => new Request(url, { cache: 'reload' }))))
+      .catch(() => {}) // /offline may not exist yet — fail silently
       .then(() => self.skipWaiting())
   )
 })
@@ -25,27 +23,66 @@ self.addEventListener('fetch', e => {
   const { request } = e
   if (request.method !== 'GET') return
   const url = new URL(request.url)
+
+  // Never intercept API calls — always go to network.
   if (url.pathname.startsWith('/api/')) return
-  if (url.pathname === '/ponto' || url.pathname === '/admin' || url.pathname === '/kiosk') return
 
-  // Only runtime-cache immutable, same-origin static assets (hashed Next.js chunks, fonts,
-  // icons). This keeps the offline fallback for the app shell without letting the cache grow
-  // unbounded with arbitrary responses, and avoids ever serving a stale HTML/data response.
-  const isStatic = url.origin === self.location.origin &&
-    (url.pathname.startsWith('/_next/static/') || /\.(?:js|css|woff2?|png|jpe?g|svg|ico|webp)$/.test(url.pathname))
-  if (!isStatic) return
+  // Immutable static assets (hashed Next.js chunks, fonts, icons) — cache-first.
+  const isImmutable = url.origin === self.location.origin &&
+    (url.pathname.startsWith('/_next/static/') || /\.(?:woff2?|ttf)$/.test(url.pathname))
+  if (isImmutable) {
+    e.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached
+        return fetch(request).then(res => {
+          if (res.ok) {
+            const clone = res.clone()
+            caches.open(CACHE).then(c => c.put(request, clone))
+          }
+          return res
+        })
+      })
+    )
+    return
+  }
 
-  e.respondWith(
-    fetch(request)
-      .then(res => {
-        if (res.ok || res.type === 'opaque') {
+  // Static assets that may change (images, icons, css not in /_next/static/) —
+  // stale-while-revalidate.
+  const isSameSiteStatic = url.origin === self.location.origin &&
+    /\.(?:js|css|png|jpe?g|svg|ico|webp)$/.test(url.pathname)
+  if (isSameSiteStatic) {
+    e.respondWith(
+      caches.open(CACHE).then(cache =>
+        cache.match(request).then(cached => {
+          const fresh = fetch(request).then(res => {
+            if (res.ok || res.type === 'opaque') cache.put(request, res.clone())
+            return res
+          }).catch(() => cached ?? new Response('', { status: 503 }))
+          return cached ?? fresh
+        })
+      )
+    )
+    return
+  }
+
+  // App shell pages — network-first with stale-while-revalidate fallback.
+  if (url.origin === self.location.origin) {
+    e.respondWith(
+      fetch(request).then(res => {
+        if (res.ok) {
           const clone = res.clone()
           caches.open(CACHE).then(c => c.put(request, clone))
         }
         return res
-      })
-      .catch(() => caches.match(request).then(r => r ?? fetch(request)))
-  )
+      }).catch(() =>
+        caches.match(request).then(cached =>
+          cached ?? caches.match('/offline').then(offline =>
+            offline ?? new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } })
+          )
+        )
+      )
+    )
+  }
 })
 
 self.addEventListener('push', e => {
@@ -81,7 +118,6 @@ self.addEventListener('notificationclick', e => {
       const target = list.find(c => c.url.includes(url)) || list[0]
       if (target) {
         target.focus()
-        // Only navigate if not already on the target and the browser supports it (iOS Safari may not).
         if (!target.url.includes(url) && 'navigate' in target) return target.navigate(url).catch(() => {})
         return
       }

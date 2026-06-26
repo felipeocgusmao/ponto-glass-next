@@ -52,6 +52,7 @@ export default function AdminPage() {
   const [showCmdK, setShowCmdK] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const [theme, setTheme] = useState('dark')
+  const [isSystemTheme, setIsSystemTheme] = useState(false)
   const [accent, setAccentState] = useState('indigo')
   const [font, setFontState] = useState('inter')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -72,12 +73,23 @@ export default function AdminPage() {
     ? MANAGER_TABS
     : (user?.super_admin ? [...ALL_TABS, ...SUPER_ADMIN_TABS] : ALL_TABS)
 
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    document.documentElement.setAttribute('data-theme', next)
-    localStorage.setItem('pg.theme', next)
+  const selectTheme = (mode: 'dark' | 'light' | 'system') => {
+    if (mode === 'system') {
+      localStorage.removeItem('pg.theme')
+      setIsSystemTheme(true)
+      const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      const next = sysDark ? 'dark' : 'light'
+      setTheme(next)
+      document.documentElement.setAttribute('data-theme', next)
+    } else {
+      setIsSystemTheme(false)
+      setTheme(mode)
+      document.documentElement.setAttribute('data-theme', mode)
+      localStorage.setItem('pg.theme', mode)
+    }
   }
+
+  const toggleTheme = () => selectTheme(theme === 'dark' ? 'light' : 'dark')
 
   const changeAccent = (a: string) => {
     setAccentState(a)
@@ -140,8 +152,10 @@ export default function AdminPage() {
     }
     if (savedTheme) {
       applyTheme(savedTheme)
+      setIsSystemTheme(false)
     } else {
       applyTheme(mq.matches ? 'dark' : 'light')
+      setIsSystemTheme(true)
     }
     const handleColorScheme = (e: MediaQueryListEvent) => {
       if (!localStorage.getItem('pg.theme')) applyTheme(e.matches ? 'dark' : 'light')
@@ -210,8 +224,26 @@ export default function AdminPage() {
   )
 
   if (!user) return (
-    <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--bg)' }}>
-      <div className="tnum mono" style={{ fontSize: 32, color: 'var(--fg-dim)' }}>…</div>
+    <div className="app" data-collapsed="false">
+      <div className="sidebar" style={{ position: 'fixed', display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div className="sb-head"><div className="skeleton" style={{ width: 22, height: 22, borderRadius: 5, flexShrink: 0 }} /><div className="skeleton" style={{ width: 80, height: 13 }} /></div>
+        <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {[100, 80, 90, 70, 85].map((w, i) => <div key={i} className="skeleton" style={{ height: 28, width: `${w}%`, borderRadius: 6 }} />)}
+        </div>
+      </div>
+      <div className="main">
+        <div className="topbar"><div className="skeleton" style={{ width: 140, height: 14 }} /><div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}><div className="skeleton" style={{ width: 28, height: 28, borderRadius: 6 }} /><div className="skeleton" style={{ width: 28, height: 28, borderRadius: 6 }} /></div></div>
+        <div className="page">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="skeleton" style={{ height: 28, width: '35%' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+              {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 96, borderRadius: 10 }} />)}
+            </div>
+            <div className="skeleton" style={{ height: 240, borderRadius: 10 }} />
+            <div className="skeleton" style={{ height: 180, borderRadius: 10 }} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 
@@ -223,7 +255,8 @@ export default function AdminPage() {
           theme={theme}
           accent={accent}
           font={font}
-          onToggleTheme={toggleTheme}
+          isSystemTheme={isSystemTheme}
+          onSelectTheme={selectTheme}
           onChangeAccent={changeAccent}
           onChangeFont={changeFont}
           onChangePwd={() => { setShowSettings(false); setShowPwd(true) }}
