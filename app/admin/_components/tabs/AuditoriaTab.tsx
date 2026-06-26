@@ -15,6 +15,7 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
       style={{ zIndex: 80, display: 'grid', placeItems: 'center' }}
     >
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--sidebar-bg)', borderRadius: 12, padding: 16, maxWidth: 380 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="Foto do registo" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
         <button onClick={onClose} className="btn ghost" style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}>Fechar</button>
       </div>

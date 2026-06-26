@@ -71,6 +71,21 @@
 .btn-emp.danger-big:hover { background: color-mix(in oklch, var(--danger-soft) 85%, var(--danger)); }
 .btn-emp.warn { color: var(--warning-fg); background: var(--warning-soft); border-color: transparent; }
 .btn-emp.warn:hover { background: color-mix(in oklch, var(--warning-soft) 85%, var(--warning)); }
+/* ── Tab fade-in ─── */
+@keyframes pg-tab-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.tab-fade { animation: pg-tab-enter 0.18s ease; }
+
+/* ── Entrada button pulse ─── */
+@keyframes pg-pulse-btn {
+  0%, 100% { box-shadow: 0 4px 12px -2px color-mix(in oklch, var(--accent) 40%, transparent), inset 0 1px 0 rgba(255,255,255,0.18); }
+  50% { box-shadow: 0 4px 24px 4px color-mix(in oklch, var(--accent) 60%, transparent), inset 0 1px 0 rgba(255,255,255,0.18); }
+}
+.btn-emp.primary-big.pulse { animation: pg-pulse-btn 1.6s ease-in-out infinite; }
+
+/* ── Bottom sheet slide-up ─── */
+@keyframes pg-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-up { animation: pg-sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
 .emp-history { display: flex; flex-direction: column; gap: 10px; }
 .emp-history-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle); }
 .emp-history-empty { padding: 16px; border: 1px dashed var(--border-strong); border-radius: var(--r-md); text-align: center; font-size: 12.5px; color: var(--fg-muted); }

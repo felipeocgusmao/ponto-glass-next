@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
+import type { PunchRecord, DayException } from '@/lib/types'
 import EmpSidebar from './_components/EmpSidebar'
 import { PontoTab } from './_components/PontoTab'
 import { HistoricoTab } from './_components/HistoricoTab'
@@ -13,6 +13,8 @@ import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, roundToQuarter, busin
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
 import SettingsModal from '@/app/admin/_components/SettingsModal'
+import { usePunchData } from './_lib/usePunchData'
+import { useThemeSettings } from '@/lib/hooks/useThemeSettings'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
@@ -68,17 +70,16 @@ function RefreshIcon({ size = 14 }: { size?: number }) { return <svg width={size
 
 export default function PontoPage() {
   const { t } = useLang()
-  const [user, setUser] = useState<EmployeeProfile | null>(null)
+  const { theme, isSystemTheme, accent, font, selectTheme, toggleTheme, changeAccent, changeFont, syncFromServer } = useThemeSettings({
+    onThemeChange: (mode) => {
+      fetch('/api/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: mode }) }).catch(() => {})
+    },
+  })
+  const { user, setUser, records, setRecords, fetchError, setFetchError, loadUser, loadRecords } = usePunchData({ onUserTheme: syncFromServer })
   const [showSettings, setShowSettings] = useState(false)
-  const [records, setRecords] = useState<PunchRecord[]>([])
   const [now, setNow] = useState<Date | null>(null)
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [isSystemTheme, setIsSystemTheme] = useState(false)
-  const [accent, setAccentState] = useState('indigo')
-  const [font, setFontState] = useState('inter')
   const [punching, setPunching] = useState(false)
   const [toast, setToast] = useState('')
-  const [fetchError, setFetchError] = useState(false)
   const [tab, setTab] = useState<Tab>('ponto')
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -150,47 +151,14 @@ export default function PontoPage() {
   const [corrMsg, setCorrMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const router = useRouter()
-  const fetchSeq = useRef(0)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pullStartY = useRef(0)
+  const swipeStartX = useRef(0)
+  const swipeStartY = useRef(0)
   const [pullDistance, setPullDistance] = useState(0)
   const [isPulling, setIsPulling] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
-
-  // A token can stay validly *signed* (so the edge middleware bounces /login back to a
-  // protected page) while the API rejects it — e.g. the session was revoked via
-  // sessions_valid_from. Clearing the cookie through logout makes /login reachable again,
-  // instead of looping forever on the loading splash.
-  const endDeadSession = useCallback(async () => {
-    try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* clear cookie anyway */ }
-    router.replace('/login')
-  }, [router])
-
-  const loadUser = useCallback(async () => {
-    setFetchError(false)
-    try {
-      const res = await fetch('/api/me')
-      if (!res.ok) { await endDeadSession(); return }
-      const profile = await res.json()
-      setUser(profile)
-      if (profile.theme) {
-        setTheme(profile.theme)
-        document.documentElement.setAttribute('data-theme', profile.theme)
-      }
-    } catch { setFetchError(true) }
-  }, [endDeadSession])
-
-  const loadRecords = useCallback(async () => {
-    const seq = ++fetchSeq.current
-    try {
-      const res = await fetch('/api/records?today=true')
-      if (!res.ok) return
-      const data = await res.json()
-      // Ignore out-of-order responses: a slow, stale reload must not revert a newer state.
-      if (seq === fetchSeq.current) setRecords(data)
-    } catch { /* keep */ }
-  }, [])
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true)
@@ -417,6 +385,34 @@ export default function PontoPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPulling, pullDistance, isRefreshing, loadUser, loadRecords])
 
+  // Horizontal swipe to navigate tabs
+  useEffect(() => {
+    const el = pageRef.current
+    if (!el) return
+    const TABS: Tab[] = ['ponto', 'historico', 'banco', 'correcoes', 'perfil']
+    const onStart = (e: TouchEvent) => {
+      swipeStartX.current = e.touches[0].clientX
+      swipeStartY.current = e.touches[0].clientY
+    }
+    const onEnd = (e: TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - swipeStartX.current
+      const dy = e.changedTouches[0].clientY - swipeStartY.current
+      if (Math.abs(dx) < 50 || Math.abs(dx) <= Math.abs(dy) * 1.2) return
+      setTab(cur => {
+        const idx = TABS.indexOf(cur)
+        if (dx < 0 && idx < TABS.length - 1) return TABS[idx + 1]
+        if (dx > 0 && idx > 0) return TABS[idx - 1]
+        return cur
+      })
+    }
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchend', onEnd)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const iv = setInterval(() => {
       if (document.visibilityState === 'visible') loadRecords()
@@ -566,31 +562,6 @@ export default function PontoPage() {
     return () => clearInterval(iv)
   }, [user, records, t])
   useEffect(() => {
-    const saved = localStorage.getItem('pg.theme') as 'dark' | 'light' | null
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const applyTheme = (t: 'dark' | 'light') => {
-      setTheme(t)
-      document.documentElement.setAttribute('data-theme', t)
-    }
-    if (saved) {
-      applyTheme(saved)
-      setIsSystemTheme(false)
-    } else {
-      applyTheme(mq.matches ? 'dark' : 'light')
-      setIsSystemTheme(true)
-    }
-    const handleColorScheme = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('pg.theme')) applyTheme(e.matches ? 'dark' : 'light')
-    }
-    mq.addEventListener('change', handleColorScheme)
-    const savedAccent = localStorage.getItem('pg.accent')
-    if (savedAccent) setAccentState(savedAccent)
-    const savedFont = localStorage.getItem('pg.font')
-    if (savedFont) setFontState(savedFont)
-    return () => mq.removeEventListener('change', handleColorScheme)
-  }, [])
-
-  useEffect(() => {
     if (tab === 'historico') loadHistory()
     if (tab === 'banco') { loadBank(); loadCompensation() }
     if (tab === 'correcoes') loadCorrections()
@@ -643,39 +614,7 @@ export default function PontoPage() {
       }
     }, 300_000)
     return () => clearInterval(iv)
-  }, [user, records, loadRecords])
-
-  const selectTheme = (mode: 'dark' | 'light' | 'system') => {
-    if (mode === 'system') {
-      localStorage.removeItem('pg.theme')
-      setIsSystemTheme(true)
-      const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      const next = sysDark ? 'dark' : 'light'
-      setTheme(next)
-      document.documentElement.setAttribute('data-theme', next)
-    } else {
-      setIsSystemTheme(false)
-      setTheme(mode)
-      document.documentElement.setAttribute('data-theme', mode)
-      localStorage.setItem('pg.theme', mode)
-      fetch('/api/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: mode }) }).catch(() => {})
-    }
-  }
-
-  const toggleTheme = () => selectTheme(theme === 'dark' ? 'light' : 'dark')
-
-  const changeAccent = (a: string) => {
-    setAccentState(a)
-    document.documentElement.setAttribute('data-accent', a)
-    localStorage.setItem('pg.accent', a)
-  }
-
-  const changeFont = (f: string) => {
-    setFontState(f)
-    if (f === 'inter') document.documentElement.removeAttribute('data-font')
-    else document.documentElement.setAttribute('data-font', f)
-    localStorage.setItem('pg.font', f)
-  }
+  }, [user, records, loadRecords, t])
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -696,6 +635,7 @@ export default function PontoPage() {
 
   const punch = async (type: PunchType) => {
     if (!user || punching) return
+    if ('vibrate' in navigator) navigator.vibrate(50)
     setPunching(true)
 
     if (!navigator.onLine) {
@@ -879,7 +819,7 @@ export default function PontoPage() {
 
   return (
     <div className="app" data-collapsed={sidebarCollapsed ? 'true' : undefined}>
-      {toast && <div className="toast">{toast}</div>}
+      {toast && <div className="toast">{toast}<div className="toast-progress"/></div>}
 
       {showSettings && (
         <SettingsModal
@@ -1033,6 +973,8 @@ export default function PontoPage() {
           </div>
         )}
 
+        {/* ── TAB CONTENT (key forces remount for enter animation) ─────────── */}
+        <div key={tab} className="tab-fade">
         {/* ── PONTO TAB ─────────────────────────────────────────────────────── */}
         {tab === 'ponto' && (
           <PontoTab
@@ -1100,6 +1042,7 @@ export default function PontoPage() {
           />
         )}
         </div>
+        </div>
       </div>
 
       {/* ── PUNCH-OUT CONFIRMATION ──────────────────────────────────────────── */}
@@ -1109,6 +1052,7 @@ export default function PontoPage() {
           onClick={() => setConfirmingOut(false)}
         >
           <div
+            className="sheet-up"
             onClick={e => e.stopPropagation()}
             style={{ background: 'var(--sidebar-bg)', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', padding: '24px 24px 48px', width: '100%', maxWidth: 480 }}
           >

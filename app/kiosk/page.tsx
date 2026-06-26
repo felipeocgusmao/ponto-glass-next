@@ -62,6 +62,7 @@ function QrModal({ emp, onClose }: { emp: Employee; onClose: () => void }) {
         <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{emp.name}</div>
         <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 20 }}>Digitalize para registar ponto com o telemóvel</div>
         {loading && <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)' }}>A gerar QR…</div>}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         {qrUrl && <img src={qrUrl} alt="QR Code" style={{ width: 200, height: 200, borderRadius: 8, display: 'block', margin: '0 auto' }} />}
         <button onClick={onClose} className="btn" style={{ marginTop: 20, width: '100%', justifyContent: 'center' }}>Fechar</button>
       </div>
@@ -231,6 +232,7 @@ export default function KioskPage() {
     <div className="emp-shell">
       <header className="emp-topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon-192.svg" width="26" height="26" alt="" style={{ borderRadius: 6, flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: '-0.01em' }}>{t('kiosk.title')}</div>
@@ -395,6 +397,7 @@ export default function KioskPage() {
                     </>
                   ) : (
                     <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={photoData} alt="Foto capturada" style={{ width: 160, height: 120, borderRadius: 8, objectFit: 'cover' }} />
                       <button className="btn ghost sm" onClick={() => setPhotoData(null)}>Nova foto</button>
                     </>

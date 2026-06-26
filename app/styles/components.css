@@ -223,10 +223,17 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   background: var(--fg); color: var(--bg);
-  padding: 8px 14px; border-radius: var(--r-md); font-size: 12.5px; font-weight: 500;
+  padding: 8px 14px 10px; border-radius: var(--r-md); font-size: 12.5px; font-weight: 500;
   z-index: 200; box-shadow: var(--shadow-lg); animation: pg-toastIn 0.2s ease;
+  overflow: hidden;
 }
 @keyframes pg-toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.toast-progress {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: currentColor; opacity: 0.3; transform-origin: left;
+  animation: pg-toast-progress 2.2s linear forwards;
+}
+@keyframes pg-toast-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
 /* ─── Misc utilities ─── */
 .divider { height: 1px; background: var(--border); margin: 16px 0; }

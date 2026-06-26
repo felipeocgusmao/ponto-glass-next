@@ -16,6 +16,7 @@ import { ErrorBoundary } from '@/app/_components/ErrorBoundary'
 import { MeuPontoTab } from './_components/tabs/MeuPontoTab'
 import { DashboardTab } from './_components/tabs/DashboardTab'
 import { useNotifications } from './_lib/useNotifications'
+import { useThemeSettings } from '@/lib/hooks/useThemeSettings'
 
 function TabSkeleton() {
   return (
@@ -44,6 +45,7 @@ const IntegracoesTab = dynamic(() => import('./_components/tabs/IntegracoesTab')
 const AusenciasTab   = dynamic(() => import('./_components/tabs/AusenciasTab').then(m => ({ default: m.AusenciasTab })), { loading: TabSkeleton })
 
 export default function AdminPage() {
+  const { theme, isSystemTheme, accent, font, selectTheme, toggleTheme, changeAccent, changeFont } = useThemeSettings()
   const [user, setUser] = useState<EmployeeProfile | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [tab, setTab] = useState<Tab>('dashboard')
@@ -51,10 +53,6 @@ export default function AdminPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [showCmdK, setShowCmdK] = useState(false)
   const [fetchError, setFetchError] = useState(false)
-  const [theme, setTheme] = useState('dark')
-  const [isSystemTheme, setIsSystemTheme] = useState(false)
-  const [accent, setAccentState] = useState('indigo')
-  const [font, setFontState] = useState('inter')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [pendingCorrections, setPendingCorrections] = useState(0)
@@ -72,37 +70,6 @@ export default function AdminPage() {
   const visibleTabs = isManager
     ? MANAGER_TABS
     : (user?.super_admin ? [...ALL_TABS, ...SUPER_ADMIN_TABS] : ALL_TABS)
-
-  const selectTheme = (mode: 'dark' | 'light' | 'system') => {
-    if (mode === 'system') {
-      localStorage.removeItem('pg.theme')
-      setIsSystemTheme(true)
-      const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      const next = sysDark ? 'dark' : 'light'
-      setTheme(next)
-      document.documentElement.setAttribute('data-theme', next)
-    } else {
-      setIsSystemTheme(false)
-      setTheme(mode)
-      document.documentElement.setAttribute('data-theme', mode)
-      localStorage.setItem('pg.theme', mode)
-    }
-  }
-
-  const toggleTheme = () => selectTheme(theme === 'dark' ? 'light' : 'dark')
-
-  const changeAccent = (a: string) => {
-    setAccentState(a)
-    document.documentElement.setAttribute('data-accent', a)
-    localStorage.setItem('pg.accent', a)
-  }
-
-  const changeFont = (f: string) => {
-    setFontState(f)
-    if (f === 'inter') document.documentElement.removeAttribute('data-font')
-    else document.documentElement.setAttribute('data-font', f)
-    localStorage.setItem('pg.font', f)
-  }
 
   const toggleCollapse = () => {
     const next = !sidebarCollapsed
@@ -144,31 +111,8 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('pg.theme')
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const applyTheme = (t: string) => {
-      setTheme(t)
-      document.documentElement.setAttribute('data-theme', t)
-    }
-    if (savedTheme) {
-      applyTheme(savedTheme)
-      setIsSystemTheme(false)
-    } else {
-      applyTheme(mq.matches ? 'dark' : 'light')
-      setIsSystemTheme(true)
-    }
-    const handleColorScheme = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('pg.theme')) applyTheme(e.matches ? 'dark' : 'light')
-    }
-    mq.addEventListener('change', handleColorScheme)
-    const savedAccent = localStorage.getItem('pg.accent')
-    if (savedAccent) { setAccentState(savedAccent); document.documentElement.setAttribute('data-accent', savedAccent) }
-    const savedFont = localStorage.getItem('pg.font')
-    if (savedFont) { setFontState(savedFont) }
     const savedCollapsed = localStorage.getItem('pg.sidebar-collapsed') === 'true'
-    if (savedCollapsed) {
-      setSidebarCollapsed(true)
-    }
+    if (savedCollapsed) setSidebarCollapsed(true)
     setFetchError(false)
     loadUser()
     loadEmployees()
@@ -176,7 +120,7 @@ export default function AdminPage() {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') refreshPendingCount()
     }, 60_000)
-    return () => { clearInterval(interval); mq.removeEventListener('change', handleColorScheme) }
+    return () => clearInterval(interval)
   }, [loadUser, loadEmployees, refreshPendingCount])
 
   // Sync data-collapsed attribute on app element
