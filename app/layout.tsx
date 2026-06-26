@@ -68,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Analytics />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t)r.setAttribute('data-theme',t);var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);}catch(e){}})();if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js')`,
+            __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t){r.setAttribute('data-theme',t);}else{r.setAttribute('data-theme',window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);}catch(e){}})();if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js')`,
           }}
         />
       </body>

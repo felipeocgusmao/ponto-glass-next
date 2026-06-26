@@ -565,11 +565,21 @@ export default function PontoPage() {
   }, [user, records, t])
   useEffect(() => {
     const saved = localStorage.getItem('pg.theme') as 'dark' | 'light' | null
-    if (saved) setTheme(saved)
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const applyTheme = (t: 'dark' | 'light') => {
+      setTheme(t)
+      document.documentElement.setAttribute('data-theme', t)
+    }
+    if (saved) { applyTheme(saved) } else { applyTheme(mq.matches ? 'dark' : 'light') }
+    const handleColorScheme = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem('pg.theme')) applyTheme(e.matches ? 'dark' : 'light')
+    }
+    mq.addEventListener('change', handleColorScheme)
     const savedAccent = localStorage.getItem('pg.accent')
     if (savedAccent) setAccentState(savedAccent)
     const savedFont = localStorage.getItem('pg.font')
     if (savedFont) setFontState(savedFont)
+    return () => mq.removeEventListener('change', handleColorScheme)
   }, [])
 
   useEffect(() => {
