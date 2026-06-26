@@ -143,7 +143,7 @@ export default function PontoPage() {
     histYM, histMonthLabel, isCurrentHistMonth,
     calendarView, setCalendarView,
     goPrevMonth, goNextMonth,
-    loadHistory,
+    loadHistory, invalidateHistory,
   } = useEmployeeHistory({ lunchBreakMin })
 
   // Extracted hooks
@@ -447,7 +447,7 @@ export default function PontoPage() {
         const rec: PunchRecord = await res.json()
         // Replace optimistic record with the authoritative server record
         setRecords(prev => [...prev.filter(r => r.id !== tempId), rec])
-        setHistoryLoaded(false)
+        invalidateHistory()
         setPunchError(null)
         showToast(type === 'entrada' ? t('ponto.registered_in') : type === 'saída' ? t('ponto.registered_out') : t(`punch.${type}` as Parameters<typeof t>[0]))
         loadRecords()

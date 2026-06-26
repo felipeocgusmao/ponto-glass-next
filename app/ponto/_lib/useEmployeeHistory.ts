@@ -87,6 +87,8 @@ export function useEmployeeHistory({ lunchBreakMin }: Options) {
   const goPrevMonth = useCallback(() => setHistYM(({ year, month }) => month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 }), [])
   const goNextMonth = useCallback(() => setHistYM(({ year, month }) => month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 }), [])
 
+  const invalidateHistory = useCallback(() => setHistoryLoaded(false), [])
+
   return {
     historyRecs, historyLoading, historyLoaded,
     historyExceptionsFull,
@@ -94,6 +96,6 @@ export function useEmployeeHistory({ lunchBreakMin }: Options) {
     histYM, histMonthLabel, isCurrentHistMonth,
     calendarView, setCalendarView,
     goPrevMonth, goNextMonth,
-    loadHistory,
+    loadHistory, invalidateHistory,
   }
 }
