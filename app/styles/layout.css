@@ -259,7 +259,7 @@
 /* ─── Small-screen adjustments (≤ 768px) ─── */
 @media (max-width: 768px) {
   .topbar { padding: env(safe-area-inset-top, 0px) 12px 0; gap: 8px; }
-  .page { padding: 14px; gap: 12px; }
+  .page { padding: 14px; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); gap: 12px; }
   .form-grid-2 { grid-template-columns: 1fr; }
   .form-grid-3 { grid-template-columns: 1fr 1fr; }
   /* Activity rows: drop the earnings column and shrink the others to fit. */
@@ -272,6 +272,6 @@
 
 @media (max-width: 480px) {
   .form-grid-3 { grid-template-columns: 1fr; }
-  .page { padding: 12px; gap: 10px; }
+  .page { padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); gap: 10px; }
   .status-row > [data-col="bar"] { display: none; }
 }
