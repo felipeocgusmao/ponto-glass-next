@@ -1,15 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { PunchRecord, DayException } from '@/lib/types'
+import type { PunchRecord } from '@/lib/types'
 import EmpSidebar from './_components/EmpSidebar'
 import { PontoTab } from './_components/PontoTab'
 import { HistoricoTab } from './_components/HistoricoTab'
 import { BancoTab } from './_components/BancoTab'
 import { CorrecoesTab } from './_components/CorrecoesTab'
 import { PerfilTab } from './_components/PerfilTab'
-import { calcNetMinutes, roundToQuarter, businessDate, empColor, avatarInitials, getWorkState, calcLiveMin } from '@/lib/utils'
+import { businessDate, empColor, avatarInitials, getWorkState, calcLiveMin } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
 import { apiFetch } from '@/lib/apiFetch'
@@ -20,6 +20,8 @@ import { useThemeSettings } from '@/lib/hooks/useThemeSettings'
 import { usePushNotifications } from './_lib/usePushNotifications'
 import { useGeofence } from './_lib/useGeofence'
 import { useEmployeeHistory } from './_lib/useEmployeeHistory'
+import { useBankData } from './_lib/useBankData'
+import { useCorrectionRequests } from './_lib/useCorrectionRequests'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes' | 'perfil'
@@ -28,10 +30,6 @@ async function getGeo(): Promise<{ lat: number; lng: number } | null> {
   const { getPosition } = await import('@/lib/native')
   return getPosition(8000)
 }
-
-type CorrectionStatus = 'pending' | 'approved' | 'rejected'
-interface CorrReq { id: string; req_type: string; req_timestamp: string; req_date: string; reason: string | null; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
-interface CompReq { id: string; date: string; hours_requested: number; reason: string; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
 
 // Topbar breadcrumb labels per tab (mirrors the admin panel's title chip).
 const TAB_TITLES: Record<Tab, 'tab.meu_ponto' | 'tab.registros' | 'tab.banco' | 'tab.correcoes' | 'tab.perfil'> = {
@@ -64,27 +62,6 @@ export default function PontoPage() {
 
   // history tab — state and data managed by dedicated hook
 
-  // bank tab state
-  const [bankBalance, setBankBalance] = useState<number | null>(null)
-  const [bankLoading, setBankLoading] = useState(false)
-  const [bankLoaded, setBankLoaded] = useState(false)
-
-  // compensation request state (inside banco tab)
-  const [compList, setCompList] = useState<CompReq[]>([])
-  const [compLoaded, setCompLoaded] = useState(false)
-  const [compLoading, setCompLoading] = useState(false)
-  const [compDate, setCompDate] = useState('')
-  const [compHours, setCompHours] = useState('')
-  const [compReason, setCompReason] = useState('')
-  const [compSubmitting, setCompSubmitting] = useState(false)
-  const [compMsg, setCompMsg] = useState<{ ok: boolean; text: string } | null>(null)
-
-  // corrections tab state
-  const [corrList, setCorrList] = useState<CorrReq[]>([])
-  const [corrLoaded, setCorrLoaded] = useState(false)
-  const [corrLoading, setCorrLoading] = useState(false)
-  const [corrBadge, setCorrBadge] = useState(0)
-
   // profile tab state
   const [profileEmail, setProfileEmail] = useState('')
   const [profileEmailSaving, setProfileEmailSaving] = useState(false)
@@ -110,12 +87,6 @@ export default function PontoPage() {
 
   // reminder
   const [reminderDismissed, setReminderDismissed] = useState(false)
-  const [corrDate, setCorrDate] = useState('')
-  const [corrTime, setCorrTime] = useState('')
-  const [corrType, setCorrType] = useState('entrada')
-  const [corrReason, setCorrReason] = useState('')
-  const [corrSubmitting, setCorrSubmitting] = useState(false)
-  const [corrMsg, setCorrMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const router = useRouter()
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -146,101 +117,37 @@ export default function PontoPage() {
     loadHistory, invalidateHistory,
   } = useEmployeeHistory({ lunchBreakMin })
 
+  // Bank + compensation hook (banco tab)
+  const initDate = businessDate()
+  const initNow = new Date()
+  const initTime = `${String(initNow.getHours()).padStart(2, '0')}:${String(initNow.getMinutes()).padStart(2, '0')}`
+  const {
+    bankBalance, bankLoading,
+    compList, compLoaded, compLoading,
+    compDate, setCompDate,
+    compHours, setCompHours,
+    compReason, setCompReason,
+    compSubmitting, compMsg,
+    loadBank, loadCompensation, submitCompensation,
+  } = useBankData({ t: t as (key: string) => string, initialDate: initDate })
+
+  // Correction requests hook (correcoes tab)
+  const {
+    corrList, corrLoaded, corrLoading, corrBadge,
+    corrDate, setCorrDate,
+    corrTime, setCorrTime,
+    corrType, setCorrType,
+    corrReason, setCorrReason,
+    corrSubmitting, corrMsg,
+    loadCorrections, submitCorrection, markCorrectionsSeen,
+  } = useCorrectionRequests({ t: t as (key: string) => string, initialDate: initDate, initialTime: initTime })
+
   // Extracted hooks
   const { geoDistance } = useGeofence({
     user, records, loadRecords,
     onAutoExit: (msg) => setAutoExitBanner(msg),
   })
   usePushNotifications({ user, records, t: t as (key: string) => string })
-
-  const loadBank = useCallback(async () => {
-    if (bankLoaded) return
-    setBankLoading(true)
-    try {
-      const res = await fetch('/api/hour-bank')
-      if (res.ok) { const d = await res.json(); setBankBalance(d.balanceMin); setBankLoaded(true) }
-    } catch { /* keep */ }
-    finally { setBankLoading(false) }
-  }, [bankLoaded])
-
-  const loadCorrections = useCallback(async () => {
-    if (corrLoaded) return
-    setCorrLoading(true)
-    try {
-      const res = await fetch('/api/correction-requests')
-      if (res.ok) {
-        const list: CorrReq[] = await res.json()
-        setCorrList(list)
-        setCorrLoaded(true)
-        const seenRaw = localStorage.getItem('pg.corr_seen')
-        const seen: Set<string> = seenRaw ? new Set(JSON.parse(seenRaw)) : new Set()
-        const newResolved = list.filter(c => c.status !== 'pending' && !seen.has(c.id))
-        setCorrBadge(newResolved.length)
-      }
-    } catch { /* keep */ }
-    finally { setCorrLoading(false) }
-  }, [corrLoaded])
-
-  const loadCompensation = useCallback(async () => {
-    if (compLoaded) return
-    setCompLoading(true)
-    try {
-      const res = await fetch('/api/compensation-requests')
-      if (res.ok) { setCompList(await res.json()); setCompLoaded(true) }
-    } catch { /* keep */ }
-    finally { setCompLoading(false) }
-  }, [compLoaded])
-
-  const submitCompensation = async () => {
-    if (!compHours || parseFloat(compHours) <= 0) { setCompMsg({ ok: false, text: t('comp.hours_req') }); return }
-    if (!compDate) { setCompMsg({ ok: false, text: t('comp.date_req') }); return }
-    if (!compReason.trim()) { setCompMsg({ ok: false, text: t('comp.reason_req') }); return }
-    setCompSubmitting(true); setCompMsg(null)
-    try {
-      const res = await fetch('/api/compensation-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: compDate, hours_requested: parseFloat(compHours), reason: compReason.trim() }),
-      })
-      if (res.ok) {
-        setCompMsg({ ok: true, text: t('comp.success') })
-        setCompHours(''); setCompReason('')
-        setCompLoaded(false)
-        await loadCompensation()
-      } else {
-        const d = await res.json()
-        setCompMsg({ ok: false, text: d.error ?? t('comp.err.generic') })
-      }
-    } catch { setCompMsg({ ok: false, text: t('comp.err.connect') }) }
-    finally { setCompSubmitting(false) }
-  }
-
-  const submitCorrection = async () => {
-    if (!corrDate || !corrTime || !corrType) return
-    if (!corrReason.trim()) { setCorrMsg({ ok: false, text: t('corr.reason_req') }); return }
-    setCorrSubmitting(true); setCorrMsg(null)
-    try {
-      // Convert the chosen local wall-clock to a UTC instant, exactly like real punches
-      // (now.toISOString()) and manual records. Sending a naive string let the DB (timestamptz)
-      // treat it as UTC, shifting the corrected time by the user's timezone offset.
-      const timestamp = new Date(`${corrDate}T${corrTime}:00`).toISOString()
-      const res = await fetch('/api/correction-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: corrType, timestamp, reason: corrReason || undefined }),
-      })
-      if (res.ok) {
-        setCorrMsg({ ok: true, text: t('corr.success') })
-        setCorrReason('')
-        setCorrLoaded(false) // force reload
-        await loadCorrections()
-      } else {
-        const d = await res.json()
-        setCorrMsg({ ok: false, text: d.error ?? 'Erro ao enviar pedido.' })
-      }
-    } catch { setCorrMsg({ ok: false, text: 'Erro de conexão.' }) }
-    finally { setCorrSubmitting(false) }
-  }
 
   useEffect(() => { loadUser(); loadRecords() }, [loadUser, loadRecords])
 
@@ -276,13 +183,6 @@ export default function PontoPage() {
   }, [t, loadRecords]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (user) setProfileEmail(user.email ?? '') }, [user])
-  useEffect(() => {
-    const n = new Date()
-    const today = businessDate(n)
-    setCorrDate(today)
-    setCompDate(today)
-    setCorrTime(`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`)
-  }, [])
 
   useEffect(() => {
     setNow(new Date())
@@ -373,11 +273,8 @@ export default function PontoPage() {
   }, [tab, loadHistory, loadBank, loadCorrections, loadCompensation])
 
   useEffect(() => {
-    if (tab !== 'correcoes' || !corrLoaded) return
-    const ids = corrList.filter(c => c.status !== 'pending').map(c => c.id)
-    localStorage.setItem('pg.corr_seen', JSON.stringify(ids))
-    setCorrBadge(0)
-  }, [tab, corrLoaded, corrList])
+    if (tab === 'correcoes' && corrLoaded) markCorrectionsSeen(corrList)
+  }, [tab, corrLoaded, corrList, markCorrectionsSeen])
 
   // Reset reminder dismissed state when employee punches out / state changes
   useEffect(() => {

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { Inter, JetBrains_Mono, Lora } from 'next/font/google'
 import './globals.css'
 import './styles/tokens.css'
 import './styles/layout.css'
@@ -9,6 +10,28 @@ import Providers from './providers'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
 import { ServiceWorkerRegistration } from './_components/ServiceWorkerRegistration'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+  weight: ['300', '400', '500', '600', '700'],
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains',
+  display: 'swap',
+  weight: ['400', '500'],
+})
+
+const lora = Lora({
+  subsets: ['latin'],
+  variable: '--font-lora',
+  display: 'swap',
+  weight: ['400', '600'],
+  style: ['normal', 'italic'],
+})
 
 export const viewport: Viewport = {
   themeColor: '#08090b',
@@ -57,16 +80,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" data-theme="dark" data-accent="indigo" suppressHydrationWarning>
+    <html lang="pt-BR" data-theme="dark" data-accent="indigo" suppressHydrationWarning
+      className={`${inter.variable} ${jetbrainsMono.variable} ${lora.variable}`}
+    >
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font -- App Router layout.tsx is the correct place for global fonts */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Lora:ital,wght@0,400;0,600;1,400&display=swap"
-          rel="stylesheet"
-        />
       </head>
       <body>
         <a href="#main-content" className="skip-link">Ir para o conteúdo principal</a>
