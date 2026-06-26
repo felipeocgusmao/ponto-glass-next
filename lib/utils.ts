@@ -597,3 +597,30 @@ export function haversineMeters(
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
+
+// ── CSV export ───────────────────────────────────────────────────────────────
+
+export function exportPunchCsv(empName: string, monthLabel: string, records: PunchRecord[]): void {
+  const PUNCH_LABEL: Record<string, string> = {
+    entrada: 'Entrada', 'saída': 'Saída',
+    inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço',
+    pausa_cafe: 'Pausa café', retorno_cafe: 'Retorno café',
+  }
+  const sorted = [...records].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  const header = 'Data,Tipo,Hora'
+  const lines = sorted.map(r => {
+    const time = new Date(r.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+    const label = PUNCH_LABEL[r.type] ?? r.type
+    return `${r.date},"${label}",${time}`
+  })
+  const csv = '﻿' + [header, ...lines].join('\n') // BOM prefix for Excel UTF-8 compatibility
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ponto_${empName.replace(/\s+/g, '_')}_${monthLabel.replace(/[\s/]/g, '_')}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}

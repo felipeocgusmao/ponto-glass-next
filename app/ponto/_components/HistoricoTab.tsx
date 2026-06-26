@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
-import { calcNetMinutes, fmtCentesimal, roundToQuarter, openPayslip, businessDate } from '@/lib/utils'
+import { calcNetMinutes, fmtCentesimal, roundToQuarter, openPayslip, exportPunchCsv, businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import { CalendarView } from './CalendarView'
 
@@ -154,13 +154,22 @@ export const HistoricoTab = memo(function HistoricoTab({
           )}
 
           {!historyLoading && historyRecs.length > 0 && (
-            <button
-              className="btn-emp"
-              style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
-              onClick={() => openPayslip(user.name, histMonthLabel, historyRecs, user.workday_hours, user.lunch_break_minutes, user.hourly_rate)}
-            >
-              {t('history.export_payslip')}
-            </button>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button
+                className="btn-emp"
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={() => openPayslip(user.name, histMonthLabel, historyRecs, user.workday_hours, user.lunch_break_minutes, user.hourly_rate)}
+              >
+                {t('history.export_payslip')}
+              </button>
+              <button
+                className="btn-emp"
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={() => exportPunchCsv(user.name, histMonthLabel, historyRecs)}
+              >
+                {t('history.export_csv')}
+              </button>
+            </div>
           )}
 
           {[

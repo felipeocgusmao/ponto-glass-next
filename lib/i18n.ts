@@ -102,6 +102,7 @@ const t = {
     'history.worked_month':     'trabalhadas este mês',
     'history.no_records':       'Nenhum registo este mês.',
     'history.export_payslip':   '📄 Exportar holerite do mês',
+    'history.export_csv':       '⬇ Exportar CSV',
 
     // ── Bank tab ──────────────────────────────────────────────────────────
     'bank.title':               'Banco de horas',
@@ -772,6 +773,7 @@ const t = {
     'history.worked_month':     'trabalhadas este mês',
     'history.no_records':       'Nenhum registro este mês.',
     'history.export_payslip':   '📄 Exportar holerite do mês',
+    'history.export_csv':       '⬇ Exportar CSV',
 
     'bank.title':               'Banco de horas',
     'bank.surplus':             'Você tem horas a favor acumuladas',
@@ -1395,6 +1397,7 @@ const t = {
     'history.worked_month':     'worked this month',
     'history.no_records':       'No records this month.',
     'history.export_payslip':   '📄 Export monthly payslip',
+    'history.export_csv':       '⬇ Export CSV',
 
     'bank.title':               'Hour bank',
     'bank.surplus':             'You have accumulated credit hours',
@@ -2018,6 +2021,7 @@ const t = {
     'history.worked_month':     'trabajadas este mes',
     'history.no_records':       'Sin registros este mes.',
     'history.export_payslip':   '📄 Exportar nómina del mes',
+    'history.export_csv':       '⬇ Exportar CSV',
 
     'bank.title':               'Banco de horas',
     'bank.surplus':             'Tienes horas acumuladas a favor',
