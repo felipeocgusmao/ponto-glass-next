@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 
@@ -25,7 +26,7 @@ interface Props {
   submitCorrection: () => void
 }
 
-export function CorrecoesTab({
+export const CorrecoesTab = memo(function CorrecoesTab({
   corrLoading, corrLoaded, corrList,
   corrDate, setCorrDate, corrTime, setCorrTime,
   corrType, setCorrType, corrReason, setCorrReason,
@@ -107,4 +108,4 @@ export function CorrecoesTab({
       )}
     </div>
   )
-}
+})

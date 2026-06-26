@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PunchRecord, DayException } from '@/lib/types'
 import EmpSidebar from './_components/EmpSidebar'
@@ -9,16 +9,22 @@ import { HistoricoTab } from './_components/HistoricoTab'
 import { BancoTab } from './_components/BancoTab'
 import { CorrecoesTab } from './_components/CorrecoesTab'
 import { PerfilTab } from './_components/PerfilTab'
-import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, roundToQuarter, businessDate, empColor, avatarInitials } from '@/lib/utils'
+import { calcNetMinutes, roundToQuarter, businessDate, empColor, avatarInitials, getWorkState, calcLiveMin } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
 import SettingsModal from '@/app/admin/_components/SettingsModal'
 import { usePunchData } from './_lib/usePunchData'
 import { useThemeSettings } from '@/lib/hooks/useThemeSettings'
+import { usePushNotifications } from './_lib/usePushNotifications'
+import { useGeofence } from './_lib/useGeofence'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
-type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
 type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes' | 'perfil'
+
+async function getGeo(): Promise<{ lat: number; lng: number } | null> {
+  const { getPosition } = await import('@/lib/native')
+  return getPosition(8000)
+}
 
 type CorrectionStatus = 'pending' | 'approved' | 'rejected'
 interface CorrReq { id: string; req_type: string; req_timestamp: string; req_date: string; reason: string | null; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
@@ -33,37 +39,6 @@ const TAB_TITLES: Record<Tab, 'tab.meu_ponto' | 'tab.registros' | 'tab.banco' | 
   perfil:    'tab.perfil',
 }
 
-function getWorkState(recs: PunchRecord[]): { state: WorkState; since: string | null } {
-  if (!recs.length) return { state: 'absent', since: null }
-  const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-  const last = sorted[sorted.length - 1]
-  if (WORKING_TYPES.includes(last.type)) return { state: 'working', since: last.timestamp }
-  if (last.type === 'inicio_almoco') return { state: 'lunch', since: last.timestamp }
-  if (last.type === 'pausa_cafe') return { state: 'coffee', since: last.timestamp }
-  if (last.type === 'saída') return { state: 'out', since: last.timestamp }
-  return { state: 'absent', since: null }
-}
-
-function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
-  const { state, since } = getWorkState(recs)
-  const hasBreaks = recs.some(r => ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe'].includes(r.type))
-  if (hasBreaks) {
-    const { workedMin, coffeeMin } = calcTimeBreakdown(recs)
-    const completed = workedMin + coffeeMin
-    if ((state === 'working' || state === 'coffee') && since)
-      return Math.round(completed + (Date.now() - new Date(since).getTime()) / 60_000)
-    return Math.round(completed)
-  }
-  const base = calcNetMinutes(recs, lunchAuto)
-  if (state === 'working' && since)
-    return Math.round(base + (Date.now() - new Date(since).getTime()) / 60_000)
-  return Math.round(base)
-}
-
-async function getGeo(): Promise<{ lat: number; lng: number } | null> {
-  const { getPosition } = await import('@/lib/native')
-  return getPosition(8000)
-}
 
 function StopIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg> }
 function RefreshIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg> }
@@ -112,9 +87,6 @@ export default function PontoPage() {
   const [compSubmitting, setCompSubmitting] = useState(false)
   const [compMsg, setCompMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
-  // geolocation distance state
-  const [geoDistance, setGeoDistance] = useState<number | null>(null)
-
   // corrections tab state
   const [corrList, setCorrList] = useState<CorrReq[]>([])
   const [corrLoaded, setCorrLoaded] = useState(false)
@@ -159,6 +131,20 @@ export default function PontoPage() {
   const [isPulling, setIsPulling] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
+
+  // Derived from records — memoized so the sort+filter doesn't run on every 1s clock tick
+  const myRecsMemo = useMemo(
+    () => records.filter(r => r.employee_id === user?.id),
+    [records, user?.id],
+  )
+  const { state: stateMemo, since: sinceMemo } = useMemo(() => getWorkState(myRecsMemo), [myRecsMemo])
+
+  // Extracted hooks
+  const { geoDistance } = useGeofence({
+    user, records, loadRecords,
+    onAutoExit: (msg) => setAutoExitBanner(msg),
+  })
+  usePushNotifications({ user, records, t: t as (key: string) => string })
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true)
@@ -319,25 +305,6 @@ export default function PontoPage() {
     setCorrTime(`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`)
   }, [])
 
-  // Register for push notifications (native via Capacitor or web via Service Worker)
-  useEffect(() => {
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-    if (!vapidKey) return
-    ;(async () => {
-      try {
-        if (typeof window !== 'undefined' && 'serviceWorker' in navigator)
-          await navigator.serviceWorker.register('/sw.js').catch(() => {})
-        const { registerPush } = await import('@/lib/native')
-        const result = await registerPush(vapidKey)
-        if (!result) return
-        await fetch('/api/push-subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(result),
-        })
-      } catch { /* push not critical */ }
-    })()
-  }, [])
   useEffect(() => {
     setNow(new Date())
     const i = setInterval(() => setNow(new Date()), 1000)
@@ -420,147 +387,6 @@ export default function PontoPage() {
     return () => clearInterval(iv)
   }, [loadRecords])
 
-  // Real-time geolocation distance indicator (30s interval when user has a workplace set)
-  useEffect(() => {
-    if (!user || !user.workplace_lat || user.geo_mode === 'disabled') return
-
-    function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
-      const R = 6371000
-      const dLat = (lat2 - lat1) * Math.PI / 180
-      const dLng = (lng2 - lng1) * Math.PI / 180
-      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-    }
-
-    const update = async () => {
-      if (document.visibilityState !== 'visible') return
-      const geo = await getGeo()
-      if (!geo) return
-      setGeoDistance(Math.round(haversineM(user.workplace_lat!, user.workplace_lng!, geo.lat, geo.lng)))
-    }
-
-    update()
-    const iv = setInterval(update, 30_000)
-    return () => clearInterval(iv)
-  }, [user])
-
-  // Push notifications: 15-min warning + overtime alert.
-  // Runs on its own 60s interval so it does not re-run on every clock tick.
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof Notification === 'undefined') return
-
-    const check = () => {
-      if (!user || !records.length) return
-      if (Notification.permission !== 'granted') return
-
-      const myRecs = records.filter(r => r.employee_id === user.id)
-      const { state: ws } = getWorkState(myRecs)
-      if (ws !== 'working') return
-
-      const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
-      const targetMin = user.workday_hours * 60
-      const remaining = targetMin - liveMin
-      const overtime = liveMin - targetMin
-      const today = businessDate()
-      const key15 = `pg.notif.warn15.${today}.${user.id}`
-      const keyOt = `pg.notif.overtime.${today}.${user.id}`
-
-      const notify = (title: string, body: string, tag: string) => {
-        navigator.serviceWorker.ready.then(reg => {
-          reg.showNotification(title, { body, icon: '/icon-192.svg', badge: '/icon-192.svg', tag })
-        }).catch(() => {})
-      }
-
-      if (remaining > 0 && remaining <= 15 && !localStorage.getItem(key15)) {
-        localStorage.setItem(key15, '1')
-        notify('Hora de terminar em breve ⏱', `Faltam ${Math.round(remaining)} min para completar a tua jornada.`, 'end-warning')
-      }
-      if (overtime >= 1 && !localStorage.getItem(keyOt)) {
-        localStorage.setItem(keyOt, '1')
-        notify('Jornada concluída 🔔', 'Já completaste a jornada de hoje. Não te esqueças de registar a saída!', 'overtime-alert')
-      }
-    }
-
-    check()
-    const iv = setInterval(check, 60_000)
-    return () => clearInterval(iv)
-  }, [user, records])
-
-  // ── Quarter-hour reminder ─────────────────────────────────────────────────────
-  // Because reports/holerites round each day to the nearest 15-min mark, the cleanest
-  // record is one batched exactly on :00 / :15 / :30 / :45. This effect fires ~2 min
-  // before the next quarter mark when the next expected punch is entrada (state =
-  // absent, after the employee's expected_start / 08:00 fallback) or saída (state =
-  // working, after expected_end / workday completed). Almoço and pausa-café are out.
-  // Runs on its own 60s interval — no need to re-run on every clock tick.
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof Notification === 'undefined') return
-
-    const parseHM = (s: string | null | undefined): number | null => {
-      if (!s) return null
-      const [h, m] = s.split(':').map(Number)
-      if (isNaN(h) || isNaN(m)) return null
-      return h * 60 + m
-    }
-
-    const notify = (title: string, body: string, tag: string) => {
-      navigator.serviceWorker.ready
-        .then(reg => reg.showNotification(title, { body, icon: '/icon-192.svg', badge: '/icon-192.svg', tag }))
-        .catch(() => {})
-    }
-
-    const check = () => {
-      if (!user) return
-      if (Notification.permission !== 'granted') return
-
-      const now = new Date()
-      const myRecs = records.filter(r => r.employee_id === user.id)
-      const { state: ws } = getWorkState(myRecs)
-      if (ws !== 'working' && ws !== 'absent') return // skip lunch/coffee/out
-
-      const nowMin = now.getHours() * 60 + now.getMinutes()
-      const minsUntilQuarter = (15 - (nowMin % 15)) % 15
-      if (minsUntilQuarter > 2 || minsUntilQuarter === 0) return // only fire 1–2 min before
-
-      const targetMin = nowMin + minsUntilQuarter
-      const hh = String(Math.floor(targetMin / 60) % 24).padStart(2, '0')
-      const mm = String(targetMin % 60).padStart(2, '0')
-      const targetLabel = `${hh}:${mm}`
-      const today = businessDate()
-
-      if (ws === 'absent') {
-        const startMin = parseHM(user.expected_start) ?? 8 * 60
-        if (nowMin < startMin) return
-        const key = `pg.notif.q.entry.${today}.${targetLabel}`
-        if (localStorage.getItem(key)) return
-        localStorage.setItem(key, '1')
-        notify(
-          t('ponto.notif.entry.title'),
-          t('ponto.notif.entry.body').replace('{time}', targetLabel),
-          `quarter-entry-${targetLabel}`,
-        )
-        return
-      }
-
-      // ws === 'working'
-      const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
-      const endMin = parseHM(user.expected_end)
-      const workdayMin = user.workday_hours * 60
-      const eligible = endMin != null ? nowMin >= endMin : liveMin >= workdayMin
-      if (!eligible) return
-      const key = `pg.notif.q.exit.${today}.${targetLabel}`
-      if (localStorage.getItem(key)) return
-      localStorage.setItem(key, '1')
-      notify(
-        t('ponto.notif.exit.title'),
-        t('ponto.notif.exit.body').replace('{time}', targetLabel),
-        `quarter-exit-${targetLabel}`,
-      )
-    }
-
-    const iv = setInterval(check, 60_000)
-    return () => clearInterval(iv)
-  }, [user, records, t])
   useEffect(() => {
     if (tab === 'historico') loadHistory()
     if (tab === 'banco') { loadBank(); loadCompensation() }
@@ -579,42 +405,6 @@ export default function PontoPage() {
     setReminderDismissed(false)
   }, [records])
 
-  // ── Auto punch-out by geofencing ───────────────────────────────────────────
-  useEffect(() => {
-    if (!user) return
-    const { state: ws } = getWorkState(records.filter(r => r.employee_id === user.id))
-    if (ws !== 'working') return
-    if (user.geo_mode !== 'required') return
-    if (user.workplace_lat == null) return
-
-    function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-      const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    }
-
-    const iv = setInterval(async () => {
-      if (document.visibilityState !== 'visible') return
-      const geo = await getGeo()
-      if (!geo) return
-      const distM = haversineKm(user.workplace_lat!, user.workplace_lng!, geo.lat, geo.lng) * 1000
-      const maxDist = (user.max_distance_meters ?? 200) * 1.5
-      if (distM > maxDist) {
-        try {
-          const res = await fetch('/api/punch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'saída', auto_exit: true, latitude: geo.lat, longitude: geo.lng }),
-          })
-          if (res.ok) {
-            setAutoExitBanner(t('emp.auto_exit'))
-            loadRecords()
-          }
-        } catch { /* non-critical */ }
-      }
-    }, 300_000)
-    return () => clearInterval(iv)
-  }, [user, records, loadRecords, t])
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -762,8 +552,9 @@ export default function PontoPage() {
     </div>
   )
 
-  const myRecs = records.filter(r => r.employee_id === user.id)
-  const { state, since } = getWorkState(myRecs)
+  const myRecs = myRecsMemo
+  const state = stateMemo
+  const since = sinceMemo
   const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
   const targetMin = user.workday_hours * 60
   const pct = Math.min(100, (liveMin / targetMin) * 100)
@@ -777,39 +568,39 @@ export default function PontoPage() {
   const greeting = now && now.getHours() < 12 ? t('ponto.greeting.morning') : now && now.getHours() < 19 ? t('ponto.greeting.afternoon') : t('ponto.greeting.evening')
 
   // ── History tab helpers ──────────────────────────────────────────────────────
-  const byDay = new Map<string, PunchRecord[]>()
-  historyRecs.forEach(r => {
-    if (!byDay.has(r.date)) byDay.set(r.date, [])
-    byDay.get(r.date)!.push(r)
-  })
-  const sortedDays = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a))
-  // Sum the rounded daily totals so the month total matches the sum of the
-  // displayed rows (each rounded to the nearest quarter-hour).
-  const totalMonthMin = sortedDays.reduce((sum, date) => {
-    const recs = byDay.get(date)!
-    const exact = calcNetMinutes(recs, user.lunch_break_minutes)
-    return sum + roundToQuarter(exact)
-  }, 0)
-  // working weekdays in the loaded month with no records = absent
-  const absentDays: string[] = (() => {
-    if (!historyLoaded || historyRecs.length === 0 && sortedDays.length === 0) return []
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const { year, month } = histYM
-    const firstOfMonth = `${year}-${pad(month + 1)}-01`
-    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
-    const monthEnd = `${year}-${pad(month + 1)}-${pad(lastDay)}`
-    const today = businessDate()
-    const cur = new Date(firstOfMonth + 'T12:00:00')
-    const end = new Date((monthEnd > today ? today : monthEnd) + 'T12:00:00')
-    const absent: string[] = []
-    while (cur <= end) {
-      const d = cur.getDay()
-      const iso = cur.toISOString().split('T')[0]
-      if (d !== 0 && d !== 6 && !byDay.has(iso) && !historyExceptions.includes(iso)) absent.push(iso)
-      cur.setDate(cur.getDate() + 1)
-    }
-    return absent
-  })()
+  const { byDay, sortedDays, totalMonthMin, absentDays } = useMemo(() => {
+    const byDay = new Map<string, PunchRecord[]>()
+    historyRecs.forEach(r => {
+      if (!byDay.has(r.date)) byDay.set(r.date, [])
+      byDay.get(r.date)!.push(r)
+    })
+    const sortedDays = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a))
+    const totalMonthMin = sortedDays.reduce((sum, date) => {
+      const recs = byDay.get(date)!
+      const exact = calcNetMinutes(recs, user.lunch_break_minutes)
+      return sum + roundToQuarter(exact)
+    }, 0)
+    const absentDays: string[] = (() => {
+      if (!historyLoaded || (historyRecs.length === 0 && sortedDays.length === 0)) return []
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const { year, month } = histYM
+      const firstOfMonth = `${year}-${pad(month + 1)}-01`
+      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+      const monthEnd = `${year}-${pad(month + 1)}-${pad(lastDay)}`
+      const today = businessDate()
+      const cur = new Date(firstOfMonth + 'T12:00:00')
+      const end = new Date((monthEnd > today ? today : monthEnd) + 'T12:00:00')
+      const absent: string[] = []
+      while (cur <= end) {
+        const d = cur.getDay()
+        const iso = cur.toISOString().split('T')[0]
+        if (d !== 0 && d !== 6 && !byDay.has(iso) && !historyExceptions.includes(iso)) absent.push(iso)
+        cur.setDate(cur.getDate() + 1)
+      }
+      return absent
+    })()
+    return { byDay, sortedDays, totalMonthMin, absentDays }
+  }, [historyRecs, histYM, historyLoaded, historyExceptions, user.lunch_break_minutes])
 
   const _todayBiz = businessDate()
   const isCurrentHistMonth = histYM.year === Number(_todayBiz.slice(0, 4)) && histYM.month === Number(_todayBiz.slice(5, 7)) - 1
@@ -974,7 +765,7 @@ export default function PontoPage() {
         )}
 
         {/* ── TAB CONTENT (key forces remount for enter animation) ─────────── */}
-        <div key={tab} className="tab-fade">
+        <div key={tab} className="tab-fade" role="tabpanel" id={`tabpanel-${tab}`} aria-label={t(TAB_TITLES[tab])}>
         {/* ── PONTO TAB ─────────────────────────────────────────────────────── */}
         {tab === 'ponto' && (
           <PontoTab

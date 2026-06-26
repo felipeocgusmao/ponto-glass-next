@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { EmployeeProfile, PunchRecord } from '@/lib/types'
 import { fmtMinutes, fmtEur } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
@@ -70,7 +71,7 @@ interface Props {
   setConfirmingOut: (v: boolean) => void
 }
 
-export function PontoTab({ user, state, since, liveMin, targetMin: _targetMin, pct, remaining, overtime, earnings, hh, mm, ss, greeting, myRecs, punching, punch, geoDistance, setConfirmingOut }: Props) {
+export const PontoTab = memo(function PontoTab({ user, state, since, liveMin, targetMin: _targetMin, pct, remaining, overtime, earnings, hh, mm, ss, greeting, myRecs, punching, punch, geoDistance, setConfirmingOut }: Props) {
   const { t } = useLang()
   const isPastStart = (() => {
     const now = new Date()
@@ -95,7 +96,7 @@ export function PontoTab({ user, state, since, liveMin, targetMin: _targetMin, p
           <span>{hh}</span><span className="emp-clock-sep">:</span><span>{mm}</span>
           <span className="emp-clock-sec">:{ss}</span>
         </div>
-        <div className="emp-status">
+        <div className="emp-status" aria-live="polite" aria-atomic="true">
           {state === 'working' && since && <span className="chip success"><span className="dot"/>{t('ponto.status.working')} {fmtTime(since)}{remaining > 0 && ` · ${fmtMinutes(remaining)} restantes`}</span>}
           {state === 'lunch' && since && <span className="chip warn"><span className="dot"/>{t('ponto.status.lunch')} {fmtTime(since)}</span>}
           {state === 'coffee' && since && <span className="chip warn"><span className="dot"/>{t('ponto.status.coffee')} {fmtTime(since)}</span>}
@@ -197,4 +198,4 @@ export function PontoTab({ user, state, since, liveMin, targetMin: _targetMin, p
       </div>
     </div>
   )
-}
+})

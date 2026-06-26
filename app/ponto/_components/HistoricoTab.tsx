@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
 import { calcNetMinutes, fmtCentesimal, roundToQuarter, openPayslip, businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
@@ -36,7 +37,7 @@ interface Props {
   goNextMonth: () => void
 }
 
-export function HistoricoTab({
+export const HistoricoTab = memo(function HistoricoTab({
   user, historyLoading, historyRecs, historyExceptionsFull,
   byDay, sortedDays, totalMonthMin, absentDays,
   histYM, histMonthLabel, isCurrentHistMonth,
@@ -212,4 +213,4 @@ export function HistoricoTab({
       )}
     </div>
   )
-}
+})
