@@ -362,9 +362,10 @@ const t = {
     'profile.save_email':  'Guardar email',
     'profile.info':        'Informações da conta',
     'profile.security':    'Segurança',
-    'profile.theme':       'Tema',
-    'profile.theme.dark':  'Escuro',
-    'profile.theme.light': 'Claro',
+    'profile.theme':        'Tema',
+    'profile.theme.dark':   'Escuro',
+    'profile.theme.light':  'Claro',
+    'profile.theme.system': 'Sistema',
 
     // ── Kiosk ─────────────────────────────────────────────────────────────
     'kiosk.title':        'Terminal de Ponto',
@@ -1026,9 +1027,10 @@ const t = {
     'profile.save_email':  'Salvar email',
     'profile.info':        'Informações da conta',
     'profile.security':    'Segurança',
-    'profile.theme':       'Tema',
-    'profile.theme.dark':  'Escuro',
-    'profile.theme.light': 'Claro',
+    'profile.theme':        'Tema',
+    'profile.theme.dark':   'Escuro',
+    'profile.theme.light':  'Claro',
+    'profile.theme.system': 'Sistema',
 
     // ── Kiosk ─────────────────────────────────────────────────────────────
     'kiosk.title':        'Terminal de Ponto',
@@ -1648,9 +1650,10 @@ const t = {
     'profile.save_email':  'Save email',
     'profile.info':        'Account info',
     'profile.security':    'Security',
-    'profile.theme':       'Theme',
-    'profile.theme.dark':  'Dark',
-    'profile.theme.light': 'Light',
+    'profile.theme':        'Theme',
+    'profile.theme.dark':   'Dark',
+    'profile.theme.light':  'Light',
+    'profile.theme.system': 'System',
 
     // ── Kiosk ─────────────────────────────────────────────────────────────
     'kiosk.title':        'Time Clock Terminal',
@@ -2258,9 +2261,10 @@ const t = {
     'profile.save_email':  'Guardar email',
     'profile.info':        'Información de la cuenta',
     'profile.security':    'Seguridad',
-    'profile.theme':       'Tema',
-    'profile.theme.dark':  'Oscuro',
-    'profile.theme.light': 'Claro',
+    'profile.theme':        'Tema',
+    'profile.theme.dark':   'Oscuro',
+    'profile.theme.light':  'Claro',
+    'profile.theme.system': 'Sistema',
 
     'ponto.reminder':         '¿Olvidaste fichar la salida?',
     'ponto.reminder.body':    'Llevas {n} min de tu horario.',

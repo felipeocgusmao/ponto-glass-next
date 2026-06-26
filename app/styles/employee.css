@@ -1,0 +1,78 @@
+/* ─── Employee topbar user menu (the ponto page reuses the shared .app /
+   .main / .topbar / .page shell; only these content pieces are bespoke) ─── */
+.emp-user-menu { display: flex; align-items: center; gap: 12px; }
+.emp-user-info { text-align: right; line-height: 1.2; }
+.emp-user-name { font-size: 13px; font-weight: 550; color: var(--fg); }
+.emp-user-role { font-size: 11px; color: var(--fg-subtle); }
+
+/* Mobile-first card: full width, compact padding */
+.emp-card {
+  width: 100%; max-width: 100%; background: rgba(255,255,255,0.52); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 24px 16px 20px; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 28px; overflow-x: hidden;
+  backdrop-filter: blur(28px) saturate(2.0);
+  -webkit-backdrop-filter: blur(28px) saturate(2.0);
+}
+/* Clock scales to fit any width */
+.emp-clock-time { font-size: clamp(40px, 11vw, 64px); font-weight: 500; letter-spacing: -0.04em; line-height: 1; color: var(--fg); display: flex; align-items: baseline; }
+/* Stats column must not blow out the progress grid */
+.emp-stats { min-width: 0; }
+.emp-stat-label { font-size: 12px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Smaller ring on mobile */
+.emp-ring { width: 90px; height: 90px; flex-shrink: 0; }
+[data-theme="dark"] .emp-card { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
+.emp-greeting { text-align: center; }
+.emp-greeting-hi { font-size: 16px; color: var(--fg-muted); font-weight: 400; }
+.emp-greeting-date { font-size: 12.5px; color: var(--fg-subtle); margin-top: 2px; }
+.emp-clock-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.emp-clock-time { font-size: 64px; font-weight: 500; letter-spacing: -0.04em; line-height: 1; color: var(--fg); display: flex; align-items: baseline; }
+.emp-clock-sep { animation: pg-blink 1s steps(2) infinite; }
+.emp-clock-sec { font-size: 24px; color: var(--fg-subtle); margin-left: 6px; font-weight: 400; }
+.emp-status { display: flex; justify-content: center; }
+/* MeuPonto (admin) — 2-column layout that stacks below 900px */
+.meu-ponto-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .meu-ponto-grid { grid-template-columns: 1fr; } }
+
+.emp-progress {
+  display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center;
+  padding: 16px; background: rgba(255,255,255,0.45); border-radius: var(--r-lg); border: 1px solid var(--border);
+  backdrop-filter: blur(12px) saturate(1.5);
+  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+}
+[data-theme="dark"] .emp-progress { background: rgba(255,255,255,0.04); }
+.emp-ring { width: 110px; height: 110px; flex-shrink: 0; }
+.emp-stats { display: flex; flex-direction: column; gap: 10px; }
+.emp-stat { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.emp-stat-label { font-size: 12px; color: var(--fg-muted); }
+.emp-stat-value { font-size: 15px; font-weight: 600; font-family: var(--font-mono); letter-spacing: -0.02em; }
+.emp-stat.primary .emp-stat-value { font-size: 17px; color: var(--fg); }
+.emp-stat.tone-warn .emp-stat-value { color: var(--warning-fg); }
+.emp-stat.tone-success .emp-stat-value { color: var(--success-fg); }
+.emp-actions { display: flex; flex-direction: column; gap: 10px; }
+.emp-action-row { display: flex; gap: 10px; }
+.emp-action-row .btn-emp { flex: 1; }
+.btn-emp {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 46px; padding: 0 20px; font-size: 14px; font-weight: 550;
+  border-radius: var(--r-md); border: 1px solid var(--border);
+  background: var(--surface); color: var(--fg); cursor: pointer;
+  transition: background 0.12s, transform 0.06s; white-space: nowrap;
+}
+.btn-emp:hover { background: var(--hover); border-color: var(--border-strong); }
+.btn-emp:active { transform: translateY(1px); }
+.btn-emp.primary-big {
+  background: var(--accent); color: white; border-color: var(--accent); height: 54px; font-size: 15px; font-weight: 600;
+  box-shadow: 0 4px 12px -2px color-mix(in oklch, var(--accent) 40%, transparent), inset 0 1px 0 rgba(255,255,255,0.18);
+}
+.btn-emp.primary-big:hover { background: color-mix(in oklch, var(--accent) 90%, #000); }
+[data-theme="dark"] .btn-emp.primary-big { color: #0c0d10; }
+[data-theme="dark"] .btn-emp.primary-big:hover { background: color-mix(in oklch, var(--accent) 90%, #fff); }
+.btn-emp.danger-big { height: 46px; color: var(--danger-fg); background: var(--danger-soft); border-color: transparent; }
+.btn-emp.danger-big:hover { background: color-mix(in oklch, var(--danger-soft) 85%, var(--danger)); }
+.btn-emp.warn { color: var(--warning-fg); background: var(--warning-soft); border-color: transparent; }
+.btn-emp.warn:hover { background: color-mix(in oklch, var(--warning-soft) 85%, var(--warning)); }
+.emp-history { display: flex; flex-direction: column; gap: 10px; }
+.emp-history-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle); }
+.emp-history-empty { padding: 16px; border: 1px dashed var(--border-strong); border-radius: var(--r-md); text-align: center; font-size: 12.5px; color: var(--fg-muted); }
+.emp-history-list { display: flex; flex-direction: column; gap: 4px; }
+.emp-history-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface-2); border-radius: var(--r-sm); }

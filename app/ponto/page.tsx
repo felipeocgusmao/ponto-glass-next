@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
-import { CalendarView } from './_components/CalendarView'
 import EmpSidebar from './_components/EmpSidebar'
-import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, fmtMinutes, fmtCentesimal, fmtCentesimalSigned, fmtEur, roundToQuarter, openPayslip, businessDate, empColor, avatarInitials } from '@/lib/utils'
+import { PontoTab } from './_components/PontoTab'
+import { HistoricoTab } from './_components/HistoricoTab'
+import { BancoTab } from './_components/BancoTab'
+import { CorrecoesTab } from './_components/CorrecoesTab'
+import { PerfilTab } from './_components/PerfilTab'
+import { calcTimeBreakdown, calcNetMinutes, WORKING_TYPES, roundToQuarter, businessDate, empColor, avatarInitials } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
 import SettingsModal from '@/app/admin/_components/SettingsModal'
-import { SunIcon, MoonIcon } from '@/app/admin/_components/icons'
-import { TotpSection } from '@/app/_components/TotpSection'
 
 type PunchType = 'entrada' | 'saída' | 'inicio_almoco' | 'fim_almoco' | 'pausa_cafe' | 'retorno_cafe'
 type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
@@ -19,17 +21,6 @@ type Tab = 'ponto' | 'historico' | 'banco' | 'correcoes' | 'perfil'
 type CorrectionStatus = 'pending' | 'approved' | 'rejected'
 interface CorrReq { id: string; req_type: string; req_timestamp: string; req_date: string; reason: string | null; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
 interface CompReq { id: string; date: string; hours_requested: number; reason: string; status: CorrectionStatus; reviewer_note: string | null; created_at: string }
-
-// Fallback map used only when t() key lookup fails (e.g. SSR without context)
-const PUNCH_LABEL_PT: Record<string, string> = {
-  entrada: 'Entrada', 'saída': 'Saída',
-  inicio_almoco: 'Início almoço', fim_almoco: 'Fim almoço',
-  pausa_cafe: 'Pausa café', retorno_cafe: 'Retorno café',
-}
-const PUNCH_TONE: Record<string, string> = {
-  entrada: 'success', fim_almoco: 'success', retorno_cafe: 'success',
-  'saída': 'danger', inicio_almoco: 'warn', pausa_cafe: 'warn',
-}
 
 // Topbar breadcrumb labels per tab (mirrors the admin panel's title chip).
 const TAB_TITLES: Record<Tab, 'tab.meu_ponto' | 'tab.registros' | 'tab.banco' | 'tab.correcoes' | 'tab.perfil'> = {
@@ -67,49 +58,13 @@ function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
   return Math.round(base)
 }
 
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
-}
-
 async function getGeo(): Promise<{ lat: number; lng: number } | null> {
   const { getPosition } = await import('@/lib/native')
   return getPosition(8000)
 }
 
-function ProgressRing({ pct, overtime, label }: { pct: number; overtime: boolean; label: string }) {
-  const r = 56, c = 2 * Math.PI * r
-  const off = c - (pct / 100) * c
-  return (
-    <svg viewBox="-70 -70 140 140" className="emp-ring">
-      <circle cx="0" cy="0" r={r} fill="none" stroke="var(--surface-3)" strokeWidth="8"/>
-      <circle cx="0" cy="0" r={r} fill="none"
-        stroke={overtime ? 'var(--warning)' : 'var(--accent)'}
-        strokeWidth="8" strokeDasharray={c} strokeDashoffset={off}
-        transform="rotate(-90)" strokeLinecap="round"
-        style={{ transition: 'stroke-dashoffset 0.5s ease' }}/>
-      <text x="0" y="2" textAnchor="middle" dominantBaseline="middle"
-        fontSize="20" fontWeight="600" fill="var(--fg)"
-        fontFamily="var(--font-mono)" letterSpacing="-0.04em">
-        {Math.round(pct)}%
-      </text>
-      <text x="0" y="20" textAnchor="middle" fontSize="9"
-        fill="var(--fg-subtle)" fontWeight="600" letterSpacing="0.06em">
-        {label}
-      </text>
-    </svg>
-  )
-}
-
-function PlayIcon({ size = 16 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> }
 function StopIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg> }
-function UtensilsIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><line x1="7" y1="2" x2="7" y2="22"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg> }
-function CoffeeIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> }
 function RefreshIcon({ size = 14 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg> }
-function ClockIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg> }
-function HistoryIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> }
-function BankIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg> }
-function EditIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> }
-function UserIcon({ size = 18 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
 
 export default function PontoPage() {
   const { t } = useLang()
@@ -118,6 +73,7 @@ export default function PontoPage() {
   const [records, setRecords] = useState<PunchRecord[]>([])
   const [now, setNow] = useState<Date | null>(null)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [isSystemTheme, setIsSystemTheme] = useState(false)
   const [accent, setAccentState] = useState('indigo')
   const [font, setFontState] = useState('inter')
   const [punching, setPunching] = useState(false)
@@ -196,6 +152,11 @@ export default function PontoPage() {
   const router = useRouter()
   const fetchSeq = useRef(0)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pullStartY = useRef(0)
+  const [pullDistance, setPullDistance] = useState(0)
+  const [isPulling, setIsPulling] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const pageRef = useRef<HTMLDivElement>(null)
 
   // A token can stay validly *signed* (so the edge middleware bounces /login back to a
   // protected page) while the API rejects it — e.g. the session was revoked via
@@ -415,6 +376,47 @@ export default function PontoPage() {
     return () => clearInterval(i)
   }, [])
 
+  // Pull-to-refresh: swipe down from top of the page element
+  useEffect(() => {
+    const el = pageRef.current
+    if (!el) return
+    const THRESHOLD = 72
+    const onTouchStart = (e: TouchEvent) => {
+      if (el.scrollTop > 0) return
+      pullStartY.current = e.touches[0].clientY
+      setIsPulling(true)
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isPulling && el.scrollTop > 0) return
+      const dy = e.touches[0].clientY - pullStartY.current
+      if (dy > 0) {
+        setPullDistance(Math.min(dy, THRESHOLD * 1.5))
+        if (dy > 10) e.preventDefault()
+      }
+    }
+    const onTouchEnd = async () => {
+      if (pullDistance >= THRESHOLD && !isRefreshing) {
+        setIsRefreshing(true)
+        setPullDistance(0)
+        setIsPulling(false)
+        await Promise.all([loadUser(), loadRecords()])
+        setIsRefreshing(false)
+      } else {
+        setPullDistance(0)
+        setIsPulling(false)
+      }
+    }
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPulling, pullDistance, isRefreshing, loadUser, loadRecords])
+
   useEffect(() => {
     const iv = setInterval(() => {
       if (document.visibilityState === 'visible') loadRecords()
@@ -570,7 +572,13 @@ export default function PontoPage() {
       setTheme(t)
       document.documentElement.setAttribute('data-theme', t)
     }
-    if (saved) { applyTheme(saved) } else { applyTheme(mq.matches ? 'dark' : 'light') }
+    if (saved) {
+      applyTheme(saved)
+      setIsSystemTheme(false)
+    } else {
+      applyTheme(mq.matches ? 'dark' : 'light')
+      setIsSystemTheme(true)
+    }
     const handleColorScheme = (e: MediaQueryListEvent) => {
       if (!localStorage.getItem('pg.theme')) applyTheme(e.matches ? 'dark' : 'light')
     }
@@ -637,13 +645,24 @@ export default function PontoPage() {
     return () => clearInterval(iv)
   }, [user, records, loadRecords])
 
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    document.documentElement.setAttribute('data-theme', next)
-    localStorage.setItem('pg.theme', next)
-    fetch('/api/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: next }) }).catch(() => {})
+  const selectTheme = (mode: 'dark' | 'light' | 'system') => {
+    if (mode === 'system') {
+      localStorage.removeItem('pg.theme')
+      setIsSystemTheme(true)
+      const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      const next = sysDark ? 'dark' : 'light'
+      setTheme(next)
+      document.documentElement.setAttribute('data-theme', next)
+    } else {
+      setIsSystemTheme(false)
+      setTheme(mode)
+      document.documentElement.setAttribute('data-theme', mode)
+      localStorage.setItem('pg.theme', mode)
+      fetch('/api/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: mode }) }).catch(() => {})
+    }
   }
+
+  const toggleTheme = () => selectTheme(theme === 'dark' ? 'light' : 'dark')
 
   const changeAccent = (a: string) => {
     setAccentState(a)
@@ -720,7 +739,7 @@ export default function PontoPage() {
         // Replace optimistic record with the authoritative server record
         setRecords(prev => [...prev.filter(r => r.id !== tempId), rec])
         setHistoryLoaded(false)
-        showToast(type === 'entrada' ? t('ponto.registered_in') : type === 'saída' ? t('ponto.registered_out') : PUNCH_LABEL_PT[type])
+        showToast(type === 'entrada' ? t('ponto.registered_in') : type === 'saída' ? t('ponto.registered_out') : t(`punch.${type}` as Parameters<typeof t>[0]))
         loadRecords()
       } else {
         setRecords(prev => prev.filter(r => r.id !== tempId))
@@ -776,8 +795,30 @@ export default function PontoPage() {
   )
 
   if (!user) return (
-    <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--bg)' }}>
-      <div className="tnum mono" style={{ fontSize: 32, color: 'var(--fg-dim)' }}>…</div>
+    <div className="app">
+      <div className="main">
+        <div className="topbar">
+          <div className="skeleton" style={{ width: 32, height: 32, borderRadius: 6, flexShrink: 0 }} />
+          <div className="skeleton" style={{ width: 120, height: 13 }} />
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <div className="skeleton" style={{ width: 28, height: 28, borderRadius: 6 }} />
+            <div className="skeleton skeleton-avatar" style={{ width: 30, height: 30 }} />
+          </div>
+        </div>
+        <div className="page">
+          <div className="emp-card" style={{ gap: 20 }}>
+            <div className="skeleton" style={{ height: 18, width: '50%', margin: '0 auto' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <div className="skeleton" style={{ width: 90, height: 56, borderRadius: 4 }} />
+              <div className="skeleton" style={{ width: 80, height: 22, borderRadius: 999 }} />
+            </div>
+            <div className="skeleton" style={{ height: 110, borderRadius: 10 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="skeleton" style={{ height: 54, borderRadius: 8 }} />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 
@@ -845,7 +886,8 @@ export default function PontoPage() {
           theme={theme}
           accent={accent}
           font={font}
-          onToggleTheme={toggleTheme}
+          isSystemTheme={isSystemTheme}
+          onSelectTheme={selectTheme}
           onChangeAccent={changeAccent}
           onChangeFont={changeFont}
           onChangePwd={() => { setTab('perfil'); setShowSettings(false) }}
@@ -903,7 +945,30 @@ export default function PontoPage() {
           </button>
         </div>
 
-        <div className="page">
+        <div className="page" ref={pageRef} id="main-content">
+
+        {/* ── PULL-TO-REFRESH INDICATOR ─────────────────────────────────── */}
+        {(pullDistance > 8 || isRefreshing) && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0,
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            height: Math.max(pullDistance, isRefreshing ? 48 : 0),
+            pointerEvents: 'none', zIndex: 10,
+            transition: isRefreshing ? 'height 0.2s' : 'none',
+          }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-md)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transform: isRefreshing ? 'none' : `rotate(${Math.min(pullDistance / 72 * 360, 360)}deg)`,
+              transition: isRefreshing ? 'transform 0.3s' : 'none',
+            }}>
+              <RefreshIcon size={16} />
+            </div>
+          </div>
+        )}
 
         {/* ── OFFLINE / QUEUE BANNER ────────────────────────────────────── */}
         {(!isOnline || queueCount > 0) && (
@@ -970,563 +1035,69 @@ export default function PontoPage() {
 
         {/* ── PONTO TAB ─────────────────────────────────────────────────────── */}
         {tab === 'ponto' && (
-          <div className="emp-card">
-            <div className="emp-greeting">
-              <div className="emp-greeting-hi">
-                {greeting},{' '}
-                <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{user.name.split(' ')[0]}</span>
-              </div>
-              <div className="emp-greeting-date" style={{ textTransform: 'capitalize' }}>
-                {now ? now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' }) : ''}
-              </div>
-            </div>
-
-            <div className="emp-clock-wrap">
-              <div className="emp-clock-time tnum mono">
-                <span>{hh}</span><span className="emp-clock-sep">:</span><span>{mm}</span>
-                <span className="emp-clock-sec">:{ss}</span>
-              </div>
-              <div className="emp-status">
-                {state === 'working' && since && <span className="chip success"><span className="dot"/>{t('ponto.status.working')} {fmtTime(since)}</span>}
-                {state === 'lunch' && since && <span className="chip warn"><span className="dot"/>{t('ponto.status.lunch')} {fmtTime(since)}</span>}
-                {state === 'coffee' && since && <span className="chip warn"><span className="dot"/>{t('ponto.status.coffee')} {fmtTime(since)}</span>}
-                {state === 'out' && since && <span className="chip">{t('ponto.status.out')} {fmtTime(since)}</span>}
-                {state === 'absent' && <span className="chip">{t('ponto.status.absent')}</span>}
-              </div>
-            </div>
-
-            <div className="emp-progress">
-              <ProgressRing pct={pct} overtime={overtime > 0} label={t('ponto.journey')}/>
-              <div className="emp-stats">
-                <div className="emp-stat primary">
-                  <span className="emp-stat-label">{t('ponto.worked')}</span>
-                  <span className="emp-stat-value">{fmtMinutes(liveMin)}</span>
-                </div>
-                <div className={`emp-stat ${overtime > 0 ? 'tone-warn' : ''}`}>
-                  <span className="emp-stat-label">{overtime > 0 ? t('ponto.overtime') : t('ponto.remaining')}</span>
-                  <span className="emp-stat-value">{overtime > 0 ? '+' + fmtMinutes(overtime) : fmtMinutes(remaining)}</span>
-                </div>
-                {earnings != null && (
-                  <div className="emp-stat tone-success">
-                    <span className="emp-stat-label">{t('ponto.daily_earnings')}</span>
-                    <span className="emp-stat-value">{fmtEur(earnings)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="emp-actions">
-              {state === 'absent' && (
-                <button className="btn-emp primary-big" onClick={() => punch('entrada')} disabled={punching}>
-                  <PlayIcon size={16}/> {punching ? t('ponto.registering') : t('ponto.punch_in')}
-                </button>
-              )}
-              {state === 'working' && (
-                <>
-                  <div className="emp-action-row">
-                    <button className="btn-emp warn" onClick={() => punch('inicio_almoco')} disabled={punching}><UtensilsIcon size={14}/> {t('ponto.lunch_start')}</button>
-                    <button className="btn-emp warn" onClick={() => punch('pausa_cafe')} disabled={punching}><CoffeeIcon size={14}/> {t('ponto.coffee_start')}</button>
-                  </div>
-                  <button className="btn-emp danger-big" onClick={() => setConfirmingOut(true)} disabled={punching}>
-                    <StopIcon size={14}/> {t('ponto.punch_out')}
-                  </button>
-                </>
-              )}
-              {state === 'lunch' && (
-                <button className="btn-emp primary-big" onClick={() => punch('fim_almoco')} disabled={punching}>
-                  <PlayIcon size={16}/> {punching ? t('ponto.registering') : t('ponto.lunch_end')}
-                </button>
-              )}
-              {state === 'coffee' && (
-                <button className="btn-emp primary-big" onClick={() => punch('retorno_cafe')} disabled={punching}>
-                  <PlayIcon size={16}/> {punching ? t('ponto.registering') : t('ponto.coffee_end')}
-                </button>
-              )}
-              {state === 'out' && (
-                <button className="btn-emp" onClick={() => punch('entrada')} disabled={punching}>
-                  <RefreshIcon size={14}/> {t('ponto.punch_again')}
-                </button>
-              )}
-            </div>
-
-            {/* Geolocation distance indicator */}
-            {geoDistance !== null && user.workplace_lat != null && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 11, color: geoDistance <= (user.max_distance_meters ?? 200) ? 'var(--success-fg)' : 'var(--fg-muted)',
-                justifyContent: 'center', marginBottom: 4,
-              }}>
-                <span>📍</span>
-                <span>
-                  {geoDistance <= (user.max_distance_meters ?? 200)
-                    ? t('geo.inside')
-                    : t('geo.distance_m').replace('{n}', String(geoDistance))}
-                </span>
-              </div>
-            )}
-
-            <div className="emp-history">
-              <div className="emp-history-head">
-                <span>{t('ponto.today_history')}</span>
-                <span className="muted tnum" style={{ fontSize: 11 }}>
-                  {myRecs.length} {myRecs.length === 1 ? t('ponto.punch') : t('ponto.punches')}
-                </span>
-              </div>
-              {myRecs.length === 0 ? (
-                <div className="emp-history-empty">{t('ponto.no_punches')}</div>
-              ) : (
-                <div className="emp-history-list">
-                  {[...myRecs]
-                    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                    .map(r => (
-                      <div key={r.id} className="emp-history-item">
-                        <span className={`chip ${PUNCH_TONE[r.type] ?? ''} outline`}>{t(`punch.${r.type}` as Parameters<typeof t>[0]) || PUNCH_LABEL_PT[r.type] || r.type}</span>
-                        <span className="muted tnum mono" style={{ marginLeft: 'auto', fontSize: 12 }}>{fmtTime(r.timestamp)}</span>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <PontoTab
+            user={user} state={state} since={since}
+            liveMin={liveMin} targetMin={targetMin} pct={pct}
+            remaining={remaining} overtime={overtime} earnings={earnings}
+            hh={hh} mm={mm} ss={ss} greeting={greeting}
+            myRecs={myRecs} punching={punching} punch={punch}
+            geoDistance={geoDistance} setConfirmingOut={setConfirmingOut}
+          />
         )}
 
         {/* ── HISTÓRICO TAB ─────────────────────────────────────────────────── */}
         {tab === 'historico' && (
-          <div className="emp-card">
-            {/* Weekly bar chart — only shown when viewing the current month */}
-            {isCurrentHistMonth && !historyLoading && byDay.size > 0 && (() => {
-              const targetMin = (user?.workday_hours ?? 8) * 60
-              const today = businessDate()
-              const days7: { date: string; min: number; isToday: boolean; isWeekend: boolean }[] = []
-              for (let i = 6; i >= 0; i--) {
-                const d = new Date(today + 'T12:00:00')
-                d.setDate(d.getDate() - i)
-                const iso = d.toISOString().split('T')[0]
-                const recs = byDay.get(iso) ?? []
-                const dow = d.getDay()
-                days7.push({
-                  date: iso,
-                  min: recs.length > 0 ? roundToQuarter(calcNetMinutes(recs, user.lunch_break_minutes)) : 0,
-                  isToday: iso === today,
-                  isWeekend: dow === 0 || dow === 6,
-                })
-              }
-              const maxMin = Math.max(targetMin * 1.2, ...days7.map(d => d.min))
-              const W = 44, GAP = 6, H = 52, LABEL_H = 18
-              const totalW = days7.length * W + (days7.length - 1) * GAP
-              return (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 8 }}>{t('emp.last_7_days')}</div>
-                  <svg width="100%" viewBox={`0 0 ${totalW} ${H + LABEL_H}`} style={{ overflow: 'visible', display: 'block' }}>
-                    {/* target line */}
-                    <line
-                      x1={0} y1={H - (targetMin / maxMin) * H}
-                      x2={totalW} y2={H - (targetMin / maxMin) * H}
-                      stroke="var(--accent)" strokeWidth="1" strokeDasharray="3 3" opacity="0.5"
-                    />
-                    {days7.map((d, i) => {
-                      const barH = d.min > 0 ? Math.max(3, (d.min / maxMin) * H) : 0
-                      const x = i * (W + GAP)
-                      const [, mo, day] = d.date.split('-').map(Number)
-                      const fill = d.isToday ? 'var(--accent)' : d.isWeekend ? 'var(--surface-3)' : 'var(--surface-2)'
-                      const textColor = d.isToday ? 'var(--accent)' : 'var(--fg-subtle)'
-                      return (
-                        <g key={d.date}>
-                          <rect
-                            x={x} y={H - barH} width={W} height={barH}
-                            rx={4} fill={fill} opacity={d.isWeekend && !d.min ? 0.4 : 1}
-                          />
-                          {d.min > 0 && (
-                            <text x={x + W / 2} y={H - barH - 3} textAnchor="middle" fontSize={8} fill="var(--fg-muted)" fontFamily="var(--font-mono)">
-                              {Math.floor(d.min / 60)}h{d.min % 60 > 0 ? String(d.min % 60).padStart(2,'0') : ''}
-                            </text>
-                          )}
-                          <text x={x + W / 2} y={H + 12} textAnchor="middle" fontSize={9} fill={textColor} fontWeight={d.isToday ? 700 : 400}>
-                            {String(day).padStart(2,'0')}/{String(mo).padStart(2,'0')}
-                          </text>
-                        </g>
-                      )
-                    })}
-                  </svg>
-                </div>
-              )
-            })()}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <button onClick={goPrevMonth} aria-label={t('emp.prev_month')}
-                    style={{ background: 'var(--surface-2)', border: 'none', cursor: 'pointer', padding: '2px 9px', borderRadius: 4, fontSize: 13, color: 'var(--fg-muted)' }}>‹</button>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', minWidth: 104, textAlign: 'center' }}>
-                    {histMonthLabel}
-                  </div>
-                  <button onClick={goNextMonth} disabled={isCurrentHistMonth} aria-label={t('emp.next_month')}
-                    style={{ background: 'var(--surface-2)', border: 'none', cursor: isCurrentHistMonth ? 'default' : 'pointer', padding: '2px 9px', borderRadius: 4, fontSize: 13, color: 'var(--fg-muted)', opacity: isCurrentHistMonth ? 0.4 : 1 }}>›</button>
-                </div>
-                <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 6, padding: '2px 3px', gap: 1 }}>
-                  <button
-                    onClick={() => setCalendarView(false)}
-                    style={{
-                      background: !calendarView ? 'var(--accent)' : 'none',
-                      border: 'none', cursor: 'pointer', padding: '3px 8px',
-                      borderRadius: 4, fontSize: 10, fontWeight: 600,
-                      color: !calendarView ? '#fff' : 'var(--fg-muted)', transition: 'all 0.15s',
-                    }}
-                  >{t('calendar.list_view')}</button>
-                  <button
-                    onClick={() => setCalendarView(true)}
-                    style={{
-                      background: calendarView ? 'var(--accent)' : 'none',
-                      border: 'none', cursor: 'pointer', padding: '3px 8px',
-                      borderRadius: 4, fontSize: 10, fontWeight: 600,
-                      color: calendarView ? '#fff' : 'var(--fg-muted)', transition: 'all 0.15s',
-                    }}
-                  >{t('calendar.calendar_view')}</button>
-                </div>
-              </div>
-              {!calendarView && totalMonthMin > 0 && (
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--fg)' }} title={fmtMinutes(totalMonthMin)}>{fmtCentesimal(totalMonthMin)}</span>
-                  <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('history.worked_month')}</span>
-                </div>
-              )}
-            </div>
-
-            {historyLoading && <div className="alert-inline info">{t('common.loading')}</div>}
-
-            {calendarView && !historyLoading && (
-              <CalendarView
-                records={historyRecs}
-                exceptions={historyExceptionsFull}
-                year={histYM.year}
-                month={histYM.month}
-                lunchBreakMinutes={user.lunch_break_minutes}
-              />
-            )}
-
-            {!calendarView && (
-              <>
-                {!historyLoading && sortedDays.length === 0 && (
-                  <div className="alert-inline info">{t('history.no_records')}</div>
-                )}
-
-                {!historyLoading && historyRecs.length > 0 && (
-                  <button
-                    className="btn-emp"
-                    style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
-                    onClick={() => {
-                      openPayslip(user.name, histMonthLabel, historyRecs, user.workday_hours, user.lunch_break_minutes, user.hourly_rate)
-                    }}
-                  >
-                    {t('history.export_payslip')}
-                  </button>
-                )}
-
-                {[
-                  ...sortedDays.map(date => ({ date, type: 'day' as const })),
-                  ...absentDays.map(date => ({ date, type: 'absent' as const })),
-                ].sort((a, b) => b.date.localeCompare(a.date)).map(({ date, type }) => {
-                  if (type === 'absent') {
-                    const dt = new Date(date + 'T12:00:00')
-                    return (
-                      <div key={`absent-${date}`} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)', textTransform: 'capitalize' }}>
-                          {dt.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
-                        </span>
-                        <span className="chip danger" style={{ fontSize: 10 }}>{t('ponto.absent_day')}</span>
-                      </div>
-                    )
-                  }
-                  const recs = byDay.get(date)!.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                  const exactDayMin = calcNetMinutes(recs, user.lunch_break_minutes)
-                  // Historical rows display the rounded centesimal value (matches relatório / holerite).
-                  const dayMin = roundToQuarter(exactDayMin)
-                  const dt = new Date(date + 'T12:00:00')
-                  const isToday = date === businessDate()
-                  return (
-                    <div key={date} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <div>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: isToday ? 'var(--accent)' : 'var(--fg)', textTransform: 'capitalize' }}>
-                            {dt.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
-                          </span>
-                          {isToday && <span className="chip accent" style={{ fontSize: 9, marginLeft: 6 }}>{t('emp.today_chip')}</span>}
-                        </div>
-                        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)', color: dayMin > 0 ? 'var(--fg)' : 'var(--fg-subtle)' }}>
-                          {dayMin > 0 ? fmtCentesimal(dayMin) : '—'}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {recs.map(r => (
-                          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span className={`chip ${PUNCH_TONE[r.type] ?? ''} outline`} style={{ fontSize: 10 }}>
-                              {t(`punch.${r.type}` as Parameters<typeof t>[0]) || PUNCH_LABEL_PT[r.type] || r.type}
-                            </span>
-                            <span className="muted tnum" style={{ fontSize: 10 }}>{fmtTime(r.timestamp)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </>
-            )}
-          </div>
+          <HistoricoTab
+            user={user}
+            historyLoading={historyLoading} historyLoaded={historyLoaded}
+            historyRecs={historyRecs} historyExceptionsFull={historyExceptionsFull}
+            byDay={byDay} sortedDays={sortedDays}
+            totalMonthMin={totalMonthMin} absentDays={absentDays}
+            histYM={histYM} histMonthLabel={histMonthLabel}
+            isCurrentHistMonth={isCurrentHistMonth}
+            calendarView={calendarView} setCalendarView={setCalendarView}
+            goPrevMonth={goPrevMonth} goNextMonth={goNextMonth}
+          />
         )}
 
         {/* ── BANCO TAB ─────────────────────────────────────────────────────── */}
         {tab === 'banco' && (
-          <div className="emp-card">
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 16 }}>
-              {t('bank.title')}
-            </div>
-
-            {bankLoading && <div className="alert-inline info">{t('common.loading')}</div>}
-
-            {!bankLoading && bankBalance !== null && (
-              <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <div style={{
-                  fontSize: 48, fontWeight: 800, fontFamily: 'var(--font-mono)',
-                  color: bankBalance >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)',
-                  letterSpacing: '-0.03em',
-                }}>
-                  {fmtCentesimalSigned(bankBalance)}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--fg-muted)', marginTop: 8 }}>
-                  {bankBalance >= 0 ? t('bank.surplus') : t('bank.deficit')}
-                </div>
-                <div style={{ marginTop: 24, padding: '12px 16px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--fg-muted)', textAlign: 'left' }}>
-                  {t('bank.explanation')}
-                </div>
-              </div>
-            )}
-
-            {!bankLoading && bankBalance === null && (
-              <div className="alert-inline info">{t('bank.load_error')}</div>
-            )}
-
-            {/* ── Compensation request form ──────────────────────────────── */}
-            <div style={{ borderTop: '1px solid var(--border)', marginTop: 20, paddingTop: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 14 }}>
-                {t('comp.title')}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <div className="field" style={{ flex: 1 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('comp.date')}</label>
-                    <input type="date" className="input" value={compDate} onChange={e => setCompDate(e.target.value)} max={businessDate()} />
-                  </div>
-                  <div className="field" style={{ flex: 1 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('comp.hours')}</label>
-                    <input type="number" min="0.5" max="24" step="0.5" className="input" value={compHours} onChange={e => setCompHours(e.target.value)} placeholder="ex: 2" />
-                  </div>
-                </div>
-                <div className="field">
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('comp.reason')} <span style={{ color: 'var(--danger-fg)' }}>*</span></label>
-                  <input type="text" className="input" value={compReason} onChange={e => setCompReason(e.target.value)} placeholder={t('comp.reason_ph').replace('{date}', compDate || '—')} />
-                </div>
-                {compMsg && <div className={`alert-inline ${compMsg.ok ? 'ok' : 'err'}`}>{compMsg.text}</div>}
-                <button className="btn-emp primary-big" onClick={submitCompensation} disabled={compSubmitting}>
-                  {compSubmitting ? t('comp.submitting') : t('comp.submit')}
-                </button>
-              </div>
-
-              {compLoading && <div className="alert-inline info">{t('common.loading')}</div>}
-
-              {compLoaded && compList.length > 0 && (
-                <>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 10 }}>
-                    {t('comp.my_requests')}
-                  </div>
-                  {compList.map(cr => (
-                    <div key={cr.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>{cr.date.split('-').reverse().join('/')} · {cr.hours_requested}h</span>
-                        <span className={`chip ${cr.status === 'approved' ? 'success' : cr.status === 'rejected' ? 'danger' : 'warn'}`} style={{ fontSize: 10 }}>
-                          {t(`comp.status.${cr.status}` as Parameters<typeof t>[0])}
-                        </span>
-                      </div>
-                      {cr.reason && <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontStyle: 'italic' }}>&ldquo;{cr.reason}&rdquo;</div>}
-                      {cr.reviewer_note && (
-                        <div style={{ marginTop: 6, padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', borderLeft: '2px solid var(--accent)', fontSize: 11, color: 'var(--fg-muted)' }}>
-                          {t('comp.reviewer_note')}: {cr.reviewer_note}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          </div>
+          <BancoTab
+            bankLoading={bankLoading} bankBalance={bankBalance}
+            compLoading={compLoading} compLoaded={compLoaded} compList={compList}
+            compDate={compDate} setCompDate={setCompDate}
+            compHours={compHours} setCompHours={setCompHours}
+            compReason={compReason} setCompReason={setCompReason}
+            compSubmitting={compSubmitting} compMsg={compMsg}
+            submitCompensation={submitCompensation}
+          />
         )}
         {/* ── CORREÇÕES TAB ─────────────────────────────────────────────── */}
         {tab === 'correcoes' && (
-          <div className="emp-card">
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 16 }}>
-              {t('corr.request_title')}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-              <div className="field">
-                <label htmlFor="corr-date" style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.date')}</label>
-                <input id="corr-date" type="date" className="input" value={corrDate} onChange={e => setCorrDate(e.target.value)} max={businessDate()} />
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div className="field" style={{ flex: 1 }}>
-                  <label htmlFor="corr-type" style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.type')}</label>
-                  <select id="corr-type" className="input" value={corrType} onChange={e => setCorrType(e.target.value)}>
-                    <option value="entrada">{t('punch.entrada')}</option>
-                    <option value="saída">{t('punch.saída')}</option>
-                    <option value="inicio_almoco">{t('punch.inicio_almoco')}</option>
-                    <option value="fim_almoco">{t('punch.fim_almoco')}</option>
-                    <option value="pausa_cafe">{t('punch.pausa_cafe')}</option>
-                    <option value="retorno_cafe">{t('punch.retorno_cafe')}</option>
-                  </select>
-                </div>
-                <div className="field" style={{ flex: 1 }}>
-                  <label htmlFor="corr-time" style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.time')}</label>
-                  <input id="corr-time" type="time" className="input" value={corrTime} onChange={e => setCorrTime(e.target.value)} />
-                </div>
-              </div>
-              <div className="field">
-                <label htmlFor="corr-reason" style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('corr.reason')}</label>
-                <input id="corr-reason" type="text" className="input" value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder={t('corr.reason_placeholder')} />
-              </div>
-
-              {corrMsg && (
-                <div className={`alert-inline ${corrMsg.ok ? 'ok' : 'err'}`}>{corrMsg.text}</div>
-              )}
-
-              <button className="btn-emp primary-big" onClick={submitCorrection} disabled={corrSubmitting}>
-                {corrSubmitting ? t('corr.submitting') : t('corr.submit')}
-              </button>
-            </div>
-
-            {corrLoading && <div className="alert-inline info">{t('common.loading')}</div>}
-
-            {corrLoaded && corrList.length > 0 && (
-              <>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 12 }}>
-                  {t('corr.my_requests')}
-                </div>
-                {corrList.map(cr => {
-                  const d = new Date(cr.req_timestamp)
-                  const dateStr = cr.req_date.split('-').reverse().join('/')
-                  const timeStr = d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
-                  return (
-                    <div key={cr.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>{t(`punch.${cr.req_type}` as Parameters<typeof t>[0]) || cr.req_type} · {dateStr} {timeStr}</span>
-                        <span className={`chip ${cr.status === 'approved' ? 'success' : cr.status === 'rejected' ? 'danger' : 'warn'}`} style={{ fontSize: 10 }}>
-                          {cr.status === 'approved' ? t('corr.status.approved') : cr.status === 'rejected' ? t('corr.status.rejected') : t('corr.status.pending')}
-                        </span>
-                      </div>
-                      {cr.reason && <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontStyle: 'italic' }}>&ldquo;{cr.reason}&rdquo;</div>}
-                      {cr.reviewer_note && (
-                        <div style={{ marginTop: 6, padding: '6px 10px', background: cr.status === 'rejected' ? 'rgba(239,68,68,0.08)' : 'var(--surface-2)', borderRadius: 'var(--r-sm)', borderLeft: `2px solid ${cr.status === 'rejected' ? 'var(--danger-fg)' : 'var(--accent)'}`, fontSize: 11, color: cr.status === 'rejected' ? 'var(--danger-fg)' : 'var(--fg-muted)' }}>
-                          {t('corr.reviewer_note')}: {cr.reviewer_note}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </>
-            )}
-          </div>
+          <CorrecoesTab
+            corrLoading={corrLoading} corrLoaded={corrLoaded} corrList={corrList}
+            corrDate={corrDate} setCorrDate={setCorrDate}
+            corrTime={corrTime} setCorrTime={setCorrTime}
+            corrType={corrType} setCorrType={setCorrType}
+            corrReason={corrReason} setCorrReason={setCorrReason}
+            corrSubmitting={corrSubmitting} corrMsg={corrMsg}
+            submitCorrection={submitCorrection}
+          />
         )}
         {/* ── PERFIL TAB ────────────────────────────────────────────────── */}
         {tab === 'perfil' && (
-          <div className="emp-card">
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 16 }}>
-              {t('profile.info')}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-              <div className={`avatar size-30 av-c${(user.id.charCodeAt(0) % 8) + 1}`}>{user.name.split(' ').slice(0,2).map(w=>w[0]?.toUpperCase()??'').join('')}</div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{user.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>@{user.username}</div>
-              </div>
-            </div>
-
-            {!user.lock_profile && (
-              <>
-                <div className="field" style={{ marginBottom: 8 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('emp.email_optional')}</label>
-                  <input type="email" className="input" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setProfileEmailMsg(null) }} placeholder="email@empresa.com" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
-                </div>
-                {profileEmailMsg && <div className={`alert-inline ${profileEmailMsg.ok ? 'ok' : 'err'}`} style={{ marginBottom: 8 }}>{profileEmailMsg.text}</div>}
-                <button className="btn-emp" style={{ width: '100%', justifyContent: 'center', marginBottom: 24 }} onClick={saveEmail} disabled={profileEmailSaving}>
-                  {profileEmailSaving ? t('pwd.saving') : t('profile.save_email')}
-                </button>
-              </>
-            )}
-
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 8 }}>
-              {t('profile.theme')}
-            </div>
-            <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 3, gap: 2, marginBottom: 24 }}>
-              {(['dark', 'light'] as const).map(th => (
-                <button
-                  key={th}
-                  onClick={() => { if (theme !== th) toggleTheme() }}
-                  style={{
-                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    background: theme === th ? 'var(--accent)' : 'none',
-                    border: 'none', cursor: 'pointer', padding: '8px',
-                    borderRadius: 6, fontSize: 13, fontWeight: theme === th ? 600 : 400,
-                    color: theme === th ? '#fff' : 'var(--fg-muted)',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {th === 'dark' ? <MoonIcon size={13}/> : <SunIcon size={13}/>}
-                  {t(th === 'dark' ? 'profile.theme.dark' : 'profile.theme.light')}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 12 }}>
-              {t('profile.security')}
-            </div>
-            {user.lock_profile ? (
-              <div className="alert-inline info" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🔒</span>
-                <span>{t('emp.profile_locked').charAt(0).toUpperCase() + t('emp.profile_locked').slice(1)}</span>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div className="field">
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.current_password')}</label>
-                  <input type="password" className="input" value={pwdCurrent} onChange={e => { setPwdCurrent(e.target.value); setPwdMsg(null) }} placeholder="••••••" />
-                </div>
-                <div className="field">
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.new_password')}</label>
-                  <input type="password" className="input" value={pwdNext} onChange={e => { setPwdNext(e.target.value); setPwdMsg(null) }} placeholder={t('pwd.min_chars')} />
-                </div>
-                <div className="field">
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('auth.confirm_password')}</label>
-                  <input type="password" className="input" value={pwdConfirm} onChange={e => { setPwdConfirm(e.target.value); setPwdMsg(null) }} placeholder="••••••" />
-                </div>
-                {pwdMsg && <div className={`alert-inline ${pwdMsg.ok ? 'ok' : 'err'}`}>{pwdMsg.text}</div>}
-                <button className="btn-emp primary-big" onClick={changePassword} disabled={pwdSaving || !pwdCurrent || !pwdNext}>
-                  {pwdSaving ? t('pwd.saving') : t('pwd.save')}
-                </button>
-                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
-                  <TotpSection />
-                </div>
-                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
-                  <button
-                    className="btn-emp"
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={async () => {
-                      await fetch('/api/auth/revoke-other-sessions', { method: 'POST' })
-                      showToast(t('emp.sessions_revoked'))
-                    }}
-                  >
-                    {t('emp.revoke_sessions')}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <PerfilTab
+            user={user} theme={theme} isSystemTheme={isSystemTheme} selectTheme={selectTheme}
+            profileEmail={profileEmail} setProfileEmail={setProfileEmail}
+            profileEmailSaving={profileEmailSaving} profileEmailMsg={profileEmailMsg}
+            setProfileEmailMsg={setProfileEmailMsg}
+            pwdCurrent={pwdCurrent} setPwdCurrent={setPwdCurrent}
+            pwdNext={pwdNext} setPwdNext={setPwdNext}
+            pwdConfirm={pwdConfirm} setPwdConfirm={setPwdConfirm}
+            pwdSaving={pwdSaving} pwdMsg={pwdMsg} setPwdMsg={setPwdMsg}
+            saveEmail={saveEmail} changePassword={changePassword}
+            showToast={showToast}
+          />
         )}
         </div>
       </div>

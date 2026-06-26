@@ -1,7 +1,7 @@
 'use client'
 
 import { useLang, LANG_LABELS, type Lang } from '@/lib/LangContext'
-import { SunIcon, MoonIcon, LockSmIcon, IconX, IconLogout } from './icons'
+import { SunIcon, MoonIcon, MonitorIcon, LockSmIcon, IconX, IconLogout } from './icons'
 import { TotpSection } from '@/app/_components/TotpSection'
 import { useState, useEffect } from 'react'
 
@@ -97,14 +97,15 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 )
 
 export default function SettingsModal({
-  theme, accent, font,
-  onToggleTheme, onChangeAccent, onChangeFont,
+  theme, accent, font, isSystemTheme,
+  onSelectTheme, onChangeAccent, onChangeFont,
   onChangePwd, onLogout, onRevokeOtherSessions, onClose,
 }: {
   theme: string
   accent: string
   font: string
-  onToggleTheme: () => void
+  isSystemTheme: boolean
+  onSelectTheme: (mode: 'dark' | 'light' | 'system') => void
   onChangeAccent: (a: string) => void
   onChangeFont: (f: string) => void
   onChangePwd: () => void
@@ -141,18 +142,25 @@ export default function SettingsModal({
               <SectionLabel>{t('settings.theme')}</SectionLabel>
               <div className="seg" style={{ width: '100%' }}>
                 <button
-                  className={theme === 'light' ? 'active' : ''}
-                  onClick={() => theme !== 'light' && onToggleTheme()}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                  className={!isSystemTheme && theme === 'light' ? 'active' : ''}
+                  onClick={() => onSelectTheme('light')}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11 }}
                 >
-                  <SunIcon /> {t('profile.theme.light')}
+                  <SunIcon size={12}/> {t('profile.theme.light')}
                 </button>
                 <button
-                  className={theme === 'dark' ? 'active' : ''}
-                  onClick={() => theme !== 'dark' && onToggleTheme()}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                  className={!isSystemTheme && theme === 'dark' ? 'active' : ''}
+                  onClick={() => onSelectTheme('dark')}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11 }}
                 >
-                  <MoonIcon /> {t('profile.theme.dark')}
+                  <MoonIcon size={12}/> {t('profile.theme.dark')}
+                </button>
+                <button
+                  className={isSystemTheme ? 'active' : ''}
+                  onClick={() => onSelectTheme('system')}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11 }}
+                >
+                  <MonitorIcon size={12}/> {t('profile.theme.system')}
                 </button>
               </div>
             </div>
