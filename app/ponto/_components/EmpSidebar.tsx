@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { avatarInitials, empColor } from '@/lib/utils'
 import type { EmployeeProfile } from '@/lib/types'
 import { useLang } from '@/lib/LangContext'
@@ -50,6 +51,30 @@ export default function EmpSidebar({
 }) {
   const { t } = useLang()
   const ci = empColor(user.id)
+  const navRef = useRef<HTMLDivElement>(null)
+
+  const handleNavKeyDown = (e: React.KeyboardEvent, tabId: Tab) => {
+    const idx = TABS.indexOf(tabId)
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      const next = TABS[(idx + 1) % TABS.length]
+      setTab(next)
+      navRef.current?.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus()
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault()
+      const prev = TABS[(idx - 1 + TABS.length) % TABS.length]
+      setTab(prev)
+      navRef.current?.querySelector<HTMLElement>(`[data-tab="${prev}"]`)?.focus()
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setTab(TABS[0])
+      navRef.current?.querySelector<HTMLElement>(`[data-tab="${TABS[0]}"]`)?.focus()
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setTab(TABS[TABS.length - 1])
+      navRef.current?.querySelector<HTMLElement>(`[data-tab="${TABS[TABS.length - 1]}"]`)?.focus()
+    }
+  }
 
   return (
     <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
@@ -80,20 +105,27 @@ export default function EmpSidebar({
         )}
       </div>
 
-      <div className="sb-nav" style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+      <div ref={navRef} className="sb-nav" role="tablist" aria-label="Navegação" aria-orientation="vertical" style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
         {TABS.map(tabId => {
           const count = badges[tabId] ?? 0
+          const isActive = tab === tabId
           return (
             <button
               key={tabId}
+              data-tab={tabId}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`tabpanel-${tabId}`}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => { setTab(tabId); onMobileClose() }}
-              className={`sb-item${tab === tabId ? ' active' : ''}`}
+              onKeyDown={e => handleNavKeyDown(e, tabId)}
+              className={`sb-item${isActive ? ' active' : ''}`}
               title={collapsed ? t(TAB_LABEL_KEYS[tabId]) : undefined}
             >
               <span className="sb-item-icon">{TAB_ICONS[tabId]}</span>
               <span className="sb-item-label">{t(TAB_LABEL_KEYS[tabId])}</span>
               {count > 0 && (
-                <span className="sb-item-badge" style={{
+                <span className="sb-item-badge" aria-label={`${count} notificação${count !== 1 ? 'ões' : ''}`} style={{
                   marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 999,
                   background: 'var(--danger-fg)', color: '#fff',
                   fontSize: 10, fontWeight: 700, display: 'flex',

@@ -552,6 +552,36 @@ td{border:1px solid #ddd;padding:7px 10px;font-size:12px}.total-row{font-weight:
   if (win) { win.document.write(html); win.document.close() }
 }
 
+// ── Work state ───────────────────────────────────────────────────────────────
+export type WorkState = 'absent' | 'working' | 'lunch' | 'coffee' | 'out'
+
+export function getWorkState(recs: PunchRecord[]): { state: WorkState; since: string | null } {
+  if (!recs.length) return { state: 'absent', since: null }
+  const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  const last = sorted[sorted.length - 1]
+  if (WORKING_TYPES.includes(last.type)) return { state: 'working', since: last.timestamp }
+  if (last.type === 'inicio_almoco') return { state: 'lunch', since: last.timestamp }
+  if (last.type === 'pausa_cafe') return { state: 'coffee', since: last.timestamp }
+  if (last.type === 'saída') return { state: 'out', since: last.timestamp }
+  return { state: 'absent', since: null }
+}
+
+export function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
+  const { state, since } = getWorkState(recs)
+  const hasBreaks = recs.some(r => ['inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe'].includes(r.type))
+  if (hasBreaks) {
+    const { workedMin, coffeeMin } = calcTimeBreakdown(recs)
+    const completed = workedMin + coffeeMin
+    if ((state === 'working' || state === 'coffee') && since)
+      return Math.round(completed + (Date.now() - new Date(since).getTime()) / 60_000)
+    return Math.round(completed)
+  }
+  const base = calcNetMinutes(recs, lunchAuto)
+  if (state === 'working' && since)
+    return Math.round(base + (Date.now() - new Date(since).getTime()) / 60_000)
+  return Math.round(base)
+}
+
 // ── Geofencing ────────────────────────────────────────────────────────────────
 // Returns distance in metres between two GPS coordinates (Haversine formula).
 export function haversineMeters(

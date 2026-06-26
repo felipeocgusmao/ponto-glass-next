@@ -163,7 +163,7 @@ describe('businessDate', () => {
   })
 })
 
-import { calcWorkedMinutesPeriod, calcOvertimePeriod, calcOvertimeToday, calcHours, calcEarnings } from '../lib/utils'
+import { getWorkState, calcLiveMin, calcWorkedMinutesPeriod, calcOvertimePeriod, calcOvertimeToday, calcHours, calcEarnings } from '../lib/utils'
 
 describe('calcWorkedMinutesPeriod', () => {
   it('sums net minutes across multiple days (deducts lunch per day)', () => {
@@ -320,5 +320,76 @@ describe('calcDayRounded', () => {
   })
   it('returns 0 for empty records', () => {
     expect(calcDayRounded([], 60)).toBe(0)
+  })
+})
+
+describe('getWorkState', () => {
+  it('returns absent for empty records', () => {
+    const { state, since } = getWorkState([])
+    expect(state).toBe('absent')
+    expect(since).toBeNull()
+  })
+
+  it('returns working after entrada', () => {
+    const ts = '2026-05-28T08:00:00Z'
+    const { state, since } = getWorkState([rec('entrada', ts)])
+    expect(state).toBe('working')
+    expect(since).toBe(ts)
+  })
+
+  it('returns lunch after inicio_almoco', () => {
+    const ts = '2026-05-28T13:00:00Z'
+    const { state } = getWorkState([rec('entrada', '2026-05-28T08:00:00Z'), rec('inicio_almoco', ts)])
+    expect(state).toBe('lunch')
+  })
+
+  it('returns coffee after pausa_cafe', () => {
+    const { state } = getWorkState([rec('entrada', '2026-05-28T08:00:00Z'), rec('pausa_cafe', '2026-05-28T10:00:00Z')])
+    expect(state).toBe('coffee')
+  })
+
+  it('returns working after fim_almoco', () => {
+    const ts = '2026-05-28T14:00:00Z'
+    const { state } = getWorkState([
+      rec('entrada', '2026-05-28T08:00:00Z'),
+      rec('inicio_almoco', '2026-05-28T13:00:00Z'),
+      rec('fim_almoco', ts),
+    ])
+    expect(state).toBe('working')
+  })
+
+  it('returns out after saída', () => {
+    const ts = '2026-05-28T17:00:00Z'
+    const { state, since } = getWorkState([rec('entrada', '2026-05-28T08:00:00Z'), rec('saída', ts)])
+    expect(state).toBe('out')
+    expect(since).toBe(ts)
+  })
+})
+
+describe('calcLiveMin', () => {
+  it('returns 0 for empty records', () => {
+    expect(calcLiveMin([], 60)).toBe(0)
+  })
+
+  it('returns elapsed minutes for a completed shift', () => {
+    const records = [
+      rec('entrada', '2026-05-28T08:00:00Z'),
+      rec('saída',   '2026-05-28T17:00:00Z'), // 9h - 60min auto-lunch = 480min
+    ]
+    expect(calcLiveMin(records, 60)).toBe(480)
+  })
+
+  it('counts coffee as paid time but excludes lunch when explicit breaks are used', () => {
+    const records = [
+      rec('entrada',       '2026-05-28T08:00:00Z'),
+      rec('pausa_cafe',    '2026-05-28T10:00:00Z'),
+      rec('retorno_cafe',  '2026-05-28T10:15:00Z'),
+      rec('inicio_almoco', '2026-05-28T13:00:00Z'),
+      rec('fim_almoco',    '2026-05-28T14:00:00Z'),
+      rec('saída',         '2026-05-28T17:00:00Z'),
+    ]
+    // pure work segments: 08-10=120, 10:15-13=165, 14-17=180 → 465min
+    // coffee (paid): +15min → 480min total
+    expect(calcLiveMin(records, 60)).toBe(480)
   })
 })

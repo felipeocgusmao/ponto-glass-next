@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { fmtCentesimalSigned, businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 
@@ -21,7 +22,7 @@ interface Props {
   submitCompensation: () => void
 }
 
-export function BancoTab({
+export const BancoTab = memo(function BancoTab({
   bankLoading, bankBalance,
   compLoading, compLoaded, compList,
   compDate, setCompDate, compHours, setCompHours, compReason, setCompReason,
@@ -112,4 +113,4 @@ export function BancoTab({
       </div>
     </div>
   )
-}
+})

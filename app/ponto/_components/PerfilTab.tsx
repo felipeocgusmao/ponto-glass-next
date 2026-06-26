@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { EmployeeProfile } from '@/lib/types'
 import { useLang } from '@/lib/LangContext'
 import { SunIcon, MoonIcon } from '@/app/admin/_components/icons'
@@ -31,7 +32,7 @@ interface Props {
   showToast: (msg: string) => void
 }
 
-export function PerfilTab({
+export const PerfilTab = memo(function PerfilTab({
   user, theme, isSystemTheme, selectTheme,
   profileEmail, setProfileEmail, profileEmailSaving, profileEmailMsg, setProfileEmailMsg,
   pwdCurrent, setPwdCurrent, pwdNext, setPwdNext, pwdConfirm, setPwdConfirm,
@@ -141,4 +142,4 @@ export function PerfilTab({
       )}
     </div>
   )
-}
+})
