@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
-import type { Employee, EmployeeProfile } from '@/lib/types'
+import type { EmployeeProfile } from '@/lib/types'
 import { Tab, ALL_TABS, MANAGER_TABS, SUPER_ADMIN_TABS } from './_lib/types'
 import Sidebar from './_components/Sidebar'
 import TopBar from './_components/TopBar'
@@ -17,6 +17,7 @@ import { MeuPontoTab } from './_components/tabs/MeuPontoTab'
 import { DashboardTab } from './_components/tabs/DashboardTab'
 import { useNotifications } from './_lib/useNotifications'
 import { useThemeSettings } from '@/lib/hooks/useThemeSettings'
+import { useEmployeeList } from './_lib/useEmployeeList'
 
 function TabSkeleton() {
   return (
@@ -47,7 +48,7 @@ const AusenciasTab   = dynamic(() => import('./_components/tabs/AusenciasTab').t
 export default function AdminPage() {
   const { theme, isSystemTheme, accent, font, selectTheme, toggleTheme, changeAccent, changeFont } = useThemeSettings()
   const [user, setUser] = useState<EmployeeProfile | null>(null)
-  const [employees, setEmployees] = useState<Employee[]>([])
+  const { employees, activeEmployees, loadEmployees, setEmployees } = useEmployeeList()
   const [tab, setTab] = useState<Tab>('dashboard')
   const [showPwd, setShowPwd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -58,10 +59,6 @@ export default function AdminPage() {
   const [pendingCorrections, setPendingCorrections] = useState(0)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const router = useRouter()
-
-  // The shared list now includes deactivated employees (for the Funcionários
-  // trash bin); everything else operates on the active slice.
-  const activeEmployees = useMemo(() => employees.filter(e => e.active !== false), [employees])
 
   const { items: notifItems } = useNotifications({ pendingCorrections, employees: activeEmployees })
 
@@ -92,16 +89,6 @@ export default function AdminPage() {
       if (data.role === 'manager') setTab('meu_ponto')
     } catch { setFetchError(true) }
   }, [endDeadSession])
-
-  // all=true brings deactivated employees too — the Funcionários tab shows
-  // them under the "Inativos" filter with a restore action. Every other
-  // consumer receives the active-only slice below.
-  const loadEmployees = useCallback(async () => {
-    try {
-      const res = await fetch('/api/employees?all=true')
-      if (res.ok) setEmployees(await res.json())
-    } catch { /* silent */ }
-  }, [])
 
   const refreshPendingCount = useCallback(async () => {
     try {
