@@ -153,6 +153,8 @@ export default function PontoPage() {
   const router = useRouter()
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pullStartY = useRef(0)
+  const swipeStartX = useRef(0)
+  const swipeStartY = useRef(0)
   const [pullDistance, setPullDistance] = useState(0)
   const [isPulling, setIsPulling] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -383,6 +385,34 @@ export default function PontoPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPulling, pullDistance, isRefreshing, loadUser, loadRecords])
 
+  // Horizontal swipe to navigate tabs
+  useEffect(() => {
+    const el = pageRef.current
+    if (!el) return
+    const TABS: Tab[] = ['ponto', 'historico', 'banco', 'correcoes', 'perfil']
+    const onStart = (e: TouchEvent) => {
+      swipeStartX.current = e.touches[0].clientX
+      swipeStartY.current = e.touches[0].clientY
+    }
+    const onEnd = (e: TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - swipeStartX.current
+      const dy = e.changedTouches[0].clientY - swipeStartY.current
+      if (Math.abs(dx) < 50 || Math.abs(dx) <= Math.abs(dy) * 1.2) return
+      setTab(cur => {
+        const idx = TABS.indexOf(cur)
+        if (dx < 0 && idx < TABS.length - 1) return TABS[idx + 1]
+        if (dx > 0 && idx > 0) return TABS[idx - 1]
+        return cur
+      })
+    }
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchend', onEnd)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const iv = setInterval(() => {
       if (document.visibilityState === 'visible') loadRecords()
@@ -605,6 +635,7 @@ export default function PontoPage() {
 
   const punch = async (type: PunchType) => {
     if (!user || punching) return
+    if ('vibrate' in navigator) navigator.vibrate(50)
     setPunching(true)
 
     if (!navigator.onLine) {
@@ -788,7 +819,7 @@ export default function PontoPage() {
 
   return (
     <div className="app" data-collapsed={sidebarCollapsed ? 'true' : undefined}>
-      {toast && <div className="toast">{toast}</div>}
+      {toast && <div className="toast">{toast}<div className="toast-progress"/></div>}
 
       {showSettings && (
         <SettingsModal
@@ -942,6 +973,8 @@ export default function PontoPage() {
           </div>
         )}
 
+        {/* ── TAB CONTENT (key forces remount for enter animation) ─────────── */}
+        <div key={tab} className="tab-fade">
         {/* ── PONTO TAB ─────────────────────────────────────────────────────── */}
         {tab === 'ponto' && (
           <PontoTab
@@ -1009,6 +1042,7 @@ export default function PontoPage() {
           />
         )}
         </div>
+        </div>
       </div>
 
       {/* ── PUNCH-OUT CONFIRMATION ──────────────────────────────────────────── */}
@@ -1018,6 +1052,7 @@ export default function PontoPage() {
           onClick={() => setConfirmingOut(false)}
         >
           <div
+            className="sheet-up"
             onClick={e => e.stopPropagation()}
             style={{ background: 'var(--sidebar-bg)', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', padding: '24px 24px 48px', width: '100%', maxWidth: 480 }}
           >

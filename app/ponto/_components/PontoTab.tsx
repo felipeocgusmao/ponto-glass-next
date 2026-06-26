@@ -72,6 +72,11 @@ interface Props {
 
 export function PontoTab({ user, state, since, liveMin, targetMin: _targetMin, pct, remaining, overtime, earnings, hh, mm, ss, greeting, myRecs, punching, punch, geoDistance, setConfirmingOut }: Props) {
   const { t } = useLang()
+  const isPastStart = (() => {
+    const now = new Date()
+    const [startH = 8, startM = 0] = (user.expected_start ?? '08:00').split(':').map(Number)
+    return now.getHours() * 60 + now.getMinutes() >= startH * 60 + startM
+  })()
 
   return (
     <div className="emp-card">
@@ -91,7 +96,7 @@ export function PontoTab({ user, state, since, liveMin, targetMin: _targetMin, p
           <span className="emp-clock-sec">:{ss}</span>
         </div>
         <div className="emp-status">
-          {state === 'working' && since && <span className="chip success"><span className="dot"/>{t('ponto.status.working')} {fmtTime(since)}</span>}
+          {state === 'working' && since && <span className="chip success"><span className="dot"/>{t('ponto.status.working')} {fmtTime(since)}{remaining > 0 && ` · ${fmtMinutes(remaining)} restantes`}</span>}
           {state === 'lunch' && since && <span className="chip warn"><span className="dot"/>{t('ponto.status.lunch')} {fmtTime(since)}</span>}
           {state === 'coffee' && since && <span className="chip warn"><span className="dot"/>{t('ponto.status.coffee')} {fmtTime(since)}</span>}
           {state === 'out' && since && <span className="chip">{t('ponto.status.out')} {fmtTime(since)}</span>}
@@ -121,7 +126,7 @@ export function PontoTab({ user, state, since, liveMin, targetMin: _targetMin, p
 
       <div className="emp-actions">
         {state === 'absent' && (
-          <button className="btn-emp primary-big" onClick={() => punch('entrada')} disabled={punching}>
+          <button className={`btn-emp primary-big${isPastStart ? ' pulse' : ''}`} onClick={() => punch('entrada')} disabled={punching}>
             <PlayIcon size={16}/> {punching ? t('ponto.registering') : t('ponto.punch_in')}
           </button>
         )}
