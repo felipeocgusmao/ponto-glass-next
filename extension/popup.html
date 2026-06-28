@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="popup.css" />
+  <title>PontoGlass</title>
+</head>
+<body>
+  <div id="root">
+    <!-- Loading state -->
+    <div id="loading" class="state">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Logged-out state -->
+    <div id="logged-out" class="state hidden">
+      <div class="logo-badge">PG</div>
+      <div class="lo-title">PontoGlass</div>
+      <div class="lo-sub">Faça login no site para usar a extensão.</div>
+      <button id="login-btn" class="btn primary">Entrar no PontoGlass</button>
+    </div>
+
+    <!-- Error state -->
+    <div id="error" class="state hidden">
+      <div class="err-icon">⚠️</div>
+      <div class="lo-sub" id="error-msg">Erro de conexão.</div>
+      <button id="retry-btn" class="btn ghost">Tentar novamente</button>
+    </div>
+
+    <!-- Main app -->
+    <div id="app" class="hidden">
+      <header class="topbar">
+        <div class="ident">
+          <div class="ident-name" id="user-name">—</div>
+          <div class="ident-role" id="user-handle">—</div>
+        </div>
+        <div class="avatar" id="user-avatar">—</div>
+      </header>
+
+      <main class="card">
+        <div class="greeting" id="greeting">Olá</div>
+        <div class="date" id="today-date">—</div>
+
+        <div class="clock"><span id="clock-hm">--:--</span><span class="clock-s" id="clock-s">:--</span></div>
+        <div class="status-chip" id="status-chip">—</div>
+
+        <div class="summary">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 80 80" class="ring">
+              <circle class="ring-bg" cx="40" cy="40" r="34" />
+              <circle class="ring-fg" id="ring-fg" cx="40" cy="40" r="34" />
+            </svg>
+            <div class="ring-label"><span id="ring-pct">0%</span><small>jornada</small></div>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span class="m-label">Trabalhadas</span><span class="m-value" id="m-worked">—</span></div>
+            <div class="metric"><span class="m-label">Horas extras</span><span class="m-value accent" id="m-overtime">—</span></div>
+            <div class="metric" id="m-earn-row"><span class="m-label">Ganhos do dia</span><span class="m-value money" id="m-earn">—</span></div>
+          </div>
+        </div>
+
+        <div class="actions" id="actions"></div>
+      </main>
+
+      <!-- Today's history -->
+      <section class="history">
+        <div class="hist-head">
+          <span>Histórico de hoje</span>
+          <span id="hist-count" class="hist-count">—</span>
+        </div>
+        <div id="hist-list" class="hist-list"></div>
+      </section>
+
+      <!-- Admin / manager panel (hidden for plain employees) -->
+      <section id="admin-panel" class="admin hidden">
+        <div class="admin-head">Painel</div>
+        <div class="admin-stats">
+          <button class="stat" id="stat-pending">
+            <span class="stat-value" id="pending-count">0</span>
+            <span class="stat-label">Correções pendentes</span>
+          </button>
+          <div class="stat">
+            <span class="stat-value" id="working-count">0</span>
+            <span class="stat-label">Trabalhando agora</span>
+          </div>
+        </div>
+        <div id="working-list" class="working-list"></div>
+        <button id="dashboard-btn" class="btn ghost full">Abrir painel completo →</button>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
