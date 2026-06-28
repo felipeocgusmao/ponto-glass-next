@@ -45,6 +45,8 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
   const [exceptions, setExceptions] = useState<DayException[]>([])
   const [bankBalances, setBankBalances] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
+  // Day selected in the bar chart (null = default to the most recent day).
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -237,6 +239,16 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     const d = new Date(dateStr + 'T12:00:00')
     return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
   }
+
+  const fmtDateLong = (dateStr: string) => {
+    const d = new Date(dateStr + 'T12:00:00')
+    const s = d.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
+
+  // Effective selected day for the chart readout (defaults to the latest day).
+  const selDate = selectedDate ?? chartData[chartData.length - 1]?.date
+  const selBar = chartData.find(d => d.date === selDate) ?? null
 
   if (loading) return (
     <>
@@ -477,39 +489,71 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
           <div className="card-head">
             <div className="card-title">{t('dash.chart_title').replace('{n}', String(chartDays.length))}</div>
           </div>
-          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', flex: 1 }}>
-            {/* Split the chart into a bars row (flex:1 → has a resolvable height for the % bars)
-                and a labels row, so the bars actually render. Previously each column was
-                flex-direction: column with the bar using height: X% inside an auto-height
-                parent — the percentage didn't resolve and the bars never appeared. */}
-            <div style={{ height: 160, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 3, minHeight: 0 }}>
-                {chartData.map(({ date, min }) => {
-                  const pct = (min / chartMax) * 100
-                  const isToday = date === todayStr
-                  return (
-                    <div
-                      key={`bar-${date}`}
-                      style={{
-                        flex: 1, maxWidth: 40,
-                        height: `${Math.max(pct, 3)}%`,
-                        background: isToday ? 'var(--accent)' : 'var(--accent-soft)',
-                        borderRadius: 'var(--r-xs) var(--r-xs) 0 0',
-                        transition: 'height 0.4s ease',
-                      }}
-                      title={`${fmtDate(date)}: ${min > 0 ? fmtMinutes(min) : t('dash.no_records')}`}
-                    />
-                  )
-                })}
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            {/* Readout of the selected day — updates on tap so the bars become legible */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="tnum" style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.1 }}>
+                  {selBar && selBar.min > 0 ? fmtMinutes(selBar.min) : '—'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--fg-subtle)', marginTop: 3 }}>
+                  {selDate ? fmtDateLong(selDate) : ''}
+                  {selDate === todayStr && (
+                    <span className="chip" style={{ marginLeft: 6, fontSize: 10 }}>{t('dash.chart_today')}</span>
+                  )}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>{t('dash.chart_avg')}</div>
+                <div className="tnum" style={{ fontSize: 14, fontWeight: 600 }}>{fmtMinutes(avgMin)}</div>
+              </div>
+            </div>
+
+            <div style={{ height: 150, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+                {/* average reference line for context */}
+                {avgMin > 0 && (
+                  <div
+                    aria-hidden
+                    style={{ position: 'absolute', left: 0, right: 0, bottom: `${(avgMin / chartMax) * 100}%`, borderTop: '1px dashed var(--border)', opacity: 0.7, pointerEvents: 'none' }}
+                  />
+                )}
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', gap: 3 }}>
+                  {chartData.map(({ date, min }) => {
+                    const pct = (min / chartMax) * 100
+                    const isSel = date === selDate
+                    return (
+                      <button
+                        key={`bar-${date}`}
+                        type="button"
+                        onClick={() => setSelectedDate(date)}
+                        aria-pressed={isSel}
+                        aria-label={`${fmtDate(date)}: ${min > 0 ? fmtMinutes(min) : t('dash.no_records')}`}
+                        style={{ flex: 1, maxWidth: 40, height: '100%', display: 'flex', alignItems: 'flex-end', background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer' }}
+                      >
+                        <div
+                          style={{
+                            width: '100%',
+                            height: `${Math.max(pct, 3)}%`, minHeight: 3,
+                            background: 'var(--accent)',
+                            opacity: isSel ? 1 : 0.4,
+                            borderRadius: 'var(--r-xs) var(--r-xs) 0 0',
+                            transition: 'opacity 0.2s ease, height 0.4s ease',
+                          }}
+                        />
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 3, marginTop: 6 }}>
                 {chartData.map(({ date }) => {
                   const d = new Date(date + 'T12:00:00')
-                  const isToday = date === todayStr
+                  const isSel = date === selDate
                   return (
                     <div
                       key={`lbl-${date}`}
-                      style={{ flex: 1, maxWidth: 40, textAlign: 'center', fontSize: 10, color: isToday ? 'var(--accent)' : 'var(--fg-subtle)', fontWeight: isToday ? 700 : 400 }}
+                      style={{ flex: 1, maxWidth: 40, textAlign: 'center', fontSize: 10, color: isSel ? 'var(--accent)' : 'var(--fg-subtle)', fontWeight: isSel ? 700 : 400 }}
                       className="tnum"
                     >
                       {d.getDate()}
