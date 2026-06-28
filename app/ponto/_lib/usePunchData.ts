@@ -6,11 +6,15 @@ import type { EmployeeProfile, PunchRecord } from '@/lib/types'
 
 interface UsePunchDataOptions {
   onUserTheme?: (theme: 'dark' | 'light') => void
+  // Seeded from the Server Component so the first render already has data —
+  // no initial useEffect fetch / loading skeleton round-trip.
+  initialUser?: EmployeeProfile | null
+  initialRecords?: PunchRecord[]
 }
 
-export function usePunchData({ onUserTheme }: UsePunchDataOptions = {}) {
-  const [user, setUser] = useState<EmployeeProfile | null>(null)
-  const [records, setRecords] = useState<PunchRecord[]>([])
+export function usePunchData({ onUserTheme, initialUser = null, initialRecords = [] }: UsePunchDataOptions = {}) {
+  const [user, setUser] = useState<EmployeeProfile | null>(initialUser)
+  const [records, setRecords] = useState<PunchRecord[]>(initialRecords)
   const [fetchError, setFetchError] = useState(false)
   const fetchSeq = useRef(0)
   const router = useRouter()

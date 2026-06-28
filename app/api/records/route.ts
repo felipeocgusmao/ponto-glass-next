@@ -5,6 +5,7 @@ import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcWorkDate } from '@/lib/utils'
+import { getTodayRecordsForEmployee } from '@/lib/data/records'
 
 const VALID_TYPES = ['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 
@@ -32,28 +33,31 @@ export async function GET(request: NextRequest) {
     ? user.id
     : (employeeId && employeeId !== 'all' ? employeeId : null)
 
+  // Single-employee "today" is the hot path (an employee viewing their own day, or
+  // an admin viewing one person) — served by the shared, shift-aware helper that
+  // Server Components also use, so the math stays in one place.
+  if (today && singleEmpId) {
+    return NextResponse.json(
+      await getTodayRecordsForEmployee(user, singleEmpId),
+      { headers: { 'Cache-Control': 'no-store' } },
+    )
+  }
+
   if (singleEmpId) query = query.eq('employee_id', singleEmpId)
 
   if (today) {
-    // "Today" must mean the current *work date*, which is shift-aware: a night-shift
-    // employee punching after midnight UTC is filed under the day the shift began.
-    // Match how /api/punch dates records, or in-progress shifts vanish after midnight.
-    if (singleEmpId) {
-      const { data: emp } = await supabase
-        .from('employees').select('shift_start')
-        .eq('tenant_id', user.tenant_id).eq('id', singleEmpId).single()
-      query = query.eq('date', calcWorkDate(new Date(), emp?.shift_start ?? '00:00'))
-    } else {
-      const { data: emps } = await supabase
-        .from('employees').select('id, shift_start')
-        .eq('tenant_id', user.tenant_id).eq('active', true)
-      const now = new Date()
-      const clauses = (emps ?? []).map(
-        e => `and(employee_id.eq.${e.id},date.eq.${calcWorkDate(now, e.shift_start ?? '00:00')})`
-      )
-      if (clauses.length === 0) return NextResponse.json([])
-      query = query.or(clauses.join(','))
-    }
+    // "Today" across all employees must be shift-aware: a night-shift employee
+    // punching after midnight UTC is filed under the day the shift began. Match how
+    // /api/punch dates records, or in-progress shifts vanish after midnight.
+    const { data: emps } = await supabase
+      .from('employees').select('id, shift_start')
+      .eq('tenant_id', user.tenant_id).eq('active', true)
+    const now = new Date()
+    const clauses = (emps ?? []).map(
+      e => `and(employee_id.eq.${e.id},date.eq.${calcWorkDate(now, e.shift_start ?? '00:00')})`
+    )
+    if (clauses.length === 0) return NextResponse.json([])
+    query = query.or(clauses.join(','))
   } else if (date) {
     query = query.eq('date', date)
   }
