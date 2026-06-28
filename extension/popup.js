@@ -42,7 +42,22 @@ function initials(name) {
 }
 
 // ── Geolocation (best-effort) ────────────────────────────────────────────────
-function getGeo(timeout = 8000) {
+// Resolve the position via the background service worker + offscreen document
+// (robust even if the popup closes). Falls back to the popup's own
+// navigator.geolocation if the offscreen path isn't available. Always resolves
+// (null on failure) so the caller can apply the geo_mode policy.
+function getGeoViaOffscreen(timeout) {
+  return new Promise(resolve => {
+    try {
+      chrome.runtime.sendMessage({ type: 'GET_GEOLOCATION', timeout }, res => {
+        if (chrome.runtime.lastError || !res || !res.ok) return resolve(null)
+        resolve({ lat: res.lat, lng: res.lng })
+      })
+    } catch { resolve(null) }
+  })
+}
+
+function getGeoDirect(timeout) {
   return new Promise(resolve => {
     if (!navigator.geolocation) return resolve(null)
     navigator.geolocation.getCurrentPosition(
@@ -51,6 +66,14 @@ function getGeo(timeout = 8000) {
       { timeout, maximumAge: 60_000, enableHighAccuracy: false },
     )
   })
+}
+
+async function getGeo(timeout = 8000) {
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    const viaOffscreen = await getGeoViaOffscreen(timeout)
+    if (viaOffscreen) return viaOffscreen
+  }
+  return getGeoDirect(timeout)
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
