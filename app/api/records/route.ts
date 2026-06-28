@@ -5,7 +5,7 @@ import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcWorkDate } from '@/lib/utils'
-import { getTodayRecordsForEmployee } from '@/lib/data/records'
+import { getTodayRecordsForEmployee, getTodayRecordsAllEmployees } from '@/lib/data/records'
 
 const VALID_TYPES = ['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 
@@ -43,24 +43,18 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  if (singleEmpId) query = query.eq('employee_id', singleEmpId)
-
+  // "Today" across all employees (privileged, no employeeId) — shared helper.
   if (today) {
-    // "Today" across all employees must be shift-aware: a night-shift employee
-    // punching after midnight UTC is filed under the day the shift began. Match how
-    // /api/punch dates records, or in-progress shifts vanish after midnight.
-    const { data: emps } = await supabase
-      .from('employees').select('id, shift_start')
-      .eq('tenant_id', user.tenant_id).eq('active', true)
-    const now = new Date()
-    const clauses = (emps ?? []).map(
-      e => `and(employee_id.eq.${e.id},date.eq.${calcWorkDate(now, e.shift_start ?? '00:00')})`
+    return NextResponse.json(
+      await getTodayRecordsAllEmployees(user),
+      { headers: { 'Cache-Control': 'no-store' } },
     )
-    if (clauses.length === 0) return NextResponse.json([])
-    query = query.or(clauses.join(','))
-  } else if (date) {
-    query = query.eq('date', date)
   }
+
+  // Non-today path: scope to the single employee (always, for non-privileged
+  // users) and to a specific date when given.
+  if (singleEmpId) query = query.eq('employee_id', singleEmpId)
+  if (date) query = query.eq('date', date)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

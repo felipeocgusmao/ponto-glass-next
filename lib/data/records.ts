@@ -26,3 +26,30 @@ export async function getTodayRecordsForEmployee(user: ApiUser, employeeId: stri
 
   return (data ?? []) as PunchRecord[]
 }
+
+// Today's punches for every active employee in the tenant, shift-aware. Each
+// employee's "today" is resolved against their own shift_start, so a night-shift
+// worker's in-progress day doesn't vanish at midnight. Powers the kiosk board and
+// the admin "today / all" view.
+export async function getTodayRecordsAllEmployees(user: ApiUser): Promise<PunchRecord[]> {
+  const { data: emps } = await supabase
+    .from('employees')
+    .select('id, shift_start')
+    .eq('tenant_id', user.tenant_id)
+    .eq('active', true)
+
+  const now = new Date()
+  const clauses = (emps ?? []).map(
+    e => `and(employee_id.eq.${e.id},date.eq.${calcWorkDate(now, e.shift_start ?? '00:00')})`,
+  )
+  if (clauses.length === 0) return []
+
+  const { data } = await supabase
+    .from('records')
+    .select('*')
+    .eq('tenant_id', user.tenant_id)
+    .or(clauses.join(','))
+    .order('timestamp', { ascending: true })
+
+  return (data ?? []) as PunchRecord[]
+}
