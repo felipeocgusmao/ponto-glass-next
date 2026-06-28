@@ -43,6 +43,29 @@
 
 <br/>
 
+## ░ índice
+
+- [manifesto](#-manifesto)
+- [o que é isso](#-o-que-é-isso)
+- [stack](#-stack)
+- [quickstart](#-quickstart)
+- [funcionalidades](#-funcionalidades)
+- [extensão chrome](#-extensão-chrome)
+- [design](#-design)
+- [i18n](#-i18n)
+- [arquitetura](#-arquitetura)
+- [banco de dados](#-banco-de-dados)
+- [segurança](#-segurança)
+- [roadmap](#-roadmap)
+- [documentação técnica](#-documentação-técnica)
+- [licença](#-licença)
+
+<br/>
+
+---
+
+<br/>
+
 ## ░ manifesto
 
 ```
@@ -87,7 +110,7 @@ Existe **um URL** e **uma senha**.
 │   Frontend    →   Next.js 14  (App Router)              │
 │   Linguagem   →   TypeScript  (strict)                  │
 │   Estilo      →   CSS Variables  (sem Tailwind)         │
-│   Auth        →   JWT em httpOnly cookie  (8 horas)     │
+│   Auth        →   JWT httpOnly cookie  (30 dias)        │
 │   Banco       →   Supabase  (PostgreSQL gerenciado)     │
 │   Senhas      →   bcryptjs  (hash + salt)               │
 │   Push        →   Web Push API  (VAPID)                 │
@@ -95,7 +118,7 @@ Existe **um URL** e **uma senha**.
 │   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
 │   Cron        →   Vercel Cron Jobs  (ausência, saída, mensal, semanal, alertas, bank-cap)│
 │   Voz         →   Web Speech API  (reconhecimento + TTS)│
-│   Testes      →   Vitest  (147 unit) + Playwright  (E2E) │
+│   Testes      →   Vitest  (197 unit) + Playwright  (E2E) │
 │   Monitor     →   Sentry  (erros cliente + servidor)    │
 │   Geofencing  →   Haversine  (raio por funcionário)     │
 │   Horas       →   Centesimal  (base 100, quarto de hora)│
@@ -108,7 +131,7 @@ Cada peça foi escolhida com intenção:
 
 | Peça | Motivo |
 |------|--------|
-| **Next.js App Router** | Server + client components onde faz sentido; sem overhead |
+| **Next.js App Router** | Páginas críticas (`/ponto`, `/admin`, `/kiosk`) são **Server Components** que buscam dados direto na camada `lib/data/` e passam como props — sem `useEffect` de carregamento inicial |
 | **Supabase** | PostgreSQL real, backups automáticos, sem DevOps |
 | **Jose (JWT)** | Edge-compatible — funciona nas Vercel Edge Functions |
 | **bcryptjs** | Senhas nunca saem do servidor em texto plano |
@@ -117,8 +140,8 @@ Cada peça foi escolhida com intenção:
 | **Microsoft Graph + SMTP** | Graph API como transporte principal (OAuth Client Credentials), SMTP como fallback automático |
 | **jsPDF + AutoTable** | Geração de PDF no cliente, sem dependências de servidor |
 | **Vercel Cron Jobs** | Tarefas agendadas: alerta de ausência (manhã) e alerta de saída não registada (17h) |
-| **Vitest** | 147 testes unitários: horas, auth, rate limit, geofencing, de-dup, voz, tenancy, TOTP e importação |
-| **Playwright** | Testes E2E do fluxo principal (landing, auth, demo, SEO) |
+| **Vitest** | 197 testes unitários: horas, auth, rate limit, geofencing, de-dup, voz, tenancy, TOTP, importação e **enforcement de auth nas rotas** |
+| **Playwright** | Testes E2E: landing, auth, demo, SEO + **fluxos do /ponto** (redirects, login, validação de correção) |
 | **Web Speech API** | Reconhecimento de voz (SpeechRecognition) + síntese de fala (TTS) no `/kiosk/glass` |
 | **Sentry** | Captura de erros e source maps automáticos via `withSentryConfig` |
 | **Haversine** | Cálculo de distância para validação opcional de geofencing por funcionário |
@@ -197,11 +220,15 @@ Faça login com:
 ### 5. Comandos úteis
 
 ```bash
-npm run dev        # servidor de desenvolvimento (http://localhost:3000)
-npm run build      # build de produção
-npm run test       # testes unitários (Vitest)
-npm run test:e2e   # testes E2E (Playwright) — requer servidor em execução
-npm run lint       # ESLint
+npm run dev          # servidor de desenvolvimento (Turbopack, http://localhost:3000)
+npm run build        # build de produção
+npm run start        # servir o build local
+npm run lint         # ESLint
+npm test             # testes unitários (Vitest, run once)
+npm run test:watch   # Vitest em watch mode
+npm run e2e          # testes E2E (Playwright) — requer servidor em execução
+npm run e2e:ui       # Playwright em modo UI
+npm run check        # lint + test + build (o mesmo que o CI corre)
 ```
 
 ### 6. Deploy na Vercel
@@ -346,6 +373,30 @@ Nenhuma configuração manual de banco necessária.
 
 ---
 
+## ◈ extensão chrome
+
+Uma extensão **Manifest V3** (`extension/`) que coloca a batida de ponto a um clique de distância — sem abrir o site.
+
+```
+  POPUP DA EXTENSÃO
+  ─────────────────
+  ● Reaproveita a sessão já logada (cookie httpOnly ponto_token via host_permissions)
+  ● Sem login separado — chama as mesmas APIs do app (/api/me, /api/records, /api/punch)
+  ● UI por função:
+      Funcionário      → relógio ao vivo, anel de jornada, ações contextuais, histórico do dia
+      Admin / Gerente  → tudo acima + painel rápido (correções pendentes, quem está ativo agora)
+  ● Geolocalização robusta via offscreen document (navigator.geolocation não existe no
+    service worker do MV3) — com fallback direto no popup; respeita o geo_mode do funcionário
+```
+
+**Sem build step** — JS puro com ES modules, carregável direto como _unpacked_ em `chrome://extensions`. Para empacotar para a Chrome Web Store: `cd extension && ./package.sh` (gera `dist/pontoglass-extension-v<versão>.zip`). Passos de submissão, textos da listagem e justificativa de permissões estão em [`extension/STORE.md`](extension/STORE.md); detalhes técnicos em [`extension/README.md`](extension/README.md).
+
+> ⚠️ A matemática de minutos/estado em `extension/lib/punch-utils.js` é **portada** de `lib/utils.ts`. Se a fórmula no app mudar, sincronize este ficheiro.
+
+<br/>
+
+---
+
 ## ◈ design
 
 O visual foi construído do zero em CSS puro — sem bibliotecas de UI, sem componentes prontos.  
@@ -366,6 +417,8 @@ Inspirado no minimalismo do Linear, Notion e VSCode: estrutura clara, hierarquia
 **Page-head** consistente em todos os tabs: título, subtítulo dinâmico (contagem ou estado) e botões de ação (Atualizar, Exportar, etc.).
 
 **Employee shell** — ecrã `/ponto` em layout fullscreen com relógio ao vivo, anel de progresso, ações contextuais (entrada / almoço / pausa / saída) e navegação inferior por 5 tabs (Ponto, Histórico, Banco, Correções, Perfil).
+
+As três fontes (Inter, JetBrains Mono, Lora) são **self-hosted via `next/font/google`** — injetadas como CSS variables (`--font-inter`, `--font-jetbrains`, `--font-lora`), sem `<link>` para o Google Fonts, sem requisição externa e sem FOUC.
 
 Tema claro/escuro, 9 cores de destaque e 3 variantes de fonte persistem via `localStorage` (restauradas sem FOUC pelo inline script no `<head>`). Modais, drawers e command palette usam `backdrop-filter: blur` para efeito glassmorphism.  
 Tema claro/escuro também persiste no banco por funcionário.  
@@ -404,15 +457,24 @@ ponto_glass_next/
 │   ├── page.tsx                  ← redirect inteligente (admin/manager → /admin | employee → /ponto)
 │   ├── login/page.tsx            ← autenticação (split-screen com relógio animado)
 │   ├── reset-password/page.tsx   ← reset de senha via link de e-mail
-│   ├── ponto/page.tsx            ← shell fullscreen do funcionário (relógio, histórico, banco, correções)
+│   ├── ponto/
+│   │   ├── page.tsx             ← Server Component: verifica sessão + busca perfil/registos (lib/data) → props
+│   │   ├── PontoClient.tsx      ← Client Component: shell fullscreen (relógio, histórico, banco) seeded por props
+│   │   ├── _lib/               ← hooks usePunchData / useBankData / useCorrectionRequests (seeded por initial*)
 │   │   └── _components/
-│   │       └── CalendarView      ← grelha de mês com dias coloridos (trabalhado/ausente/feriado)
+│   │       └── CalendarView    ← grelha de mês com dias coloridos (trabalhado/ausente/feriado)
 │   ├── demo/page.tsx             ← página pública de credenciais demo (noindex)
-│   ├── kiosk/page.tsx            ← modo quiosque (tablet compartilhado, sem login individual)
-│   │   └── glass/page.tsx        ← variante para smart glasses Android (640×400, alto contraste)
-│   ├── admin/page.tsx            ← painel admin/gerente (sidebar agrupada, 10 abas por role)
+│   ├── kiosk/
+│   │   ├── page.tsx             ← Server Component: valida sessão admin/gerente + busca funcionários/registos
+│   │   ├── KioskClient.tsx      ← Client Component: grelha do quiosque (sem login individual) seeded por props
+│   │   ├── confirm/             ← página pública: valida token QR HMAC e regista batida
+│   │   └── glass/page.tsx       ← variante para smart glasses Android (640×400, alto contraste)
+│   ├── admin/
+│   │   ├── page.tsx             ← Server Component: valida role + busca perfil/funcionários/correções pendentes
+│   │   ├── AdminClient.tsx      ← Client Component: painel (sidebar agrupada, 10 abas por role) seeded por props
 │   │   ├── _lib/
-│   │   │   └── useNotifications  ← hook que agrega correções pendentes, saídas em falta, ausências
+│   │   │   ├── useNotifications ← agrega correções pendentes, saídas em falta, ausências
+│   │   │   └── useEmployeeList  ← lista de funcionários seeded por initialEmployees (refresh sob demanda)
 │   │   └── _components/
 │   │       ├── Sidebar           ← grupos OPERAÇÃO / PESSOAS / ANÁLISE, colapsável, drawer mobile
 │   │       ├── TopBar            ← breadcrumbs + ⌘K + tema + sino com badge
@@ -435,6 +497,7 @@ ponto_glass_next/
 │   │
 │   └── api/
 │       ├── health/               ← endpoint público de saúde (sem auth, retorna status DB)
+│       │   └── deep/             ← health profundo (X-Health-Secret): valida env + ping ao DB com latência
 │       ├── auth/
 │       │   ├── login/            ← bcrypt + JWT + cookie + rate limit (IP + por utilizador)
 │       │   ├── logout/           ← limpa cookie
@@ -485,6 +548,12 @@ ponto_glass_next/
 ├── lib/
 │   ├── auth.ts               ← createJWT / verifyJWT
 │   ├── supabase.ts           ← cliente Supabase (service_role)
+│   ├── tenantDb.ts           ← wrapper que auto-injeta .eq('tenant_id', …) em todas as queries
+│   ├── data/                 ← camada de dados tenant-scoped, partilhada por Server Components + rotas API
+│   │   ├── profile.ts        ← getEmployeeProfile
+│   │   ├── records.ts        ← getTodayRecordsForEmployee, getTodayRecordsAllEmployees
+│   │   ├── employees.ts      ← getEmployees
+│   │   └── corrections.ts    ← getPendingCorrectionsCount
 │   ├── rateLimit.ts          ← rate limiter em memória (login / recover)
 │   ├── audit.ts              ← helper de audit log
 │   ├── email.ts              ← Microsoft Graph (preferido) + SMTP fallback
@@ -503,109 +572,19 @@ ponto_glass_next/
 ├── sentry.server.config.ts    ← inicialização Sentry no servidor
 ├── vitest.config.ts           ← configuração Vitest (jsdom, exclui e2e/)
 ├── playwright.config.ts        ← configuração Playwright (E2E, Chromium)
-├── __tests__/                 ← 147 testes unitários (utils, auth, tenancy, totp, employeeImport, punchQueue…)
-├── e2e/                       ← testes E2E (landing, auth, demo, SEO)
+├── __tests__/                 ← 197 testes unitários (utils, auth, tenancy, totp, employeeImport, punchQueue, enforcement de auth nas rotas…)
+├── e2e/                       ← testes E2E (landing, auth, demo, SEO, fluxos do /ponto)
+├── extension/                 ← extensão Chrome MV3 (popup por função, geolocalização offscreen)
+│   ├── manifest.json          ← MV3: host_permissions, background SW, offscreen, ícones
+│   ├── popup.html/.css/.js    ← UI do popup + fetch das APIs, render por nível
+│   ├── background.js          ← service worker: broker de geolocalização
+│   ├── offscreen.html/.js     ← documento offscreen → navigator.geolocation
+│   ├── lib/punch-utils.js     ← math portado de lib/utils.ts
+│   └── package.sh / STORE.md  ← empacotamento e guia de publicação na Web Store
 └── supabase/
     ├── schema.sql             ← schema do banco com RLS + migrações comentadas
     └── migrations/            ← migrações datadas (geofencing, RLS policies, backfill)
 ```
-
-<br/>
-
----
-
-## ◈ como rodar localmente
-
-### Pré-requisitos
-
-- **Node.js 20+** (ou 18 LTS)
-- **npm** 10+ (vem com Node)
-- Conta gratuita em [supabase.com](https://supabase.com)
-- (opcional) conta em [vercel.com](https://vercel.com) para deploy
-
-### Passo 1 — Clonar e instalar
-
-```bash
-git clone https://github.com/felipeocgusmao/ponto-glass-next.git
-cd ponto-glass-next
-npm install
-```
-
-### Passo 2 — Criar o projeto no Supabase
-
-1. Criar projeto novo em [app.supabase.com](https://app.supabase.com)
-2. **Project Settings → API**: copiar `Project URL` e `service_role` key
-3. **SQL Editor**: copiar e executar o conteúdo de `supabase/schema.sql`
-4. (opcional) Aplicar migrações datadas em `supabase/migrations/` na ordem cronológica
-
-> **Banco já existente?** O `schema.sql` inclui blocos `IF NOT EXISTS` idempotentes — pode correr o ficheiro inteiro sem perder dados.
-
-### Passo 3 — Configurar variáveis de ambiente
-
-```bash
-cp .env.example .env.local
-```
-
-Mínimo para arrancar:
-
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-
-# JWT — gerar com: openssl rand -base64 32
-JWT_SECRET=cole-aqui-uma-string-aleatoria-com-32-caracteres-ou-mais
-
-# Fuso horário da empresa (IANA name)
-NEXT_PUBLIC_BUSINESS_TZ=Europe/Madrid
-
-# Senha do admin que será criado no primeiro login (mín. 8 chars)
-INITIAL_ADMIN_USERNAME=admin
-INITIAL_ADMIN_PASSWORD=trocar-esta-senha-no-primeiro-login
-```
-
-Variáveis adicionais e respetivas instruções estão comentadas no `.env.example` (Vercel KV, VAPID, Microsoft Graph, SMTP, Sentry, recovery).
-
-### Passo 4 — Arrancar
-
-```bash
-npm run dev
-```
-
-Abra [http://localhost:3000](http://localhost:3000) e faça login com `admin` + `INITIAL_ADMIN_PASSWORD`. **Troque a senha imediatamente** depois do primeiro login (perfil → trocar palavra-passe) e **remova `INITIAL_ADMIN_PASSWORD` do ambiente**.
-
-### Comandos úteis
-
-```bash
-npm run dev          # Next.js dev server (turbopack)
-npm run build        # Build de produção
-npm run start        # Servir o build local
-npm run lint         # ESLint
-npm test             # Vitest (run once)
-npm run test:watch   # Vitest em watch mode
-npm run e2e          # Playwright (E2E)
-npm run e2e:ui       # Playwright em modo UI
-npm run check        # lint + test + build (mesmo que o CI corre)
-```
-
-<br/>
-
----
-
-## ◈ deploy em produção
-
-O projeto está pronto para Vercel com zero configuração extra.
-
-```bash
-# instale a CLI do Vercel
-npm i -g vercel
-
-# deploy
-vercel --prod
-```
-
-Configure as variáveis de ambiente no painel da Vercel e pronto.  
-A aplicação roda no Edge Network global — latência mínima de qualquer país.
 
 <br/>
 
@@ -786,7 +765,8 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
 
 ```
   ✓  Senhas com bcrypt (salt automático)
-  ✓  JWT assinado com HS256 em httpOnly cookie (inatingível por JS)
+  ✓  JWT assinado com HS256 em httpOnly cookie, SameSite=Lax (inatingível por JS)
+  ✓  Sessão deslizante de 30 dias — token renovado a cada requisição autenticada
   ✓  Middleware de RBAC em todas as rotas sensíveis (admin / manager / employee)
   ✓  Service role key nunca exposta ao cliente
   ✓  Rate limiting por IP: 5 tentativas / 15 min no login e na recuperação
@@ -808,6 +788,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  QR kiosk com token HMAC-SHA256 (empId:tenantId) — batida sem login, sem cookie
   ✓  Webhooks assinados com X-PontoGlass-Signature: sha256={hex} (segredo opcional por endpoint)
   ✓  Timeout de 5s em entrega de webhooks — falhas silenciosas, não bloqueiam a batida
+  ✓  Health profundo protegido por X-Health-Secret (CRON_SECRET) — não expõe segredos
 ```
 
 <br/>
@@ -815,6 +796,13 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
 ---
 
 ## ◈ roadmap
+
+Mais de 90 funcionalidades entregues — a lista completa fica colapsada para não poluir o README. A seção [funcionalidades](#-funcionalidades) acima resume o que existe hoje por função.
+
+<details>
+<summary><strong>▸ Ver roadmap completo (90+ itens entregues)</strong></summary>
+
+<br/>
 
 ```
   ✓  Trocar senha dentro do sistema
@@ -868,7 +856,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Comentário em registo (nota livre do admin/gerente, ≤ 500 chars)
   ✓  Aviso de shift_start incomum (alerta amarelo ao configurar turno diurno com horário > 00:00)
   ✓  E-mail via Microsoft Graph API (OAuth Client Credentials) com fallback SMTP automático
-  ✓  Testes Vitest (147 unit: utils, auth, tenancy, TOTP, importação, fila offline…) + E2E Playwright
+  ✓  Testes Vitest (197 unit: utils, auth, tenancy, TOTP, importação, fila offline, rotas…) + E2E Playwright
   ✓  Monitorização Sentry (cliente + servidor, source maps)
   ✓  Horas centesimais (base 100) com arredondamento ao quarto de hora em relatórios/banco/ganhos
   ✓  Lembrete push de quarto de hora (bater entrada/saída em :00/:15/:30/:45)
@@ -913,8 +901,15 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  9 cores de destaque — Índigo, Violeta, Ciano, Verde, Teal, Âmbar, Laranja, Rosa, Cinza (persistidas)
   ✓  3 variantes de fonte — Linear (Inter), Workbench (JetBrains Mono), Editorial (Lora serif)
   ✓  Settings Modal redesenhado — grid responsivo, swatches de cor, seletor de fonte por card
+  ✓  /ponto, /admin e /kiosk migradas para Server Components (fetch via lib/data, sem useEffect inicial)
+  ✓  Camada de dados tenant-scoped (lib/data) partilhada por Server Components e rotas API + lib/tenantDb
+  ✓  Fontes self-hosted via next/font/google (sem <link> externo ao Google Fonts, sem FOUC)
+  ✓  Endpoint /api/health/deep (X-Health-Secret) — valida env obrigatórias + ping ao DB com latência
+  ✓  Extensão Chrome MV3 — popup por função, geolocalização via offscreen document, empacotamento p/ Web Store
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
+
+</details>
 
 <br/>
 
@@ -926,6 +921,8 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
 - [`docs/SCHEMA.md`](docs/SCHEMA.md) — referência humana das tabelas (colunas, tipos, FKs, índices)
 - [`docs/SECURITY.md`](docs/SECURITY.md) — JWT + cookies + bcrypt + rate limit + revogação + geofencing
 - [`docs/TENANTS.md`](docs/TENANTS.md) — multi-tenancy: subdomínio por slug, domínio custom, DNS e fases
+- [`extension/README.md`](extension/README.md) — extensão Chrome: arquitetura, geolocalização offscreen e instalação
+- [`extension/STORE.md`](extension/STORE.md) — publicação na Chrome Web Store: listagem, permissões e privacidade
 - [`supabase/schema.sql`](supabase/schema.sql) — schema completo + migrações v1→v13 (multi-tenancy fases 1 + 3)
 - [`.env.example`](.env.example) — todas as variáveis com comentários e instruções
 
