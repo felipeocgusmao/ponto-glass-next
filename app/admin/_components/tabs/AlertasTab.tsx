@@ -85,7 +85,7 @@ export function AlertasTab() {
               <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
                 {t('alertas.bank_neg.desc')}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <input
                   type="number"
                   min="0"
@@ -107,7 +107,7 @@ export function AlertasTab() {
               <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
                 {t('alertas.long_day.desc')}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <input
                   type="number"
                   min="0"
@@ -129,7 +129,7 @@ export function AlertasTab() {
               <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
                 {t('alertas.max_bank.desc')}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <input
                   type="number"
                   min="0"

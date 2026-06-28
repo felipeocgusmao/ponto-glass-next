@@ -371,7 +371,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
-          <div style={{ display: 'flex', gap: 6, paddingBottom: 1 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingBottom: 1 }}>
             <button className={`filter-pill${activePreset === 'this_month' ? ' active' : ''}`} onClick={() => setPreset('this_month')}>Mês atual</button>
             <button className={`filter-pill${activePreset === 'last_month' ? ' active' : ''}`} onClick={() => setPreset('last_month')}>Mês passado</button>
             <button className={`filter-pill${activePreset === '30d' ? ' active' : ''}`} onClick={() => setPreset('30d')}>Últimos 30d</button>
