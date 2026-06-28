@@ -218,7 +218,7 @@ export function EmpresasTab() {
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-muted)', fontSize: 13 }}>A carregar…</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="table" style={{ width: '100%' }}>
+            <table className="table" style={{ width: '100%', minWidth: 760 }}>
               <thead>
                 <tr>
                   <th>Empresa</th>
@@ -235,7 +235,7 @@ export function EmpresasTab() {
                     <td style={{ fontWeight: 600 }}>
                       <div>{t.name}</div>
                       <a href={tenantUrl(t)} target="_blank" rel="noopener noreferrer"
-                         className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)', textDecoration: 'none', wordBreak: 'break-all' }}>
+                         className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                         {tenantUrl(t)}
                       </a>
                     </td>
