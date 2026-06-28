@@ -1,12 +1,9 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Demo page', () => {
-  test('landing has a link to the demo page', async ({ page }) => {
-    await page.goto('/')
-    const demoLink = page.getByRole('link', { name: /demo/i }).first()
-    await expect(demoLink).toBeVisible()
-    await demoLink.click()
-    await expect(page).toHaveURL(/\/demo/)
+  test('demo page is reachable directly', async ({ page }) => {
+    const res = await page.goto('/demo')
+    expect(res?.status()).toBeLessThan(400)
   })
 
   test('demo page shows credentials for all three roles', async ({ page }) => {

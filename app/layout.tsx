@@ -73,8 +73,13 @@ export const metadata: Metadata = {
     description: 'Sistema de ponto digital — leve, seguro e bonito. Open source.',
   },
   robots: {
-    index: true,
-    follow: true,
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+    },
   },
 }
 
