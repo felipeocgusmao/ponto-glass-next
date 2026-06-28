@@ -5,6 +5,7 @@ import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { createJWT, createPasswordResetToken } from '@/lib/auth'
 import { sendEmailVerification } from '@/lib/email'
+import { getEmployeeProfile } from '@/lib/data/profile'
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30
 
@@ -33,29 +34,9 @@ export async function GET() {
     role: user.role, tenant_id: user.tenant_id,
   }).catch(() => null)
 
-  // Try the extended profile first; if a newer column is missing from the DB
-  // (migration not applied), fall back to the basic set so the user can still
-  // sign in instead of being kicked into a logout loop on every refresh.
-  const ext = await supabase
-    .from('employees')
-    .select('id, name, username, role, super_admin, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, pending_email, lock_profile, theme, expected_start, expected_end, shift_start')
-    .eq('tenant_id', user.tenant_id)
-    .eq('id', user.id)
-    .maybeSingle()
-  if (ext.data) {
-    const res = NextResponse.json(ext.data)
-    if (fresh) setSessionCookie(res, fresh)
-    return res
-  }
-
-  const basic = await supabase
-    .from('employees')
-    .select('id, name, username, role, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email')
-    .eq('tenant_id', user.tenant_id)
-    .eq('id', user.id)
-    .maybeSingle()
-  if (!basic.data) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
-  const res = NextResponse.json(basic.data)
+  const profile = await getEmployeeProfile(user)
+  if (!profile) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
+  const res = NextResponse.json(profile)
   if (fresh) setSessionCookie(res, fresh)
   return res
 }
