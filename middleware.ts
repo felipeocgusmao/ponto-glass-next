@@ -16,6 +16,22 @@ function withHtmlNoStore(response: NextResponse): NextResponse {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Static / PWA assets must be reachable WITHOUT auth. Otherwise an
+  // unauthenticated request (e.g. Safari fetching the apple-touch-icon from the
+  // /login screen, or a browser reading the manifest to offer "Install") gets
+  // redirected to /login and receives HTML instead of the asset — which shows
+  // up as a blank "Add to Home Screen" icon and a broken PWA install.
+  if (
+    pathname === '/manifest.json' ||
+    pathname === '/sw.js' ||
+    pathname === '/robots.txt' ||
+    pathname === '/opengraph-image' ||
+    pathname.startsWith('/icon') ||
+    pathname.startsWith('/apple-icon')
+  ) {
+    return NextResponse.next()
+  }
+
   if (PUBLIC.some((p) => pathname.startsWith(p))) {
     // Already logged in → skip login page
     if (pathname === '/login') {
