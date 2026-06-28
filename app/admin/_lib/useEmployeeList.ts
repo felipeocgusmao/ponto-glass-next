@@ -3,8 +3,8 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Employee } from '@/lib/types'
 
-export function useEmployeeList() {
-  const [employees, setEmployees] = useState<Employee[]>([])
+export function useEmployeeList(initialEmployees: Employee[] = []) {
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
 
   // all=true brings deactivated employees too — the Funcionários tab shows
   // them under the "Inativos" filter with a restore action. Every other

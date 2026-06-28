@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
+import { getEmployees } from '@/lib/data/employees'
 import bcrypt from 'bcryptjs'
 
 async function requireAdmin() {
@@ -32,16 +33,7 @@ export async function GET(request: NextRequest) {
   // never see inactive people.
   const includeInactive = new URL(request.url).searchParams.get('all') === 'true'
 
-  let query = supabase
-    .from('employees')
-    .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode')
-    .eq('tenant_id', actor.tenant_id)
-    .order('created_at', { ascending: true })
-  if (!includeInactive) query = query.eq('active', true)
-
-  const { data, error } = await query
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const data = await getEmployees(actor, { includeInactive })
   return NextResponse.json(data, {
     headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
   })
