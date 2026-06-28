@@ -37,24 +37,50 @@ Edite `config.js`:
 - `businessTz` — deve bater com `NEXT_PUBLIC_BUSINESS_TZ` no servidor para o
   cálculo de "hoje" e dos minutos trabalhados ficar idêntico ao site.
 
-## Limitações conhecidas (protótipo)
+## Geolocalização (offscreen document)
 
-- **Geolocalização**: capturada com `navigator.geolocation` no popup, com
-  timeout de 8s e em modo best-effort. Se `geo_mode = 'required'` e o GPS não
-  responder a tempo, a batida é bloqueada com aviso (mesma regra do servidor).
+`navigator.geolocation` não existe no service worker e usá-la direto do popup é
+frágil (o popup pode fechar no meio do pedido). Por isso a localização passa pelo
+caminho suportado no MV3:
+
+```
+popup  ──GET_GEOLOCATION──▶  background.js (service worker)
+                               └─ cria offscreen.html (reason: GEOLOCATION)
+                                    └─ offscreen.js → navigator.geolocation
+                               ◀── { lat, lng } ──┘  (e fecha o offscreen)
+```
+
+Se o caminho offscreen não estiver disponível, há **fallback** para
+`navigator.geolocation` no próprio popup. Em ambos, se `geo_mode = 'required'` e o
+GPS não responder a tempo (8s), a batida é bloqueada com aviso (regra do servidor).
+
+## Empacotar e publicar
+
+```bash
+cd extension
+./package.sh      # gera dist/pontoglass-extension-v<versão>.zip
+```
+
+Passos completos de submissão, textos da listagem, justificativa de permissões e
+modelo de política de privacidade estão em [`STORE.md`](./STORE.md).
+
+## Notas
+
 - A lógica de minutos/estado em `lib/punch-utils.js` é **portada** de
   `lib/utils.ts`. Se a fórmula no app mudar, sincronize este arquivo.
-- Sem build step: é JS puro com ES modules, carregável direto como unpacked.
+- Sem build step: JS puro com ES modules, carregável direto como _unpacked_.
 
 ## Estrutura
 
 ```
 extension/
-├── manifest.json        # MV3, host_permissions, popup, ícones
+├── manifest.json        # MV3, host_permissions, background, offscreen, ícones
 ├── config.js            # baseUrl + businessTz
-├── popup.html           # markup do popup
-├── popup.css            # tema escuro espelhando o app
-├── popup.js             # lógica: fetch das APIs, render por nível, batida
+├── popup.html/.css/.js  # UI do popup + lógica (fetch das APIs, render por nível)
+├── background.js        # service worker: broker de geolocalização
+├── offscreen.html/.js   # documento offscreen → navigator.geolocation
 ├── lib/punch-utils.js   # math portado de lib/utils.ts
-└── icons/               # ícone do relógio (16/32/48/128)
+├── icons/               # ícone do relógio (16/32/48/128)
+├── package.sh           # empacota o zip para a Web Store
+└── STORE.md             # materiais e passos de publicação
 ```
