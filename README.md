@@ -484,7 +484,7 @@ ponto_glass_next/
 │   │       ├── SettingsModal     ← glassmorphism; tema, 9 accents, 3 fontes, idioma, sessões, sair
 │   │       └── tabs/
 │   │           ├── MeuPontoTab       ← ponto do admin/gerente logado
-│   │           ├── DashboardTab      ← KPIs, sparkline, gráfico 14 dias, feed de batidas, atrasos
+│   │           ├── DashboardTab      ← KPIs, sparkline, gráfico 14 dias interativo (toque na barra → horas do dia + linha de média), feed de batidas, atrasos
 │   │           ├── StatusTab         ← status ao vivo, toggle Lista/Cards, detecta sessões abertas de ontem
 │   │           ├── RegistrosTab      ← search + tipo + range pills (Hoje/7d/14d/30d), agrupado por data
 │   │           ├── FuncionariosTab   ← filter bar + tabela densa + drawer de configurações
@@ -908,6 +908,9 @@ Mais de 90 funcionalidades entregues — a lista completa fica colapsada para n�
   ✓  Fontes self-hosted via next/font/google (sem <link> externo ao Google Fonts, sem FOUC)
   ✓  Endpoint /api/health/deep (X-Health-Secret) — valida env obrigatórias + ping ao DB com latência
   ✓  Extensão Chrome MV3 — popup por função, geolocalização via offscreen document, empacotamento p/ Web Store
+  ✓  Ícone da marca (relógio) em iOS, Android, PWA/desktop, favicon e apple-touch — fonte única em assets/
+  ✓  Assets de PWA (ícones/manifest/sw) servidos sem auth — corrige ícone em branco no "Adicionar à Tela de Início" e install no Windows
+  ✓  Gráfico 14 dias interativo no Dashboard — toque/clique na barra mostra as horas do dia + linha de média
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
 
