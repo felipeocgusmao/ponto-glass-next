@@ -141,7 +141,7 @@ Cada peça foi escolhida com intenção:
 | **jsPDF + AutoTable** | Geração de PDF no cliente, sem dependências de servidor |
 | **Vercel Cron Jobs** | Tarefas agendadas: alerta de ausência (manhã) e alerta de saída não registada (17h) |
 | **Vitest** | 197 testes unitários: horas, auth, rate limit, geofencing, de-dup, voz, tenancy, TOTP, importação e **enforcement de auth nas rotas** |
-| **Playwright** | Testes E2E: landing, auth, demo, SEO + **fluxos do /ponto** (redirects, login, validação de correção) |
+| **Playwright** | Testes E2E: acesso à raiz/login, auth, demo, privacidade (robots/noindex) + **fluxos do /ponto** |
 | **Web Speech API** | Reconhecimento de voz (SpeechRecognition) + síntese de fala (TTS) no `/kiosk/glass` |
 | **Sentry** | Captura de erros e source maps automáticos via `withSentryConfig` |
 | **Haversine** | Cálculo de distância para validação opcional de geofencing por funcionário |
@@ -454,7 +454,8 @@ ponto_glass_next/
 ├── app/
 │   ├── _components/
 │   │   └── ErrorBoundary.tsx     ← React class component — captura erros de rendering por tab
-│   ├── page.tsx                  ← redirect inteligente (admin/manager → /admin | employee → /ponto)
+│   ├── page.tsx                  ← raiz privada: redireciona (logado → /admin|/ponto · deslogado → /login); sem vitrine pública
+│   ├── robots.ts                 ← bloqueia todos os crawlers (Disallow: /) — instância privada
 │   ├── login/page.tsx            ← autenticação (split-screen com relógio animado)
 │   ├── reset-password/page.tsx   ← reset de senha via link de e-mail
 │   ├── ponto/
@@ -573,7 +574,7 @@ ponto_glass_next/
 ├── vitest.config.ts           ← configuração Vitest (jsdom, exclui e2e/)
 ├── playwright.config.ts        ← configuração Playwright (E2E, Chromium)
 ├── __tests__/                 ← 197 testes unitários (utils, auth, tenancy, totp, employeeImport, punchQueue, enforcement de auth nas rotas…)
-├── e2e/                       ← testes E2E (landing, auth, demo, SEO, fluxos do /ponto)
+├── e2e/                       ← testes E2E (raiz/login, auth, demo, privacidade, fluxos do /ponto)
 ├── extension/                 ← extensão Chrome MV3 (popup por função, geolocalização offscreen)
 │   ├── manifest.json          ← MV3: host_permissions, background SW, offscreen, ícones
 │   ├── popup.html/.css/.js    ← UI do popup + fetch das APIs, render por nível
@@ -769,6 +770,7 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
   ✓  Sessão deslizante de 30 dias — token renovado a cada requisição autenticada
   ✓  Middleware de RBAC em todas as rotas sensíveis (admin / manager / employee)
   ✓  Service role key nunca exposta ao cliente
+  ✓  Instância privada — sem vitrine pública (raiz → /login), noindex sitewide + robots bloqueando crawlers
   ✓  Rate limiting por IP: 5 tentativas / 15 min no login e na recuperação
   ✓  Rate limiting por utilizador: 10 tentativas / 30 min (lockout independente do IP)
   ✓  Row Level Security habilitado no Supabase
@@ -864,9 +866,9 @@ Mais de 90 funcionalidades entregues — a lista completa fica colapsada para n�
   ✓  Modo Glass — /kiosk/glass para smart glasses Android (alto contraste, D-pad)
   ✓  Voz no Glass — Web Speech API: dizer "Maria entrada" seleciona + bate + confirma com TTS PT-PT
   ✓  Lógica de validação de punch extraída (punchValidation.ts) — geofencing, de-dup e tipos testáveis sem mock
-  ✓  Página /demo com credenciais fictícias (noindex) + landing pública
+  ✓  Página /demo com credenciais fictícias (noindex)
   ✓  Acessibilidade — focus rings, aria-labels, skip-link, labels associados
-  ✓  SEO — metadata Open Graph, OG image dinâmica, JSON-LD, robots.txt, sitemap.xml
+  ✓  Instância privada — noindex sitewide + robots.txt bloqueia tudo + sem sitemap; raiz → /login (sem vitrine pública). OG image mantida só para previews de link
   ✓  CI no GitHub Actions (lint + test + build) com badge
   ✓  Domínio personalizado por empresa (custom domain + slug subdomain)
   ✓  Multi-empresa (tenancy) — 5 fases: schema, API, RLS, host routing, super-admin

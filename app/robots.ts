@@ -1,14 +1,14 @@
 import type { MetadataRoute } from 'next'
 
+// Instância privada: bloqueia indexação por qualquer crawler. O sistema não tem
+// vitrine pública — quem entra na raiz é levado direto ao /login.
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/login', '/demo'],
-        disallow: ['/admin', '/ponto', '/kiosk', '/api', '/reset-password'],
+        disallow: ['/'],
       },
     ],
-    sitemap: 'https://ponto-glass-next.vercel.app/sitemap.xml',
   }
 }
