@@ -17,7 +17,9 @@ export default async function AdminPage() {
   try {
     user = await verifyApiAuth(token)
   } catch {
-    redirect('/login')
+    // Signature ok but session revoked/inactive/unknown → tell /login to clear the
+    // stale cookie instead of redirecting back here (avoids an infinite loop).
+    redirect('/login?session=expired')
   }
 
   // Only admin/manager belong here (mirrors the middleware redirect).
@@ -28,7 +30,7 @@ export default async function AdminPage() {
     getEmployees(user, { includeInactive: true }),
     getPendingCorrectionsCount(user),
   ])
-  if (!profile) redirect('/login')
+  if (!profile) redirect('/login?session=expired')
 
   return (
     <AdminClient

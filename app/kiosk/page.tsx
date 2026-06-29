@@ -16,7 +16,9 @@ export default async function KioskPage() {
   try {
     user = await verifyApiAuth(token)
   } catch {
-    redirect('/login')
+    // Signature ok but session revoked/inactive/unknown → tell /login to clear the
+    // stale cookie instead of redirecting back here (avoids an infinite loop).
+    redirect('/login?session=expired')
   }
 
   // The kiosk is a shared admin/manager device; employees go to their own screen.
