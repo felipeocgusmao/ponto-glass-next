@@ -35,6 +35,16 @@ export async function middleware(request: NextRequest) {
   if (PUBLIC.some((p) => pathname.startsWith(p))) {
     // Already logged in → skip login page
     if (pathname === '/login') {
+      // A protected page bounced the user back with ?session=expired because the
+      // token failed FULL validation (revoked session / inactive / unknown user)
+      // even though its signature is still valid. verifyJWT below would pass and
+      // redirect right back into that page → infinite redirect loop
+      // (ERR_TOO_MANY_REDIRECTS). Clear the stale cookie and render the login form.
+      if (request.nextUrl.searchParams.has('session')) {
+        const res = withHtmlNoStore(NextResponse.next())
+        res.cookies.delete('ponto_token')
+        return res
+      }
       const token = request.cookies.get('ponto_token')?.value
       if (token) {
         try {

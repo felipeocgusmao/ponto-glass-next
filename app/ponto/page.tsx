@@ -19,7 +19,9 @@ export default async function PontoPage() {
   try {
     user = await verifyApiAuth(token)
   } catch {
-    redirect('/login')
+    // Signature ok but session revoked/inactive/unknown → tell /login to clear the
+    // stale cookie instead of redirecting back here (avoids an infinite loop).
+    redirect('/login?session=expired')
   }
 
   // Privileged users live in /admin (mirrors the middleware redirect).
@@ -29,7 +31,7 @@ export default async function PontoPage() {
     getEmployeeProfile(user),
     getTodayRecordsForEmployee(user, user.id),
   ])
-  if (!profile) redirect('/login')
+  if (!profile) redirect('/login?session=expired')
 
   return <PontoClient initialUser={profile} initialRecords={records} />
 }
