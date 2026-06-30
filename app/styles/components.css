@@ -49,6 +49,7 @@
 /* ─── Cards ─── */
 .card {
   background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
@@ -69,6 +70,7 @@
   background: var(--glass-bg); border: 1px solid var(--glass-border);
   display: flex; flex-direction: column; gap: 6px;
   min-width: 0;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
@@ -197,7 +199,7 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 .drawer {
   position: fixed; top: 0; right: 0; bottom: 0; width: 480px; max-width: 92vw;
   background: var(--glass-bg-drawer); border-left: 1px solid var(--glass-border-drawer); z-index: 51;
-  display: flex; flex-direction: column; box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-highlight);
   animation: pg-slideIn 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
   -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
@@ -260,7 +262,7 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 .cmdk {
   width: 100%; max-width: 580px;
   background: var(--glass-bg-cmdk); border: 1px solid var(--glass-border-cmdk);
-  border-radius: var(--r-lg); box-shadow: var(--shadow-lg); overflow: hidden;
+  border-radius: var(--r-lg); box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-highlight); overflow: hidden;
   backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
   -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
 }
@@ -308,7 +310,7 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
   background: var(--glass-bg-panel);
   border: 1px solid var(--glass-border-panel);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-highlight);
   backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
   -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
   width: 100%; max-height: 90dvh;
@@ -321,3 +323,26 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
   padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .modal-glass-body { overflow-y: auto; padding: 20px; flex: 1; }
+
+/* ─── Liquid glass — accessibility & fallbacks (#219) ─── */
+/* Respect the OS "reduce transparency" setting: drop the blur and paint opaque
+   surfaces so text never sits on a low-contrast frosted background. */
+@media (prefers-reduced-transparency: reduce) {
+  .card, .kpi, .drawer, .cmdk, .modal-glass-panel, .chip, .sidebar, .topbar {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .card, .kpi, .drawer, .cmdk, .modal-glass-panel, .sidebar, .topbar {
+    background: var(--surface) !important;
+  }
+}
+/* Browsers without backdrop-filter at all → same opaque fallback. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card, .kpi, .drawer, .cmdk, .modal-glass-panel, .sidebar, .topbar {
+    background: var(--surface) !important;
+  }
+}
+/* Reduced motion → no glass hover transitions. */
+@media (prefers-reduced-motion: reduce) {
+  .status-row { transition: none; }
+}
