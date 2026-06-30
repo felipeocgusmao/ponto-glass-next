@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { Tenant } from '@/lib/types'
-import { IconBuilding, IconUserPlus } from '../icons'
+import { IconBuilding, IconUserPlus, IconUsers, IconPulse } from '../icons'
 import { Modal } from '../Modal'
 
 type TenantRow = Tenant & { employee_count: number; record_count: number }
@@ -208,6 +208,23 @@ export function EmpresasTab() {
         <button className="btn primary" onClick={() => { setShowCreate(true); setErr('') }}>
           <IconUserPlus size={13} /> Nova empresa
         </button>
+      </div>
+
+      {/* Cross-tenant overview — the home screen for a platform controller (no
+          operational dashboard of their own to land on). */}
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+        <div className="kpi">
+          <div className="kpi-label"><IconBuilding size={12} /> Empresas ativas</div>
+          <div className="kpi-value tnum">{tenants.filter(t => t.active).length}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label"><IconUsers size={12} /> Funcionários (total)</div>
+          <div className="kpi-value tnum">{tenants.reduce((sum, t) => sum + t.employee_count, 0)}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label"><IconPulse size={12} /> Registos de ponto (total)</div>
+          <div className="kpi-value tnum">{tenants.reduce((sum, t) => sum + t.record_count, 0)}</div>
+        </div>
       </div>
 
       {ok && <div className="alert-inline ok" style={{ marginBottom: 12 }}>{ok}</div>}

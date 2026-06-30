@@ -55,7 +55,13 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
   const { theme, isSystemTheme, accent, font, selectTheme, toggleTheme, changeAccent, changeFont } = useThemeSettings()
   const [user, setUser] = useState<EmployeeProfile | null>(initialUser)
   const { employees, activeEmployees, loadEmployees, setEmployees } = useEmployeeList(initialEmployees)
-  const [tab, setTab] = useState<Tab>(initialUser.role === 'manager' ? 'meu_ponto' : 'dashboard')
+  // A super-admin whose own tenant has no real team (just the controller
+  // account itself) is a platform operator, not a company admin — they get a
+  // "Plataforma"-only shell instead of an operational dashboard full of zeros.
+  const isPlatformOnly = initialUser.super_admin === true && initialEmployees.length <= 1
+  const [tab, setTab] = useState<Tab>(
+    initialUser.role === 'manager' ? 'meu_ponto' : isPlatformOnly ? 'empresas' : 'dashboard'
+  )
   const [showPwd, setShowPwd] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showCmdK, setShowCmdK] = useState(false)
@@ -69,10 +75,16 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
   const { items: notifItems } = useNotifications({ pendingCorrections, employees: activeEmployees })
 
   const isManager = user?.role === 'manager'
-  // Super-admins (platform operators) get the extra "Empresas" tab.
-  const visibleTabs = isManager
-    ? MANAGER_TABS
-    : (user?.super_admin ? [...ALL_TABS, ...SUPER_ADMIN_TABS] : ALL_TABS)
+  // Platform-only super-admins (no team of their own) see ONLY the Empresas
+  // tab — the operational tabs (Dashboard, Banco, Feriados, ...) would just
+  // be empty states for an account that runs no company day-to-day.
+  // Super-admins who DO have their own team (e.g. they also operate a
+  // company) keep the full set plus Empresas, same as before.
+  const visibleTabs = isPlatformOnly
+    ? SUPER_ADMIN_TABS
+    : isManager
+      ? MANAGER_TABS
+      : (user?.super_admin ? [...ALL_TABS, ...SUPER_ADMIN_TABS] : ALL_TABS)
 
   const toggleCollapse = () => {
     const next = !sidebarCollapsed
@@ -235,7 +247,7 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
           notifItems={notifItems}
         />
         <div className="page" id="main-content">
-          <MissingExitBanner />
+          {!isPlatformOnly && <MissingExitBanner />}
           <ErrorBoundary>
             {tab === 'meu_ponto'    && <MeuPontoTab user={user} />}
             {tab === 'dashboard'    && <DashboardTab employees={activeEmployees} />}
