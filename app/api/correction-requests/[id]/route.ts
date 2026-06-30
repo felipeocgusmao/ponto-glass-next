@@ -7,6 +7,7 @@ import webpush from 'web-push'
 import { sendCorrectionEmail } from '@/lib/email'
 import { calcWorkDate } from '@/lib/utils'
 import { isCsrfSafe } from '@/lib/csrf'
+import { isDuplicatePunch } from '@/lib/punchValidation'
 
 if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -71,6 +72,30 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .eq('id', cr.employee_id)
       .maybeSingle()
     const workDate = calcWorkDate(new Date(cr.req_timestamp), emp?.shift_start ?? '00:00')
+
+    // Guard against creating a duplicate punch (same type within ~1 min on that work
+    // date). The live punch path validates this; approvals must too, otherwise the
+    // day's totals get corrupted by a double entrada/saída. Block and roll the claim
+    // back to pending so the admin can adjust or reject the request.
+    const { data: dayRecs } = await supabase
+      .from('records')
+      .select('type, timestamp')
+      .eq('tenant_id', user.tenant_id)
+      .eq('employee_id', cr.employee_id)
+      .eq('date', workDate)
+    const reqAt = new Date(cr.req_timestamp)
+    const isDup = (dayRecs ?? []).some((r: { type: string; timestamp: string }) =>
+      isDuplicatePunch(r.type, r.timestamp, cr.req_type, reqAt))
+    if (isDup) {
+      await supabase.from('correction_requests')
+        .update({ status: 'pending', reviewer_id: null, reviewer_name: null, reviewer_note: null, resolved_at: null })
+        .eq('tenant_id', user.tenant_id)
+        .eq('id', params.id)
+      return NextResponse.json(
+        { error: 'Já existe uma batida deste tipo nesse horário. Ajuste ou rejeite o pedido.' },
+        { status: 409 },
+      )
+    }
 
     const { error: recErr } = await supabase.from('records').insert({
       tenant_id: user.tenant_id,
