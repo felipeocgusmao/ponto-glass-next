@@ -32,8 +32,10 @@ export function useCorrectionRequests({ t, initialDate, initialTime }: Options) 
   const [corrSubmitting, setCorrSubmitting] = useState(false)
   const [corrMsg, setCorrMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  // Always refetch: the previous `if (corrLoaded) return` guard meant the employee
+  // never saw the admin's approval/rejection until a full page reload. Re-opening
+  // the tab now pulls the current state. (Stable identity — no corrLoaded dep.)
   const loadCorrections = useCallback(async () => {
-    if (corrLoaded) return
     setCorrLoading(true)
     try {
       const res = await fetch('/api/correction-requests')
@@ -48,7 +50,7 @@ export function useCorrectionRequests({ t, initialDate, initialTime }: Options) 
       }
     } catch { /* keep */ }
     finally { setCorrLoading(false) }
-  }, [corrLoaded])
+  }, [])
 
   const submitCorrection = async () => {
     if (!corrDate || !corrTime || !corrType) return

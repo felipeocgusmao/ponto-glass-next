@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import webpush from 'web-push'
 import { sendCorrectionEmail } from '@/lib/email'
 import { calcWorkDate } from '@/lib/utils'
+import { isCsrfSafe } from '@/lib/csrf'
 
 if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -16,6 +17,8 @@ if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && proce
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  if (!isCsrfSafe(request)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const token = cookies().get('ponto_token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   let user: ApiUser
