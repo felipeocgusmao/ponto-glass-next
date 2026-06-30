@@ -11,6 +11,11 @@ const inputStyle = { height: 34 } as const
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_TENANT_ROOT_DOMAIN ?? ''
 
+// Mirrors lib/tenant.ts's DEFAULT_TENANT_ID as a plain literal — that module
+// also imports the service-role Supabase client, which must never be bundled
+// into client code.
+const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
+
 /** Where the admin of this tenant should send their employees to log in. */
 function tenantUrl(t: { slug: string; domain: string | null }): string {
   if (t.domain) return `https://${t.domain}`
@@ -51,6 +56,18 @@ export function EmpresasTab() {
   // Edit form
   const [editName, setEditName] = useState('')
   const [editDomain, setEditDomain] = useState('')
+
+  // Spin-off (platform/controller separation) form + result
+  const [showSpinOff, setShowSpinOff] = useState(false)
+  const [spName, setSpName] = useState('')
+  const [spSlug, setSpSlug] = useState('')
+  const [spDomain, setSpDomain] = useState('')
+  const [spControllerName, setSpControllerName] = useState('')
+  const [spControllerUsername, setSpControllerUsername] = useState('')
+  const [spControllerPassword, setSpControllerPassword] = useState('')
+  const [spConfirm, setSpConfirm] = useState('')
+  const [spinningOff, setSpinningOff] = useState(false)
+  const [spinOffResult, setSpinOffResult] = useState<{ tenant: Tenant; controllerUsername: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -150,6 +167,33 @@ export function EmpresasTab() {
     setEditing(t); setEditName(t.name); setEditDomain(t.domain ?? ''); setErr('')
   }
 
+  const defaultTenant = tenants.find(t => t.id === DEFAULT_TENANT_ID)
+
+  const handleSpinOff = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!defaultTenant || spConfirm !== defaultTenant.name) return
+    setSpinningOff(true); setErr('')
+    try {
+      const res = await fetch(`/api/tenants/${DEFAULT_TENANT_ID}/spin-off`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: spName, slug: spSlug.trim().toLowerCase(), domain: spDomain.trim() || null,
+          controller_name: spControllerName, controller_username: spControllerUsername, controller_password: spControllerPassword,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok && res.status !== 207) { setErr(data.error ?? 'Erro ao separar a plataforma'); return }
+      setShowSpinOff(false)
+      setSpName(''); setSpSlug(''); setSpDomain('')
+      setSpControllerName(''); setSpControllerUsername(''); setSpControllerPassword(''); setSpConfirm('')
+      setSpinOffResult({ tenant: data.tenant, controllerUsername: data.controllerUsername ?? spControllerUsername.trim().toLowerCase() })
+      if (res.status === 207) setErr(data.error) // partial success — surface alongside the result panel
+      await load()
+    } catch { setErr('Erro de conexão') }
+    finally { setSpinningOff(false) }
+  }
+
   return (
     <>
       <div className="page-head">
@@ -212,6 +256,29 @@ export function EmpresasTab() {
         </div>
       )}
 
+      {spinOffResult && (
+        <div className="card" style={{
+          marginBottom: 16,
+          border: '1px solid var(--ok-fg, #2ea043)',
+          background: 'color-mix(in srgb, var(--ok-fg, #2ea043) 6%, transparent)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 16 }}>✓</span>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Plataforma separada</div>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--fg-muted)', lineHeight: 1.6 }}>
+            Todos os dados operacionais foram movidos para <strong>&quot;{spinOffResult.tenant.name}&quot;</strong> — os funcionários
+            de lá continuam a entrar com as <strong>mesmas credenciais de sempre</strong> (só mudaram de empresa).
+            <br /><br />
+            A nova conta de controlador da plataforma é <code style={{ fontWeight: 700 }}>{spinOffResult.controllerUsername}</code>
+            {' '}— a senha que definiste. <strong>Não fica registada</strong>, guarda-a num gestor de senhas.
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <button type="button" className="btn ghost sm" onClick={() => setSpinOffResult(null)}>Fechar</button>
+          </div>
+        </div>
+      )}
+
       {/* Active tenants */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
@@ -233,7 +300,12 @@ export function EmpresasTab() {
                 {tenants.filter(t => t.active).map(t => (
                   <tr key={t.id}>
                     <td style={{ fontWeight: 600 }}>
-                      <div>{t.name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {t.name}
+                        {t.id === DEFAULT_TENANT_ID && (
+                          <span className="chip accent" style={{ fontSize: 10 }} title="Tenant da plataforma — controladores (super-admins) vivem aqui">Plataforma</span>
+                        )}
+                      </div>
                       <a href={tenantUrl(t)} target="_blank" rel="noopener noreferrer"
                          className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                         {tenantUrl(t)}
@@ -245,9 +317,20 @@ export function EmpresasTab() {
                     <td className="tnum" style={{ textAlign: 'right' }}>{t.employee_count}</td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button className="btn ghost sm" onClick={() => openEdit(t)}>Editar</button>
-                      <button className="btn ghost sm" disabled={saving} onClick={() => toggleActive(t)} style={{ marginLeft: 6 }}>
-                        Desativar
-                      </button>
+                      {t.id === DEFAULT_TENANT_ID ? (
+                        <button
+                          className="btn ghost sm"
+                          onClick={() => { setShowSpinOff(true); setErr('') }}
+                          style={{ marginLeft: 6 }}
+                          title="Move os dados operacionais para um tenant próprio e cria uma conta de controlador separada"
+                        >
+                          Separar plataforma
+                        </button>
+                      ) : (
+                        <button className="btn ghost sm" disabled={saving} onClick={() => toggleActive(t)} style={{ marginLeft: 6 }}>
+                          Desativar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -427,6 +510,89 @@ export function EmpresasTab() {
               </button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: Separar plataforma ── */}
+      {showSpinOff && defaultTenant && (
+        <Modal
+          title="⚠ Separar plataforma"
+          onClose={() => { setShowSpinOff(false); setSpConfirm(''); setErr('') }}
+          width={620}
+        >
+          <form onSubmit={handleSpinOff} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {err && <div className="alert-inline err">{err}</div>}
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.6 }}>
+              Move <strong>todos os dados</strong> de &quot;{defaultTenant.name}&quot; ({defaultTenant.employee_count} funcionário(s))
+              para uma empresa própria — e cria uma conta de controlador separada aqui na plataforma.
+              Esta acção é <strong>irreversível por esta ferramenta</strong> (reverter exigiria mover os dados de volta manualmente).
+            </div>
+
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <IconBuilding size={12} /> Nova empresa (recebe os dados operacionais)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              <div className="field">
+                <label htmlFor="sp-name">Nome</label>
+                <input id="sp-name" className="input" style={inputStyle} value={spName} onChange={e => setSpName(e.target.value)} placeholder={defaultTenant.name} required autoFocus />
+              </div>
+              <div className="field">
+                <label htmlFor="sp-slug">Slug (subdomínio)</label>
+                <input id="sp-slug" className="input" style={inputStyle} value={spSlug} onChange={e => setSpSlug(e.target.value)} placeholder="dac-industrial" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required />
+              </div>
+              <div className="field">
+                <label htmlFor="sp-domain">Domínio custom (opcional)</label>
+                <input id="sp-domain" className="input" style={inputStyle} value={spDomain} onChange={e => setSpDomain(e.target.value)} placeholder="ponto.empresa.com" />
+              </div>
+            </div>
+
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <IconUserPlus size={12} /> Nova conta de controlador (fica na plataforma)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+              <div className="field">
+                <label htmlFor="sp-ctrl-name">Nome</label>
+                <input id="sp-ctrl-name" className="input" style={inputStyle} value={spControllerName} onChange={e => setSpControllerName(e.target.value)} placeholder="Dono da plataforma" required />
+              </div>
+              <div className="field">
+                <label htmlFor="sp-ctrl-user">Usuário</label>
+                <input id="sp-ctrl-user" className="input" style={inputStyle} value={spControllerUsername} onChange={e => setSpControllerUsername(e.target.value)} placeholder="platform-owner" autoCapitalize="none" required />
+              </div>
+              <div className="field">
+                <label htmlFor="sp-ctrl-pwd">Senha (mín. 6)</label>
+                <input id="sp-ctrl-pwd" className="input" style={inputStyle} type="password" value={spControllerPassword} onChange={e => setSpControllerPassword(e.target.value)} minLength={6} required />
+              </div>
+            </div>
+
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
+              Escreve o nome exacto de &quot;{defaultTenant.name}&quot; para confirmar:
+            </div>
+            <input
+              className="input"
+              style={{ height: 34 }}
+              value={spConfirm}
+              onChange={e => setSpConfirm(e.target.value)}
+              placeholder={defaultTenant.name}
+            />
+
+            <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+              <button
+                type="submit"
+                className="btn sm"
+                disabled={spConfirm !== defaultTenant.name || spinningOff}
+                style={{
+                  background: spConfirm === defaultTenant.name ? 'var(--err-fg, #c53030)' : undefined,
+                  color: spConfirm === defaultTenant.name ? '#fff' : undefined,
+                  opacity: spConfirm !== defaultTenant.name ? 0.45 : 1,
+                }}
+              >
+                {spinningOff ? 'A separar…' : 'Separar plataforma'}
+              </button>
+              <button type="button" className="btn ghost sm" onClick={() => { setShowSpinOff(false); setSpConfirm(''); setErr('') }}>
+                Cancelar
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </>
