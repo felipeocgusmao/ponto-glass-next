@@ -44,6 +44,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: 'Already resolved' }, { status: 409 })
 
   const status = action === 'approve' ? 'approved' : 'rejected'
+  // Claim the request atomically (only while still pending) so a double-click or two
+  // concurrent admins can't both resolve it — and, once approved, can't credit twice.
   const { data, error } = await supabase
     .from('compensation_requests')
     .update({
@@ -54,10 +56,36 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       resolved_at: new Date().toISOString(),
     })
     .eq('id', params.id)
+    .eq('tenant_id', user.tenant_id)
+    .eq('status', 'pending')
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error || !data) return NextResponse.json({ error: 'Already resolved' }, { status: 409 })
+
+  // Approving a compensation must actually credit the hour bank — otherwise the
+  // request just flips to "approved" with no effect on the balance. The bank
+  // balance sums hour_bank_adjustments.minutes, so insert a positive adjustment.
+  if (action === 'approve') {
+    const minutes = Math.round(Number(existing.hours_requested) * 60)
+    const { error: adjErr } = await supabase.from('hour_bank_adjustments').insert({
+      tenant_id: user.tenant_id,
+      employee_id: existing.employee_id,
+      minutes,
+      reason: `Compensação aprovada${existing.reason ? `: ${existing.reason}` : ''}`,
+      date: existing.date,
+      created_by: user.id,
+    })
+    if (adjErr) {
+      // Roll the claim back to pending so it can be retried, rather than left
+      // approved-without-credit.
+      await supabase.from('compensation_requests')
+        .update({ status: 'pending', reviewer_id: null, reviewer_name: null, reviewer_note: null, resolved_at: null })
+        .eq('id', params.id)
+        .eq('tenant_id', user.tenant_id)
+      return NextResponse.json({ error: adjErr.message }, { status: 500 })
+    }
+  }
 
   await logAudit(user, `compensation_${action}` as any, null, { id: params.id })
 

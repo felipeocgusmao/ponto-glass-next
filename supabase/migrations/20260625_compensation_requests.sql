@@ -24,3 +24,10 @@ CREATE INDEX IF NOT EXISTS idx_comp_req_tenant_status
 
 -- Kiosk token per tenant (UUID generated on first use)
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS kiosk_token TEXT;
+
+-- Defence-in-depth RLS: refuse any access with the anon key (app uses service-role).
+-- Mirrors the lockdown applied to every other per-tenant table in schema.sql.
+ALTER TABLE compensation_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "block_anon_compensation" ON compensation_requests;
+CREATE POLICY "block_anon_compensation" ON compensation_requests
+  AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
