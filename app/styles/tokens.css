@@ -64,6 +64,22 @@
   --shadow-md: 0 4px 12px rgba(15,17,24,0.06), 0 1px 3px rgba(15,17,24,0.06);
   --shadow-lg: 0 24px 48px -12px rgba(15,17,24,0.18), 0 8px 16px -8px rgba(15,17,24,0.08);
   --shadow-pop: 0 2px 4px rgba(15,17,24,0.06), 0 8px 24px rgba(15,17,24,0.08), 0 0 0 1px var(--border);
+
+  /* ─── Glass surfaces ─── centralizes the frosted-glass values used across
+     cards, modals, sidebar and topbar (consumed in components.css / layout.css).
+     Foundation for the liquid-glass roadmap (#214). Blur/saturate are
+     theme-independent; only the translucent bg/border change per theme. */
+  --glass-blur: 28px;          --glass-saturate: 2.0;   /* cards, KPIs, sidebar */
+  --glass-blur-lg: 40px;       --glass-saturate-lg: 2.2; /* drawer, cmdk, modal */
+  --glass-blur-bar: 20px;      --glass-saturate-bar: 1.6; /* topbar */
+  --glass-blur-sm: 10px;       --glass-saturate-sm: 1.4;  /* chips */
+  --glass-bg: rgba(255,255,255,0.52);
+  --glass-border: var(--border);
+  --glass-bg-sidebar: rgba(248,248,250,0.68);
+  --glass-bg-bar: rgba(250,250,252,0.75);
+  --glass-bg-drawer: rgba(255,255,255,0.72);   --glass-border-drawer: rgba(255,255,255,0.25);
+  --glass-bg-cmdk: rgba(252,252,253,0.72);     --glass-border-cmdk: rgba(255,255,255,0.3);
+  --glass-bg-panel: rgba(252,252,253,0.82);    --glass-border-panel: rgba(255,255,255,0.45);
 }
 
 [data-theme="dark"] {
@@ -102,6 +118,15 @@
   --shadow-md: 0 4px 12px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.35);
   --shadow-lg: 0 24px 48px -12px rgba(0,0,0,0.65), 0 8px 16px -8px rgba(0,0,0,0.45);
   --shadow-pop: 0 4px 12px rgba(0,0,0,0.5), 0 0 0 1px var(--border);
+
+  /* Glass surfaces (dark) — blur/saturate inherit from :root. */
+  --glass-bg: rgba(255,255,255,0.05);
+  --glass-border: rgba(255,255,255,0.08);
+  --glass-bg-sidebar: rgba(255,255,255,0.04);
+  --glass-bg-bar: rgba(255,255,255,0.04);
+  --glass-bg-drawer: rgba(13,14,16,0.68);   --glass-border-drawer: rgba(255,255,255,0.07);
+  --glass-bg-cmdk: rgba(19,20,23,0.68);     --glass-border-cmdk: rgba(255,255,255,0.07);
+  --glass-bg-panel: rgba(13,14,16,0.78);    --glass-border-panel: rgba(255,255,255,0.07);
 }
 
 /* accent overrides */

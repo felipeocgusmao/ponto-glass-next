@@ -19,11 +19,11 @@
   /* Clear the notch so the brand row isn't hidden under the status bar
      (env() resolves to 0 on screens without safe areas). */
   padding-top: env(safe-area-inset-top, 0px);
-  background: rgba(248,248,250,0.68);
+  background: var(--glass-bg-sidebar);
   border-right: 1px solid var(--border);
   overflow: hidden;
-  backdrop-filter: blur(28px) saturate(2.0);
-  -webkit-backdrop-filter: blur(28px) saturate(2.0);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 .sidebar.mobile-open { transform: translateX(0); }
 /* Overlay backdrop for drawer */
@@ -35,7 +35,6 @@
   animation: pg-fadeIn 0.2s ease;
 }
 [data-theme="dark"] .sidebar-overlay { background: rgba(0,0,0,0.18); }
-[data-theme="dark"] .sidebar { background: rgba(255,255,255,0.04); }
 /* When drawer is open and sidebar is in collapsed state, restore full width and show labels */
 .app[data-collapsed="true"] .sidebar.mobile-open { width: 240px; }
 .app[data-collapsed="true"] .sidebar.mobile-open .sb-brand,
@@ -125,11 +124,10 @@
      on top of the dropdown. */
   position: relative; z-index: 50;
   border-bottom: 1px solid var(--border);
-  background: rgba(250,250,252,0.75); flex-shrink: 0;
-  backdrop-filter: blur(20px) saturate(1.6);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  background: var(--glass-bg-bar); flex-shrink: 0;
+  backdrop-filter: blur(var(--glass-blur-bar)) saturate(var(--glass-saturate-bar));
+  -webkit-backdrop-filter: blur(var(--glass-blur-bar)) saturate(var(--glass-saturate-bar));
 }
-[data-theme="dark"] .topbar { background: rgba(255,255,255,0.04); }
 .breadcrumbs { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg-muted); }
 .breadcrumbs .crumb { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: var(--r-sm); }
 .breadcrumbs .crumb:hover { background: var(--hover); color: var(--fg); }
