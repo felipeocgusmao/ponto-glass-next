@@ -50,6 +50,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (trimmedDomain && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(trimmedDomain))
     return NextResponse.json({ error: 'Domínio inválido' }, { status: 400 })
 
+  // Without a root domain for slug subdomains, resolveLoginTenant() only ever
+  // reaches a non-default tenant via an exact tenants.domain match — every
+  // other host falls back to the default tenant. Spinning off without a
+  // custom domain in that case would move the company's employees somewhere
+  // login can never reach (see #243 — this happened in production).
+  if (!process.env.NEXT_PUBLIC_TENANT_ROOT_DOMAIN && !trimmedDomain)
+    return NextResponse.json({
+      error: 'Sem NEXT_PUBLIC_TENANT_ROOT_DOMAIN configurado (#146), a nova empresa só fica acessível com um domínio custom. Informe um domínio ou configure o root domain primeiro.',
+    }, { status: 400 })
+
   const trimmedControllerName = String(controller_name ?? '').trim()
   const trimmedControllerUsername = String(controller_username ?? '').trim().toLowerCase()
   if (trimmedControllerName.length < 2 || trimmedControllerName.length > 100)
