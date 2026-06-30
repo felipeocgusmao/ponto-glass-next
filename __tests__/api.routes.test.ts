@@ -153,8 +153,10 @@ describe('GET /api/correction-requests', () => {
 
 describe('POST /api/tenants/[id]/spin-off', () => {
   const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
+  // A custom domain is included by default so tests unrelated to the root-domain
+  // guard (#243) don't accidentally trip it — see the dedicated tests below.
   const validBody = {
-    name: 'DAC Industrial', slug: 'dac-industrial', domain: null,
+    name: 'DAC Industrial', slug: 'dac-industrial', domain: 'ponto.dac-industrial.com',
     controller_name: 'Plataforma', controller_username: 'platform-owner', controller_password: 'senha-forte-123',
   }
 
@@ -214,5 +216,39 @@ describe('POST /api/tenants/[id]/spin-off', () => {
       { params: { id: DEFAULT_TENANT_ID } },
     )
     expect(res.status).toBe(400)
+  })
+
+  // #243: production incident — spinning off without a reachable domain locked
+  // every migrated employee out of login. Guard against repeating it.
+  it('returns 400 without a custom domain when NEXT_PUBLIC_TENANT_ROOT_DOMAIN is unset', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TENANT_ROOT_DOMAIN', '')
+    mockCookies.mockReturnValue({ get: () => ({ value: 'token' }) })
+    mockVerify.mockResolvedValue({ id: 'a1', name: 'Admin', role: 'admin', tenant_id: DEFAULT_TENANT_ID, super_admin: true })
+    const { POST } = await import('@/app/api/tenants/[id]/spin-off/route')
+    const res = await POST(
+      makeReq('http://localhost/api/tenants/x/spin-off', { method: 'POST', body: JSON.stringify({ ...validBody, domain: null }) }),
+      { params: { id: DEFAULT_TENANT_ID } },
+    )
+    expect(res.status).toBe(400)
+    const data = await res.json()
+    expect(data.error).toMatch(/domínio/i)
+    vi.unstubAllEnvs()
+  })
+
+  it('allows no custom domain when NEXT_PUBLIC_TENANT_ROOT_DOMAIN is configured', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TENANT_ROOT_DOMAIN', 'pontoglass.app')
+    mockCookies.mockReturnValue({ get: () => ({ value: 'token' }) })
+    mockVerify.mockResolvedValue({ id: 'a1', name: 'Admin', role: 'admin', tenant_id: DEFAULT_TENANT_ID, super_admin: true })
+    const { supabase } = await import('@/lib/supabase')
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 'new-tenant-id', error: null } as never)
+    const { POST } = await import('@/app/api/tenants/[id]/spin-off/route')
+    const res = await POST(
+      makeReq('http://localhost/api/tenants/x/spin-off', { method: 'POST', body: JSON.stringify({ ...validBody, domain: null }) }),
+      { params: { id: DEFAULT_TENANT_ID } },
+    )
+    // Should pass the domain guard — whatever happens past it is exercised by
+    // the rpc mock, not by the (now bypassed) domain-requirement check.
+    expect(res.status).not.toBe(400)
+    vi.unstubAllEnvs()
   })
 })

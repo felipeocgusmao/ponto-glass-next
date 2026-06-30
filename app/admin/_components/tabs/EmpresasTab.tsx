@@ -545,6 +545,15 @@ export function EmpresasTab() {
               Esta acção é <strong>irreversível por esta ferramenta</strong> (reverter exigiria mover os dados de volta manualmente).
             </div>
 
+            {!ROOT_DOMAIN && (
+              <div className="alert-inline warn">
+                ⚠ Sem <code>NEXT_PUBLIC_TENANT_ROOT_DOMAIN</code> configurado (#146): a nova empresa só vai conseguir
+                fazer login se você informar um <strong>domínio custom</strong> abaixo — sem ele, os funcionários ficam
+                sem forma de entrar (já aconteceu, ver #243). O domínio precisa estar de facto configurado na Vercel + DNS
+                antes de confirmar (ver <code>docs/TENANTS.md</code>).
+              </div>
+            )}
+
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <IconBuilding size={12} /> Nova empresa (recebe os dados operacionais)
             </div>
@@ -558,8 +567,8 @@ export function EmpresasTab() {
                 <input id="sp-slug" className="input" style={inputStyle} value={spSlug} onChange={e => setSpSlug(e.target.value)} placeholder="dac-industrial" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required />
               </div>
               <div className="field">
-                <label htmlFor="sp-domain">Domínio custom (opcional)</label>
-                <input id="sp-domain" className="input" style={inputStyle} value={spDomain} onChange={e => setSpDomain(e.target.value)} placeholder="ponto.empresa.com" />
+                <label htmlFor="sp-domain">Domínio custom{ROOT_DOMAIN ? ' (opcional)' : ' — obrigatório sem root domain'}</label>
+                <input id="sp-domain" className="input" style={inputStyle} value={spDomain} onChange={e => setSpDomain(e.target.value)} placeholder="ponto.empresa.com" required={!ROOT_DOMAIN} />
               </div>
             </div>
 
