@@ -14,6 +14,12 @@ const TENANT_TABLES = [
   'day_exceptions',
   'hour_bank_adjustments',
   'push_subscriptions',
+  'compensation_requests',
+  'webhook_configs',
+  'shift_templates',
+  'timesheet_approvals',
+  'login_sessions',
+  'kiosk_photos',
 ] as const
 
 describe('RLS lockdown (phase 3)', () => {
