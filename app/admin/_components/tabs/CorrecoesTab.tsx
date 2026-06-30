@@ -146,9 +146,12 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
         <div className="page-sub">
           {loading
             ? t('common.loading')
-            : pending.length > 0
-              ? `${pending.length} ${pending.length === 1 ? 'pedido pendente' : 'pedidos pendentes'}`
-              : 'Sem pedidos pendentes'}
+            : (() => {
+                const totalPending = pending.length + compPending.length
+                return totalPending > 0
+                  ? `${totalPending} ${totalPending === 1 ? 'pedido pendente' : 'pedidos pendentes'}`
+                  : 'Sem pedidos pendentes'
+              })()}
         </div>
       </div>
       <div className="page-actions">
