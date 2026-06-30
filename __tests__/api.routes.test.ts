@@ -20,6 +20,7 @@ vi.mock('@/lib/supabase', () => ({
       insert: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: null, error: null }),
     })),
+    rpc: vi.fn(),
   },
 }))
 
@@ -145,5 +146,73 @@ describe('GET /api/correction-requests', () => {
     const { GET } = await import('@/app/api/correction-requests/route')
     const res = await GET(makeReq('http://localhost/api/correction-requests'))
     expect(res.status).toBe(401)
+  })
+})
+
+// ─── POST /api/tenants/[id]/spin-off ─────────────────────────────────────────
+
+describe('POST /api/tenants/[id]/spin-off', () => {
+  const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
+  const validBody = {
+    name: 'DAC Industrial', slug: 'dac-industrial', domain: null,
+    controller_name: 'Plataforma', controller_username: 'platform-owner', controller_password: 'senha-forte-123',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns 403 without a token', async () => {
+    mockCookies.mockReturnValue({ get: () => undefined })
+    const { POST } = await import('@/app/api/tenants/[id]/spin-off/route')
+    const res = await POST(
+      makeReq('http://localhost/api/tenants/x/spin-off', { method: 'POST', body: JSON.stringify(validBody) }),
+      { params: { id: DEFAULT_TENANT_ID } },
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 403 for a non-super-admin', async () => {
+    mockCookies.mockReturnValue({ get: () => ({ value: 'token' }) })
+    mockVerify.mockResolvedValue({ id: 'a1', name: 'Admin', role: 'admin', tenant_id: DEFAULT_TENANT_ID, super_admin: false })
+    const { POST } = await import('@/app/api/tenants/[id]/spin-off/route')
+    const res = await POST(
+      makeReq('http://localhost/api/tenants/x/spin-off', { method: 'POST', body: JSON.stringify(validBody) }),
+      { params: { id: DEFAULT_TENANT_ID } },
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 400 when targeting a non-default tenant', async () => {
+    mockCookies.mockReturnValue({ get: () => ({ value: 'token' }) })
+    mockVerify.mockResolvedValue({ id: 'a1', name: 'Admin', role: 'admin', tenant_id: DEFAULT_TENANT_ID, super_admin: true })
+    const { POST } = await import('@/app/api/tenants/[id]/spin-off/route')
+    const res = await POST(
+      makeReq('http://localhost/api/tenants/x/spin-off', { method: 'POST', body: JSON.stringify(validBody) }),
+      { params: { id: 'some-other-tenant' } },
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 for an invalid new-company slug', async () => {
+    mockCookies.mockReturnValue({ get: () => ({ value: 'token' }) })
+    mockVerify.mockResolvedValue({ id: 'a1', name: 'Admin', role: 'admin', tenant_id: DEFAULT_TENANT_ID, super_admin: true })
+    const { POST } = await import('@/app/api/tenants/[id]/spin-off/route')
+    const res = await POST(
+      makeReq('http://localhost/api/tenants/x/spin-off', { method: 'POST', body: JSON.stringify({ ...validBody, slug: 'NOT VALID!' }) }),
+      { params: { id: DEFAULT_TENANT_ID } },
+    )
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 for a too-short controller password', async () => {
+    mockCookies.mockReturnValue({ get: () => ({ value: 'token' }) })
+    mockVerify.mockResolvedValue({ id: 'a1', name: 'Admin', role: 'admin', tenant_id: DEFAULT_TENANT_ID, super_admin: true })
+    const { POST } = await import('@/app/api/tenants/[id]/spin-off/route')
+    const res = await POST(
+      makeReq('http://localhost/api/tenants/x/spin-off', { method: 'POST', body: JSON.stringify({ ...validBody, controller_password: '123' }) }),
+      { params: { id: DEFAULT_TENANT_ID } },
+    )
+    expect(res.status).toBe(400)
   })
 })
