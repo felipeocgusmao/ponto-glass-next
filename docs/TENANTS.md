@@ -81,7 +81,8 @@ O flag `employees.super_admin` (migração v14) marca operadores da plataforma:
 
 - Veem a aba **Empresas** no admin: listar, criar (com admin inicial), editar
   nome/domínio e ativar/desativar tenants. O tenant default não pode ser
-  desativado (os operadores vivem nele).
+  desativado nem eliminado diretamente (os operadores vivem nele) — para isso,
+  ver "Separar plataforma de uma empresa-cliente" abaixo.
 - A API correspondente é `/api/tenants` (GET/POST) e `/api/tenants/[id]`
   (PATCH) — exige `role=admin` **e** `super_admin=true`, sempre lidos do
   banco, nunca do token.
@@ -90,6 +91,60 @@ O flag `employees.super_admin` (migração v14) marca operadores da plataforma:
 - Os crons (entry-reminder, absence-check, missing-exit, monthly-report)
   iteram sobre todos os tenants ativos — cada empresa recebe os seus próprios
   lembretes e relatórios.
+
+---
+
+## Separar plataforma de uma empresa-cliente
+
+Numa instalação que serve só a própria empresa, é comum que **a conta de
+super-admin e os dados operacionais (funcionários, pontos batidos) vivam no
+mesmo tenant default**. Isso é um problema no dia em que essa empresa precisa
+ser tratada como um cliente normal — desativada, eliminada, ou simplesmente
+isolada do controlo da plataforma — porque o tenant default **não pode ser
+desativado** (ver acima): faria isso também tirar o acesso dos operadores.
+
+A ação **"Separar plataforma"** (aba Empresas → linha marcada com o chip
+"Plataforma") resolve isto numa operação:
+
+1. Cria um **novo tenant** (nome/slug/domínio que você escolher) — passa a
+   ser uma empresa-cliente comum.
+2. Move **todos** os dados do tenant default para o novo tenant: funcionários,
+   registos de ponto, banco de horas, correções, compensações, feriados,
+   audit log, subscrições push, webhooks, templates de turno, aprovações de
+   semana, sessões de login e fotos do quiosque.
+3. Cria uma **nova conta de controlador** (`super_admin=true`) no tenant
+   default, agora vazio — com o nome/usuário/senha que você definir no modal.
+
+### Antes de usar
+
+Execute uma vez no **SQL Editor do Supabase**:
+`supabase/migrations/20260630_spin_off_tenant.sql` — cria a função
+`spin_off_tenant()` que a rota `/api/tenants/[id]/spin-off` chama. (Instalações
+novas a partir do `schema.sql` já ficam com ela, este passo só é necessário em
+bancos já existentes.)
+
+### Depois de separar
+
+- Os **funcionários antigos mantêm as mesmas credenciais** — só passam a
+  pertencer ao novo tenant. A sessão de quem já estiver logado muda de tenant
+  sozinha na próxima requisição (não precisa logout/login):
+  `verifyApiAuth` relê `tenant_id` do banco a cada chamada, nunca confia no
+  token.
+- Quem tinha `super_admin=true` e foi movido para o novo tenant **perde** essa
+  flag automaticamente — um admin de empresa-cliente não deve reter poder de
+  plataforma.
+- A **nova conta de controlador** só vê a aba Empresas; não tem nenhum dado
+  operacional associado.
+- A empresa migrada já pode ser ativada/desativada/eliminada como qualquer
+  outro tenant cliente.
+
+### ⚠️ Nota de segurança
+
+Esta ação é **irreversível por esta ferramenta** — não existe um botão
+"desfazer". A migração em si é atómica (tudo ou nada, via transação Postgres),
+mas reverter exigiria mover manualmente os dados de volta para o tenant
+default. Confirme o nome exato da empresa antes de prosseguir (o modal pede
+essa confirmação).
 
 ---
 
