@@ -48,11 +48,10 @@
 
 /* ─── Cards ─── */
 .card {
-  background: rgba(255,255,255,0.52); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden;
-  backdrop-filter: blur(28px) saturate(2.0);
-  -webkit-backdrop-filter: blur(28px) saturate(2.0);
+  background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--r-lg); overflow: hidden;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
-[data-theme="dark"] .card { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
 .card-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border);
@@ -67,13 +66,12 @@
 @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 .kpi {
   padding: 16px 16px 14px; border-radius: var(--r-lg);
-  background: rgba(255,255,255,0.52); border: 1px solid var(--border);
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
   display: flex; flex-direction: column; gap: 6px;
   min-width: 0;
-  backdrop-filter: blur(28px) saturate(2.0);
-  -webkit-backdrop-filter: blur(28px) saturate(2.0);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
-[data-theme="dark"] .kpi { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
 .kpi-label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; color: var(--fg-muted); }
 .kpi-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 /* flex (not inline-flex) + wrap so multiple chips on a narrow card move to a
@@ -122,8 +120,8 @@
   border: 1px solid var(--border); white-space: nowrap;
   /* Frosted "glass" so colored badges read as translucent over the page rather
      than as flat dark bars. */
-  backdrop-filter: blur(10px) saturate(1.4);
-  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate-sm));
 }
 .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .chip.success { background: var(--success-soft); color: var(--success-fg); border-color: color-mix(in oklch, var(--success-fg) 28%, transparent); }
@@ -198,13 +196,12 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 @keyframes pg-fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .drawer {
   position: fixed; top: 0; right: 0; bottom: 0; width: 480px; max-width: 92vw;
-  background: rgba(255,255,255,0.72); border-left: 1px solid rgba(255,255,255,0.25); z-index: 51;
+  background: var(--glass-bg-drawer); border-left: 1px solid var(--glass-border-drawer); z-index: 51;
   display: flex; flex-direction: column; box-shadow: var(--shadow-lg);
   animation: pg-slideIn 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  backdrop-filter: blur(40px) saturate(2.2);
-  -webkit-backdrop-filter: blur(40px) saturate(2.2);
+  backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
 }
-[data-theme="dark"] .drawer { background: rgba(13,14,16,0.68); border-left-color: rgba(255,255,255,0.07); }
 @keyframes pg-slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .drawer-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
 .drawer-body { flex: 1; overflow: auto; padding: 20px; }
@@ -262,12 +259,11 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 [data-theme="dark"] .cmdk-overlay { background: rgba(0,0,0,0.10); }
 .cmdk {
   width: 100%; max-width: 580px;
-  background: rgba(252,252,253,0.72); border: 1px solid rgba(255,255,255,0.3);
+  background: var(--glass-bg-cmdk); border: 1px solid var(--glass-border-cmdk);
   border-radius: var(--r-lg); box-shadow: var(--shadow-lg); overflow: hidden;
-  backdrop-filter: blur(40px) saturate(2.2);
-  -webkit-backdrop-filter: blur(40px) saturate(2.2);
+  backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
 }
-[data-theme="dark"] .cmdk { background: rgba(19,20,23,0.68); border-color: rgba(255,255,255,0.07); }
 .cmdk-input { width: 100%; height: 48px; padding: 0 16px; font-size: 14px; background: transparent; border: 0; border-bottom: 1px solid var(--border); outline: none; color: var(--fg); }
 .cmdk-list { max-height: 360px; overflow: auto; padding: 6px; }
 .cmdk-section { padding: 6px 10px 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle); font-weight: 600; }
@@ -309,17 +305,16 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 }
 [data-theme="dark"] .modal-glass-overlay { background: rgba(0,0,0,0.14); }
 .modal-glass-panel {
-  background: rgba(252,252,253,0.82);
-  border: 1px solid rgba(255,255,255,0.45);
+  background: var(--glass-bg-panel);
+  border: 1px solid var(--glass-border-panel);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(40px) saturate(2.2);
-  -webkit-backdrop-filter: blur(40px) saturate(2.2);
+  backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
   width: 100%; max-height: 90dvh;
   display: flex; flex-direction: column;
   animation: pg-scaleIn .18s cubic-bezier(.16,1,.3,1);
 }
-[data-theme="dark"] .modal-glass-panel { background: rgba(13,14,16,0.78); border-color: rgba(255,255,255,0.07); }
 @keyframes pg-scaleIn { from { opacity: 0; transform: scale(.97) translateY(-6px); } to { opacity: 1; transform: none; } }
 .modal-glass-head {
   display: flex; align-items: center; justify-content: space-between;
