@@ -141,6 +141,27 @@ CREATE TABLE IF NOT EXISTS correction_requests (
 CREATE INDEX IF NOT EXISTS idx_corrections_employee ON correction_requests(employee_id);
 CREATE INDEX IF NOT EXISTS idx_corrections_status   ON correction_requests(status);
 
+-- Compensation (hour-bank) requests submitted by employees. Approving one credits
+-- the hour bank (see app/api/compensation-requests/[id]). Also in
+-- migrations/20260625_compensation_requests.sql; kept here so fresh installs work.
+CREATE TABLE IF NOT EXISTS compensation_requests (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID        NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES tenants(id) ON DELETE RESTRICT,
+  employee_id     UUID        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  employee_name   TEXT        NOT NULL,
+  date            DATE        NOT NULL,
+  hours_requested NUMERIC(4,2) NOT NULL CHECK (hours_requested > 0),
+  reason          TEXT        NOT NULL,
+  status          TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  reviewer_id     UUID        REFERENCES employees(id),
+  reviewer_name   TEXT,
+  reviewer_note   TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  resolved_at     TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_comp_req_tenant_emp    ON compensation_requests(tenant_id, employee_id);
+CREATE INDEX IF NOT EXISTS idx_comp_req_tenant_status ON compensation_requests(tenant_id, status);
+
 -- v7 → v8: lock_profile — admin can prevent employees from changing their password
 ALTER TABLE employees
   ADD COLUMN IF NOT EXISTS lock_profile BOOLEAN NOT NULL DEFAULT false;
@@ -235,6 +256,7 @@ ALTER TABLE audit_logs            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE day_exceptions        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hour_bank_adjustments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE push_subscriptions    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE compensation_requests ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "block_anon_read_employees"    ON employees;
 DROP POLICY IF EXISTS "block_anon_read_records"      ON records;
@@ -249,6 +271,7 @@ DROP POLICY IF EXISTS "block_anon_audit"               ON audit_logs;
 DROP POLICY IF EXISTS "block_anon_day_exceptions"      ON day_exceptions;
 DROP POLICY IF EXISTS "block_anon_hour_bank"           ON hour_bank_adjustments;
 DROP POLICY IF EXISTS "block_anon_push_subscriptions"  ON push_subscriptions;
+DROP POLICY IF EXISTS "block_anon_compensation"        ON compensation_requests;
 DROP POLICY IF EXISTS "block_anon_tenants"             ON tenants;
 
 CREATE POLICY "block_anon_employees"          ON employees             AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
@@ -258,6 +281,7 @@ CREATE POLICY "block_anon_audit"              ON audit_logs            AS RESTRI
 CREATE POLICY "block_anon_day_exceptions"     ON day_exceptions        AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
 CREATE POLICY "block_anon_hour_bank"          ON hour_bank_adjustments AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
 CREATE POLICY "block_anon_push_subscriptions" ON push_subscriptions    AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
+CREATE POLICY "block_anon_compensation"       ON compensation_requests AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
 CREATE POLICY "block_anon_tenants"            ON tenants               AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
 
 -- v13 → v14: phase 5 of multi-tenancy — super-admin flag (platform operator).
