@@ -100,8 +100,9 @@ export function useNotifications({
     items.push({
       id: 'corrections',
       kind: 'corrections',
-      title: pendingCorrections === 1 ? '1 pedido de correção pendente' : `${pendingCorrections} pedidos de correção pendentes`,
-      description: 'Toque para rever e aprovar.',
+      // The count covers corrections AND compensations (see getPendingCorrectionsCount).
+      title: pendingCorrections === 1 ? '1 pedido pendente' : `${pendingCorrections} pedidos pendentes`,
+      description: 'Correções e compensações — toque para rever.',
       tab: 'correcoes',
     })
   }

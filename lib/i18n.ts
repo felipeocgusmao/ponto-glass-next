@@ -60,6 +60,7 @@ const t = {
     'auth.new_password':    'Nova palavra-passe',
     'auth.confirm_password':'Confirmar palavra-passe',
     'auth.role.admin':      'Admin',
+    'auth.role.super_admin': 'Super-admin',
     'auth.role.manager':    'Gerente',
     'auth.role.employee':   'Funcionário',
 
@@ -735,6 +736,7 @@ const t = {
     'auth.new_password':    'Nova senha',
     'auth.confirm_password':'Confirmar senha',
     'auth.role.admin':      'Admin',
+    'auth.role.super_admin': 'Super-admin',
     'auth.role.manager':    'Gerente',
     'auth.role.employee':   'Funcionário',
 
@@ -1361,6 +1363,7 @@ const t = {
     'auth.new_password':    'New password',
     'auth.confirm_password':'Confirm password',
     'auth.role.admin':      'Admin',
+    'auth.role.super_admin': 'Super-admin',
     'auth.role.manager':    'Manager',
     'auth.role.employee':   'Employee',
 
@@ -1987,6 +1990,7 @@ const t = {
     'auth.new_password':    'Nueva contraseña',
     'auth.confirm_password':'Confirmar contraseña',
     'auth.role.admin':      'Admin',
+    'auth.role.super_admin': 'Super-admin',
     'auth.role.manager':    'Gerente',
     'auth.role.employee':   'Empleado',
 

@@ -142,7 +142,11 @@ export default function Sidebar({
           <div className="sb-user-meta">
             <div className="sb-user-name">{user.name}</div>
             <div className="sb-user-role">
-              {user.role === 'manager' ? t('auth.role.manager') : t('auth.role.admin')}
+              {/* Distinguish the platform controller from a company admin — the two
+                  accounts are easy to mix up when they share a name (see #235). */}
+              {user.super_admin
+                ? t('auth.role.super_admin')
+                : user.role === 'manager' ? t('auth.role.manager') : t('auth.role.admin')}
             </div>
           </div>
           <span style={{ color: 'var(--fg-subtle)', flexShrink: 0 }}>

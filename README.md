@@ -679,15 +679,32 @@ push_subscriptions (
   created_at  TIMESTAMPTZ
 )
 
+-- pedidos de compensação de horas (funcionário pede, admin aprova → credita o banco)
+compensation_requests (
+  id              UUID  PRIMARY KEY,
+  tenant_id       UUID  → tenants.id,
+  employee_id     UUID  → employees.id,
+  employee_name   TEXT,
+  date            DATE,
+  hours_requested NUMERIC(4,2),     ← > 0; aprovação credita hours*60 min no banco
+  reason          TEXT,
+  status          TEXT,             ← 'pending' | 'approved' | 'rejected'
+  reviewer_id     UUID,
+  reviewer_name   TEXT,
+  reviewer_note   TEXT,
+  created_at      TIMESTAMPTZ,
+  resolved_at     TIMESTAMPTZ
+)
+
 -- aprovações de semana (timesheet lock)
 timesheet_approvals (
-  id          UUID  PRIMARY KEY,
-  tenant_id   UUID  → tenants.id,
-  employee_id UUID  → employees.id,
-  week_start  DATE,              ← segunda-feira da semana aprovada
-  approved_by UUID,
-  approved_at TIMESTAMPTZ
-)
+  id               UUID  PRIMARY KEY,
+  tenant_id        UUID  → tenants.id,
+  employee_id      UUID  → employees.id,
+  week_start       DATE,             ← segunda-feira da semana aprovada
+  approved_by_name TEXT,
+  created_at       TIMESTAMPTZ
+)                                    ← UNIQUE (tenant_id, employee_id, week_start)
 
 -- webhooks de saída
 webhook_configs (
@@ -728,9 +745,8 @@ login_sessions (
 kiosk_photos (
   id          UUID  PRIMARY KEY,
   tenant_id   UUID  → tenants.id,
-  record_id   UUID  → records.id,
-  employee_id UUID  → employees.id,
-  photo_data  TEXT,              ← data URL JPEG (≤ 300 KB)
+  record_id   UUID  → records.id,   ← a foto liga-se à batida (o funcionário vem daí)
+  photo_data  TEXT,                 ← data URL JPEG (≤ 300 KB)
   created_at  TIMESTAMPTZ
 )
 
