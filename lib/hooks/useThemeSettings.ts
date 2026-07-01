@@ -7,6 +7,19 @@ interface UseThemeSettingsOptions {
   onThemeChange?: (mode: 'dark' | 'light') => void
 }
 
+// Apply the theme attribute AND keep the iOS browser-bar tint in step: Safari
+// paints its bottom/top bars with <meta name="theme-color">, so a meta stuck on
+// the dark value leaves a black bar under the app when the theme is light.
+// Values mirror --bg in tokens.css.
+function applyThemeAttr(t: 'dark' | 'light') {
+  document.documentElement.setAttribute('data-theme', t)
+  const c = t === 'dark' ? '#08090b' : '#fafafa'
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+    m.removeAttribute('media')
+    m.setAttribute('content', c)
+  })
+}
+
 export function useThemeSettings({ onThemeChange }: UseThemeSettingsOptions = {}) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [isSystemTheme, setIsSystemTheme] = useState(false)
@@ -19,7 +32,7 @@ export function useThemeSettings({ onThemeChange }: UseThemeSettingsOptions = {}
 
     const applyTheme = (t: 'dark' | 'light') => {
       setTheme(t)
-      document.documentElement.setAttribute('data-theme', t)
+      applyThemeAttr(t)
     }
 
     if (saved) {
@@ -54,11 +67,11 @@ export function useThemeSettings({ onThemeChange }: UseThemeSettingsOptions = {}
       const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches
       const next = sysDark ? 'dark' : 'light'
       setTheme(next)
-      document.documentElement.setAttribute('data-theme', next)
+      applyThemeAttr(next)
     } else {
       setIsSystemTheme(false)
       setTheme(mode)
-      document.documentElement.setAttribute('data-theme', mode)
+      applyThemeAttr(mode)
       localStorage.setItem('pg.theme', mode)
       onThemeChange?.(mode)
     }
@@ -82,7 +95,7 @@ export function useThemeSettings({ onThemeChange }: UseThemeSettingsOptions = {}
   /** Call after loading a user profile to apply the server-stored theme preference. */
   const syncFromServer = (serverTheme: 'dark' | 'light') => {
     setTheme(serverTheme)
-    document.documentElement.setAttribute('data-theme', serverTheme)
+    applyThemeAttr(serverTheme)
   }
 
   return { theme, isSystemTheme, accent, font, selectTheme, toggleTheme, changeAccent, changeFont, syncFromServer }
