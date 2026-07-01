@@ -10,6 +10,7 @@ import Providers from './providers'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
 import { ServiceWorkerRegistration } from './_components/ServiceWorkerRegistration'
+import { GlassHighlight } from './_components/GlassHighlight'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -93,10 +94,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <a href="#main-content" className="skip-link">Ir para o conteúdo principal</a>
+        {/* Liquid-glass refraction filter (#218, experimental) — hidden, referenced
+            via backdrop-filter: url(#glass-distort) in components.css. Subtle
+            displacement (scale=14): a lens-like warp, not heavy distortion. */}
+        <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+          <filter id="glass-distort" x="-20%" y="-20%" width="140%" height="140%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.012 0.012" numOctaves={2} seed={7} result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale={14} xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </svg>
         <Providers>{children}</Providers>
         <SpeedInsights />
         <Analytics />
         <ServiceWorkerRegistration />
+        <GlassHighlight />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t){r.setAttribute('data-theme',t);}else{r.setAttribute('data-theme',window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);}catch(e){}})()`,
