@@ -4,6 +4,7 @@ import { verifyApiAuth } from '@/lib/apiAuth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { getEmployees } from '@/lib/data/employees'
+import { employeeLimitFor } from '@/lib/planLimits'
 import bcrypt from 'bcryptjs'
 
 async function requireAdmin() {
@@ -89,6 +90,20 @@ export async function POST(request: NextRequest) {
 
   if (existing)
     return NextResponse.json({ error: 'Usuário já existe' }, { status: 400 })
+
+  // Plan limit (#251): counts ACTIVE employees only — deactivating someone
+  // frees a seat for their replacement.
+  const [{ data: tenant }, { count: activeCount }] = await Promise.all([
+    supabase.from('tenants').select('plan').eq('id', actor.tenant_id).maybeSingle(),
+    supabase.from('employees').select('*', { count: 'exact', head: true })
+      .eq('tenant_id', actor.tenant_id).eq('active', true),
+  ])
+  const limit = employeeLimitFor(tenant?.plan)
+  if ((activeCount ?? 0) >= limit)
+    return NextResponse.json(
+      { error: `Limite do plano atingido (${limit} funcionários ativos). Desative alguém ou atualize o plano.` },
+      { status: 403 },
+    )
 
   const hash = await bcrypt.hash(password, 10)
   const { data, error } = await supabase

@@ -43,3 +43,44 @@ jobs:
           JWT_SECRET: ci-only-jwt-secret-min-32-characters-1234
           NEXT_PUBLIC_BUSINESS_TZ: Europe/Madrid
         run: npm run build
+
+  e2e:
+    # Flow regressions (login redirects, robots/noindex, demo) only surfaced
+    # after deploy before — this runs the Playwright specs against a real
+    # production build (#253). Credential-gated specs self-skip without
+    # E2E_USERNAME/E2E_PASSWORD; the Supabase URL is a dummy, so the
+    # invalid-credentials specs also exercise the route's failure path.
+    name: E2E (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ci-only-not-used
+      JWT_SECRET: ci-only-jwt-secret-min-32-characters-1234
+      NEXT_PUBLIC_BUSINESS_TZ: Europe/Madrid
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Start server and run E2E
+        run: |
+          npm run start &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/login > /dev/null && break
+            sleep 2
+          done
+          npx playwright test --project=chromium

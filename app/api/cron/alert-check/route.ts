@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { activeTenantIds } from '@/lib/tenant'
+import { sendPendingRequestsEmail } from '@/lib/email'
 import webpush from 'web-push'
 import type { TenantAlertSettings } from '../../tenant-settings/route'
 
@@ -87,6 +88,39 @@ async function runAlertCheck(tenantId: string) {
   return alertCount
 }
 
+// Pending-requests digest (#252): emails admins when corrections/compensations
+// are waiting. Runs regardless of alert_settings (unlike runAlertCheck, which
+// early-returns without thresholds) — push covers admins who installed it;
+// this is the safety net for the ones who didn't.
+async function runPendingDigest(tenantId: string): Promise<number> {
+  const [corr, comp] = await Promise.all([
+    supabase.from('correction_requests').select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId).eq('status', 'pending'),
+    supabase.from('compensation_requests').select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId).eq('status', 'pending'),
+  ])
+  const corrections = corr.count ?? 0
+  const compensations = comp.count ?? 0
+  if (corrections + compensations === 0) return 0
+
+  const { data: admins } = await supabase
+    .from('employees')
+    .select('name, email')
+    .eq('tenant_id', tenantId)
+    .eq('role', 'admin')
+    .eq('active', true)
+    .not('email', 'is', null)
+
+  let sent = 0
+  for (const admin of (admins ?? []) as { name: string; email: string }[]) {
+    const ok = await sendPendingRequestsEmail({
+      to: admin.email, adminName: admin.name, corrections, compensations,
+    })
+    if (ok) sent++
+  }
+  return sent
+}
+
 async function notifyAdmins(tenantId: string, notification: { title: string; body: string; url: string; tag: string }) {
   if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return
 
@@ -123,11 +157,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let totalAlerts = 0
+  let digestEmails = 0
   let failures = 0
   for (const tenantId of await activeTenantIds()) {
     try {
       totalAlerts += await runAlertCheck(tenantId)
+      digestEmails += await runPendingDigest(tenantId)
     } catch { failures++ }
   }
-  return NextResponse.json({ alerts: totalAlerts, failures })
+  return NextResponse.json({ alerts: totalAlerts, digestEmails, failures })
 }

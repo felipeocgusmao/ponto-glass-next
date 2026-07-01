@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Tenant } from '@/lib/types'
 import { IconBuilding, IconUserPlus, IconUsers, IconPulse } from '../icons'
+import { limitLabel } from '@/lib/planLimits'
 import { Modal } from '../Modal'
 
 type TenantRow = Tenant & { employee_count: number; record_count: number }
@@ -331,7 +332,9 @@ export function EmpresasTab() {
                     <td className="mono" style={{ fontSize: 12 }}>{t.slug}</td>
                     <td className="mono" style={{ fontSize: 12 }}>{t.domain ?? '—'}</td>
                     <td>{t.plan}</td>
-                    <td className="tnum" style={{ textAlign: 'right' }}>{t.employee_count}</td>
+                    <td className="tnum" style={{ textAlign: 'right' }} title={`Limite do plano ${t.plan}`}>
+                      {t.employee_count} <span style={{ color: 'var(--fg-subtle)' }}>/ {limitLabel(t.plan)}</span>
+                    </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button className="btn ghost sm" onClick={() => openEdit(t)}>Editar</button>
                       {t.id === DEFAULT_TENANT_ID ? (

@@ -6,6 +6,7 @@ import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { normalizeImportRows, MAX_IMPORT_ROWS } from '@/lib/employeeImport'
+import { employeeLimitFor } from '@/lib/planLimits'
 
 // Bulk-create employees from a parsed spreadsheet. The client parses the
 // CSV/XLSX and sends raw row objects; ALL validation happens here again via
@@ -33,6 +34,20 @@ export async function POST(request: NextRequest) {
   const errors = results.filter(r => !r.ok).map(r => ({ row: r.row, error: (r as { error: string }).error }))
 
   if (valid.length) {
+    // Plan limit (#251): the whole batch must fit within the remaining seats.
+    const [{ data: tenant }, { count: activeCount }] = await Promise.all([
+      supabase.from('tenants').select('plan').eq('id', user.tenant_id).maybeSingle(),
+      supabase.from('employees').select('*', { count: 'exact', head: true })
+        .eq('tenant_id', user.tenant_id).eq('active', true),
+    ])
+    const limit = employeeLimitFor(tenant?.plan)
+    const remaining = limit - (activeCount ?? 0)
+    if (valid.length > remaining)
+      return NextResponse.json(
+        { error: `Limite do plano: restam ${Math.max(0, remaining)} vaga(s) de ${limit}, mas a importação tem ${valid.length} funcionário(s) válido(s).` },
+        { status: 403 },
+      )
+
     // One round-trip to find usernames already taken in this tenant.
     const { data: existing } = await supabase
       .from('employees')
