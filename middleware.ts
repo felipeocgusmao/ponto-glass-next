@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 
-const PUBLIC = ['/login', '/reset-password', '/api/auth/login', '/api/auth/logout', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/recover', '/api/auth/confirm-email', '/api/cron', '/api/health', '/api/qr/punch', '/kiosk/confirm']
+// '/demo' is deliberately public (fictitious evaluation credentials, noindex) —
+// it was accidentally login-gated by the private-instance change; the CI E2E
+// suite caught the regression (#253).
+const PUBLIC = ['/login', '/reset-password', '/demo', '/api/auth/login', '/api/auth/logout', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/recover', '/api/auth/confirm-email', '/api/cron', '/api/health', '/api/qr/punch', '/kiosk/confirm']
 
 // Force a fresh fetch of every HTML page on every navigation. Without this,
 // iOS Safari (and other browsers) can serve a stale login or admin shell from

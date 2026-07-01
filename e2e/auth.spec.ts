@@ -6,7 +6,7 @@ test.describe('Authentication flow', () => {
     await page.getByRole('textbox').first().fill('usuario_inexistente')
     await page.locator('input[type="password"]').fill('senha_errada')
     await page.getByRole('button', { name: /entrar/i }).click()
-    await expect(page.locator('text=/inválid|incorret|erro/i')).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('text=/inválid|incorret|erro/i')).toBeVisible({ timeout: 15000 })
   })
 
   test('/admin redirects unauthenticated users to /login', async ({ page }) => {

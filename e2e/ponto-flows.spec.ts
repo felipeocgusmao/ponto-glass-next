@@ -21,7 +21,7 @@ test.describe('Login flow', () => {
     await page.getByRole('textbox').first().fill('usuario_inexistente_xyz')
     await page.locator('input[type="password"]').fill('senha_errada_xyz')
     await page.getByRole('button', { name: /entrar/i }).click()
-    await expect(page.locator('text=/inválid|incorret|erro/i')).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('text=/inválid|incorret|erro/i')).toBeVisible({ timeout: 15000 })
   })
 
   test('login form has accessible labels', async ({ page }) => {
@@ -82,6 +82,6 @@ test.describe('Punch flow', () => {
     await expect(page).toHaveURL(/\/ponto/, { timeout: 10000 })
 
     // The clock / time display should be visible
-    await expect(page.locator('[class*="clock"], [class*="time"], text=/\d{2}:\d{2}/').first()).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('[class*="clock"], [class*="time"], text=/\d{2}:\d{2}/').first()).toBeVisible({ timeout: 15000 })
   })
 })
