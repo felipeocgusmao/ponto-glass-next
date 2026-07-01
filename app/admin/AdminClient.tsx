@@ -108,10 +108,19 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
     } catch { setFetchError(true) }
   }, [endDeadSession])
 
+  // Must count corrections AND compensations — the server-seeded initial badge
+  // (getPendingCorrectionsCount) includes both, so a corrections-only poll would
+  // make the number silently shrink 60s after page load.
   const refreshPendingCount = useCallback(async () => {
     try {
-      const res = await fetch('/api/correction-requests?status=pending')
-      if (res.ok) { const d = await res.json(); setPendingCorrections(d.length) }
+      const [corrRes, compRes] = await Promise.all([
+        fetch('/api/correction-requests?status=pending'),
+        fetch('/api/compensation-requests'),
+      ])
+      let total = 0
+      if (corrRes.ok) total += (await corrRes.json()).length
+      if (compRes.ok) total += (await compRes.json()).filter((c: { status: string }) => c.status === 'pending').length
+      setPendingCorrections(total)
     } catch { /* silent */ }
   }, [])
 

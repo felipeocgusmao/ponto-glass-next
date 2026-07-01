@@ -23,31 +23,26 @@ export async function GET() {
   const actor = await requireSuperAdmin()
   if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const [{ data: tenants, error }, { data: emps }, { data: recs }] = await Promise.all([
-    supabase.from('tenants')
-      .select('id, name, slug, domain, plan, active, created_at')
-      .order('created_at', { ascending: true }),
-    supabase.from('employees').select('tenant_id').eq('active', true),
-    supabase.from('records').select('tenant_id'),
-  ])
+  const { data: tenants, error } = await supabase.from('tenants')
+    .select('id, name, slug, domain, plan, active, created_at')
+    .order('created_at', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const empCounts = new Map<string, number>()
-  for (const e of (emps ?? []) as { tenant_id: string }[])
-    empCounts.set(e.tenant_id, (empCounts.get(e.tenant_id) ?? 0) + 1)
+  // Per-tenant HEAD counts instead of shipping every employees/records row just
+  // to count them client-side — records grows unbounded (one row per punch),
+  // so the old full-table select made this endpoint slower every single day.
+  // Tenant count is small, so 2 count queries per tenant stay cheap.
+  const withCounts = await Promise.all((tenants ?? []).map(async t => {
+    const [emp, rec] = await Promise.all([
+      supabase.from('employees').select('*', { count: 'exact', head: true })
+        .eq('tenant_id', t.id).eq('active', true),
+      supabase.from('records').select('*', { count: 'exact', head: true })
+        .eq('tenant_id', t.id),
+    ])
+    return { ...t, employee_count: emp.count ?? 0, record_count: rec.count ?? 0 }
+  }))
 
-  const recCounts = new Map<string, number>()
-  for (const r of (recs ?? []) as { tenant_id: string }[])
-    recCounts.set(r.tenant_id, (recCounts.get(r.tenant_id) ?? 0) + 1)
-
-  return NextResponse.json(
-    (tenants ?? []).map(t => ({
-      ...t,
-      employee_count: empCounts.get(t.id) ?? 0,
-      record_count: recCounts.get(t.id) ?? 0,
-    })),
-    { headers: { 'Cache-Control': 'no-store' } },
-  )
+  return NextResponse.json(withCounts, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function POST(request: NextRequest) {
