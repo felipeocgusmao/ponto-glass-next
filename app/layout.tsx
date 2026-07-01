@@ -35,7 +35,15 @@ const lora = Lora({
 })
 
 export const viewport: Viewport = {
-  themeColor: '#08090b',
+  // iOS Safari tints the top/bottom browser bars with theme-color. A single
+  // hard-coded dark value kept the bottom bar black in light theme — pair it
+  // with the color scheme instead. The boot script + useThemeSettings then
+  // override the meta at runtime to follow the user's in-app theme choice
+  // (which can differ from the OS scheme).
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+    { media: '(prefers-color-scheme: dark)', color: '#08090b' },
+  ],
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -110,7 +118,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <GlassHighlight />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t){r.setAttribute('data-theme',t);}else{r.setAttribute('data-theme',window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);}catch(e){}})()`,
+            __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t){r.setAttribute('data-theme',t);}else{r.setAttribute('data-theme',window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);var c=r.getAttribute('data-theme')==='dark'?'#08090b':'#fafafa';document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.removeAttribute('media');m.setAttribute('content',c);});}catch(e){}})()`,
           }}
         />
       </body>

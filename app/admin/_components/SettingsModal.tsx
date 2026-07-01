@@ -136,8 +136,10 @@ export default function SettingsModal({
 
         <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-          {/* Tema + Idioma side-by-side */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {/* Tema + Idioma side-by-side on wide screens; stacked on phones —
+              the fixed 1fr 1fr grid clipped the language control ("ES" cut off)
+              on narrow viewports. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 16 }}>
             <div>
               <SectionLabel>{t('settings.theme')}</SectionLabel>
               <div className="seg" style={{ width: '100%' }}>
