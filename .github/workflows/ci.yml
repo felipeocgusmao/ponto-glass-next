@@ -48,13 +48,16 @@ jobs:
     # Flow regressions (login redirects, robots/noindex, demo) only surfaced
     # after deploy before — this runs the Playwright specs against a real
     # production build (#253). Credential-gated specs self-skip without
-    # E2E_USERNAME/E2E_PASSWORD; the Supabase URL is a dummy, so the
-    # invalid-credentials specs also exercise the route's failure path.
+    # E2E_USERNAME/E2E_PASSWORD. Supabase is a local stub that answers
+    # instant 404s: the specs only cover unauthenticated flows, so queries
+    # may fail — but they must fail fast. A dummy REMOTE host makes each
+    # supabase-js call take ~7s to surface the network error, and the login
+    # route's 3 sequential queries then blow past the specs' 15s timeout.
     name: E2E (Chromium)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.co
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
       SUPABASE_SERVICE_ROLE_KEY: ci-only-not-used
       JWT_SECRET: ci-only-jwt-secret-min-32-characters-1234
       NEXT_PUBLIC_BUSINESS_TZ: Europe/Madrid
@@ -78,6 +81,7 @@ jobs:
 
       - name: Start server and run E2E
         run: |
+          node e2e/supabase-stub.mjs &
           npm run start &
           for i in $(seq 1 30); do
             curl -sf http://localhost:3000/login > /dev/null && break
