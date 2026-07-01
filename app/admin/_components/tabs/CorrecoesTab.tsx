@@ -126,6 +126,8 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
       if (res.ok) {
         setCompRejectTarget(null); setCompRejectNote('')
         await loadComp()
+        // The sidebar badge counts compensations too — refresh it like `act` does.
+        onAction?.()
       } else {
         const d = await res.json().catch(() => ({}))
         setCompActErr(d.error ?? t('corr.err.generic'))
