@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     return res
   }
 
-  const { username, password } = await request.json()
+  const { username, password, tenant } = await request.json()
 
   if (!username || !password) {
     return NextResponse.json({ error: 'Usuário e senha são obrigatórios' }, { status: 400 })
@@ -39,10 +39,12 @@ export async function POST(request: NextRequest) {
     return res
   }
 
-  // Which tenant is this login attempt for? Resolved from the host (custom
-  // domain → slug subdomain → default). Null means the URL names a tenant
-  // subdomain that doesn't exist — refuse instead of guessing.
-  const tenantId = await resolveLoginTenant(request)
+  // Which tenant is this login attempt for? An explicit `tenant` slug from
+  // the form (fed by /login?tenant=<slug>, e.g. the demo tenant) wins;
+  // otherwise resolved from the host (custom domain → slug subdomain →
+  // default). Null means the named tenant doesn't exist — refuse instead
+  // of guessing.
+  const tenantId = await resolveLoginTenant(request, tenant)
   if (!tenantId) {
     return NextResponse.json(
       { error: 'Empresa não encontrada para este endereço. Verifique o link com o seu administrador.' },

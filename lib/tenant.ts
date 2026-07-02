@@ -45,6 +45,11 @@ export function requestHost(request: NextRequest): string {
  * Decide which tenant a login attempt belongs to, based on the host the user
  * is visiting (phase 4 of issue #6 / closes issue #5):
  *
+ *   0. An explicit slug (the login form's `tenant` field, fed by
+ *      /login?tenant=<slug>) wins over host resolution. It lets a tenant
+ *      without its own domain/subdomain be reached from the main host —
+ *      the demo tenant being the canonical case. Unknown slug → null,
+ *      same refusal semantics as the subdomain path.
  *   1. A registered custom domain (tenants.domain = host) wins.
  *   2. `<slug>.<TENANT_ROOT_DOMAIN>` resolves by slug. A slug that matches no
  *      active tenant returns null — the caller should refuse the login rather
@@ -58,7 +63,20 @@ export function requestHost(request: NextRequest): string {
  * travels to a sibling subdomain, and every API query filters by the
  * tenant_id embedded in the JWT at login.
  */
-export async function resolveLoginTenant(request: NextRequest): Promise<string | null> {
+export async function resolveLoginTenant(request: NextRequest, explicitSlug?: unknown): Promise<string | null> {
+  // 0. Explicit tenant slug from the login form. Only well-formed slugs are
+  // looked up; anything else falls through to host resolution so a malformed
+  // value degrades to the pre-existing behaviour instead of a hard refusal.
+  if (isValidTenantSlug(explicitSlug)) {
+    const { data: bySlug } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('slug', explicitSlug)
+      .eq('active', true)
+      .maybeSingle()
+    return bySlug?.id ?? null
+  }
+
   const host = requestHost(request)
   if (!host) return DEFAULT_TENANT_ID
 
