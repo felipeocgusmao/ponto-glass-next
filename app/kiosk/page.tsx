@@ -1,14 +1,35 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyApiAuth } from '@/lib/apiAuth'
+import { supabase } from '@/lib/supabase'
 import { getEmployees } from '@/lib/data/employees'
 import { getTodayRecordsAllEmployees } from '@/lib/data/records'
 import { KioskClient } from './KioskClient'
+import { TokenKioskClient } from './TokenKioskClient'
 
 // Auth + data depend on the request cookie, so this page is always dynamic.
 export const dynamic = 'force-dynamic'
 
-export default async function KioskPage() {
+export default async function KioskPage({
+  searchParams,
+}: {
+  searchParams: { token?: string }
+}) {
+  // Shared-tablet mode: /kiosk?token=<kiosk_token> (the link Integrações
+  // generates) works WITHOUT a session — the kiosk token is the credential.
+  // Validate it server-side so an invalid/revoked token never renders the UI.
+  const kioskToken = searchParams.token
+  if (kioskToken) {
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('kiosk_token', kioskToken)
+      .eq('active', true)
+      .maybeSingle()
+    if (!tenant) redirect('/login')
+    return <TokenKioskClient token={kioskToken} />
+  }
+
   const token = cookies().get('ponto_token')?.value
   if (!token) redirect('/login')
 

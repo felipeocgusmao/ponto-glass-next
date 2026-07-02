@@ -42,6 +42,15 @@ export function isCsrfSafe(request: NextRequest): boolean {
   // a browser cross-origin request always includes an Origin header.
   if (!origin) return true
 
+  // Same-origin against the actual request host. NEXT_PUBLIC_APP_URL can only
+  // name ONE origin, but multi-tenancy serves the app from tenant subdomains
+  // and custom domains too — those must not be rejected as "cross-origin".
+  const host = (request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? '')
+    .split(',')[0].trim().toLowerCase()
+  try {
+    if (host && new URL(origin).host.toLowerCase() === host) return true
+  } catch { /* malformed Origin → fall through to the allowlist */ }
+
   const allowed = getAllowedOrigins()
 
   // When no app URL is configured (e.g. local dev without env), skip CSRF check

@@ -2,16 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyApiAuth } from '@/lib/apiAuth'
 import { supabase } from '@/lib/supabase'
-import { createHmac } from 'crypto'
 import QRCode from 'qrcode'
-
-function qrToken(employeeId: string, tenantId: string): string {
-  const secret = process.env.QR_SECRET ?? process.env.JWT_SECRET ?? 'qr-fallback'
-  return createHmac('sha256', secret)
-    .update(`${employeeId}:${tenantId}`)
-    .digest('base64url')
-    .slice(0, 32)
-}
+import { qrToken } from '@/lib/qrToken'
 
 // Admin-only: returns a QR code data URL for a specific employee.
 // The QR encodes the kiosk confirm URL with a tamper-proof token.

@@ -2,17 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcWorkDate } from '@/lib/utils'
-import { createHmac } from 'crypto'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { isValidPunchType, isDuplicatePunch } from '@/lib/punchValidation'
-
-function qrToken(employeeId: string, tenantId: string): string {
-  const secret = process.env.QR_SECRET ?? process.env.JWT_SECRET ?? 'qr-fallback'
-  return createHmac('sha256', secret)
-    .update(`${employeeId}:${tenantId}`)
-    .digest('base64url')
-    .slice(0, 32)
-}
+import { verifyQrToken } from '@/lib/qrToken'
 
 // Public endpoint: punches an employee identified by their QR token.
 // No session cookie required — the HMAC token IS the authentication.
@@ -30,9 +22,7 @@ export async function POST(request: NextRequest) {
   if (!isValidPunchType(type))
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
 
-  // Constant-time token comparison to prevent timing attacks
-  const expected = qrToken(employeeId, tenantId)
-  if (token !== expected)
+  if (!verifyQrToken(token, employeeId, tenantId))
     return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
   const rl = await checkRateLimit(`qr-punch:${employeeId}`, 10, 60_000)
