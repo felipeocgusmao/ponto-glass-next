@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
+import { isCsrfSafe } from '@/lib/csrf'
 
 // '/demo' is deliberately public (fictitious evaluation credentials, noindex) —
 // it was accidentally login-gated by the private-instance change; the CI E2E
 // suite caught the regression (#253).
-const PUBLIC = ['/login', '/reset-password', '/demo', '/api/auth/login', '/api/auth/logout', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/recover', '/api/auth/confirm-email', '/api/cron', '/api/health', '/api/qr/punch', '/kiosk/confirm']
+// '/api/kiosk/employees' + '/api/kiosk/punch' authenticate via the tenant's
+// kiosk_token (not the session cookie) — the shared tablet is never logged in.
+// '/api/kiosk/token' stays session-gated: it mints/reveals that token.
+const PUBLIC = ['/login', '/reset-password', '/demo', '/api/auth/login', '/api/auth/logout', '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/recover', '/api/auth/confirm-email', '/api/cron', '/api/health', '/api/qr/punch', '/api/kiosk/employees', '/api/kiosk/punch', '/kiosk/confirm']
 
 // Force a fresh fetch of every HTML page on every navigation. Without this,
 // iOS Safari (and other browsers) can serve a stale login or admin shell from
@@ -18,6 +22,18 @@ function withHtmlNoStore(response: NextResponse): NextResponse {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // CSRF (defence-in-depth over the SameSite=Lax cookie): every API mutation
+  // gets the Origin check, instead of relying on each route remembering to
+  // call isCsrfSafe itself. Requests without an Origin header (curl, crons,
+  // server-to-server) pass — they can't carry the httpOnly cookie cross-site.
+  if (
+    pathname.startsWith('/api/') &&
+    !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
+    !isCsrfSafe(request)
+  ) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   // Static / PWA assets must be reachable WITHOUT auth. Otherwise an
   // unauthenticated request (e.g. Safari fetching the apple-touch-icon from the
@@ -60,6 +76,14 @@ export async function middleware(request: NextRequest) {
     }
     // API routes manage their own cache headers; only force-fresh HTML routes.
     return pathname.startsWith('/api/') ? NextResponse.next() : withHtmlNoStore(NextResponse.next())
+  }
+
+  // The shared-tablet kiosk link (/kiosk?token=<kiosk_token>) is public by
+  // design — the admin hands it to a device that is never logged in. The page
+  // validates the token against tenants.kiosk_token and refuses invalid ones.
+  // Without the param, /kiosk keeps requiring an admin/manager session.
+  if (pathname === '/kiosk' && request.nextUrl.searchParams.has('token')) {
+    return withHtmlNoStore(NextResponse.next())
   }
 
   const token = request.cookies.get('ponto_token')?.value

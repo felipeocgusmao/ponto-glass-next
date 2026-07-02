@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { calcWorkDate } from '@/lib/utils'
 import { isCsrfSafe } from '@/lib/csrf'
+import { checkRateLimit } from '@/lib/rateLimit'
+import { isValidPunchType, isDuplicatePunch } from '@/lib/punchValidation'
+import { logAudit } from '@/lib/audit'
 
-const VALID_TYPES = ['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
-
+// Public endpoint: punches an employee from the shared kiosk tablet.
+// No session cookie required — the tenant's kiosk_token IS the authentication
+// (an admin generates/revokes it in Integrações; middleware lets this path through).
 export async function POST(request: NextRequest) {
   if (!isCsrfSafe(request)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -17,7 +21,7 @@ export async function POST(request: NextRequest) {
   const { token, employee_id, type } = body
   if (!token) return NextResponse.json({ error: 'token required' }, { status: 400 })
   if (!employee_id) return NextResponse.json({ error: 'employee_id required' }, { status: 400 })
-  if (!type || !VALID_TYPES.includes(type))
+  if (!isValidPunchType(type))
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
 
   // Resolve tenant from kiosk token
@@ -41,8 +45,24 @@ export async function POST(request: NextRequest) {
 
   if (!employee) return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
 
+  const rl = await checkRateLimit(`kiosk-punch:${employee.id}`, 10, 60_000)
+  if (!rl.allowed)
+    return NextResponse.json({ error: 'Muitos registos seguidos. Aguarde um momento.' }, { status: 429 })
+
   const timestamp = new Date()
   const date = calcWorkDate(timestamp, employee.shift_start ?? '00:00')
+
+  // Same double-tap guard as /api/punch and /api/qr/punch — a shared tablet is
+  // the most double-tap-prone surface of the three.
+  const { data: lastRec } = await supabase
+    .from('records').select('type, timestamp')
+    .eq('tenant_id', tenant.id)
+    .eq('employee_id', employee.id)
+    .order('timestamp', { ascending: false })
+    .limit(1).maybeSingle()
+
+  if (isDuplicatePunch(lastRec?.type, lastRec?.timestamp, type, timestamp))
+    return NextResponse.json({ error: 'Registo duplicado. Aguarde um momento.' }, { status: 409 })
 
   const { data, error } = await supabase
     .from('records')
@@ -58,5 +78,13 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await logAudit(
+    { id: employee.id, name: employee.name, tenant_id: tenant.id },
+    'punch_kiosk',
+    { id: employee.id, name: employee.name },
+    { type },
+  )
+
   return NextResponse.json(data, { status: 201 })
 }

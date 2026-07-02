@@ -5,9 +5,8 @@ import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcWorkDate } from '@/lib/utils'
+import { isValidPunchType } from '@/lib/punchValidation'
 import { getTodayRecordsForEmployee, getTodayRecordsAllEmployees } from '@/lib/data/records'
-
-const VALID_TYPES = ['entrada', 'saída', 'inicio_almoco', 'fim_almoco', 'pausa_cafe', 'retorno_cafe']
 
 export async function GET(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
 
   const { employeeId, type, timestamp } = await request.json()
 
-  if (!VALID_TYPES.includes(type))
+  if (!isValidPunchType(type))
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
 
   const parsed = new Date(timestamp)

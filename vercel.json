@@ -9,6 +9,10 @@
       "schedule": "0 17 * * 1-5"
     },
     {
+      "path": "/api/cron/punch-out-reminder",
+      "schedule": "45 17 * * 1-5"
+    },
+    {
       "path": "/api/cron/monthly-report",
       "schedule": "0 8 1 * *"
     },
