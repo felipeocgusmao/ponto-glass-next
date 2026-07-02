@@ -52,15 +52,20 @@ export async function POST(request: NextRequest) {
     reason?: string
   }
 
+  // Error messages surface directly in the employee UI — keep them in pt.
   const { date, hours_requested, reason } = body
   if (!date || isNaN(new Date(date).getTime()))
-    return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+    return NextResponse.json({ error: 'Data inválida' }, { status: 400 })
   if (!hours_requested || hours_requested <= 0)
-    return NextResponse.json({ error: 'hours_requested must be positive' }, { status: 400 })
+    return NextResponse.json({ error: 'As horas devem ser um valor positivo' }, { status: 400 })
+  // Cap per request: an accidental (or malicious) 10 000h approved on a busy
+  // day would credit the hour bank beyond repair. A day has at most 24h.
+  if (hours_requested > 24)
+    return NextResponse.json({ error: 'Máximo de 24 horas por pedido' }, { status: 400 })
   if (!reason?.trim())
-    return NextResponse.json({ error: 'reason required' }, { status: 400 })
+    return NextResponse.json({ error: 'Motivo é obrigatório' }, { status: 400 })
   if (date > businessDate())
-    return NextResponse.json({ error: 'Date cannot be in the future' }, { status: 400 })
+    return NextResponse.json({ error: 'A data não pode ser no futuro' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('compensation_requests')

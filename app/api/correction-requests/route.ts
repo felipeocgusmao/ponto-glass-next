@@ -59,6 +59,14 @@ export async function POST(request: NextRequest) {
   const parsed = new Date(timestamp)
   if (!timestamp || isNaN(parsed.getTime()))
     return NextResponse.json({ error: 'Timestamp inválido' }, { status: 400 })
+  // A punch in the future can't have been "forgotten" — approving one corrupts
+  // the day's totals and trips the missing-exit alerts (#257). Small allowance
+  // for client clock skew.
+  if (parsed.getTime() > Date.now() + 5 * 60 * 1000)
+    return NextResponse.json({ error: 'Não é possível pedir correção para um horário no futuro' }, { status: 400 })
+  // The employee form requires a reason — enforce it server-side too.
+  if (!reason?.trim())
+    return NextResponse.json({ error: 'Motivo é obrigatório' }, { status: 400 })
 
   const { data: emp } = await supabase.from('employees').select('name, shift_start')
     .eq('tenant_id', user.tenant_id).eq('id', user.id).single()
@@ -71,7 +79,7 @@ export async function POST(request: NextRequest) {
     req_type: type,
     req_timestamp: parsed.toISOString(),
     req_date: calcWorkDate(parsed, emp.shift_start ?? '00:00'),
-    reason: reason || null,
+    reason: reason.trim(),
     status: 'pending',
   }).select().single()
 

@@ -92,7 +92,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
   }
 
   const approveAll = async () => {
-    if (!confirm(`Aprovar todas as ${pending.length} correcções pendentes?`)) return
+    if (!confirm(t('admin.corr.confirm_bulk').replace('{n}', String(pending.length)))) return
     setBulkApproving(true)
     setBulkMsg(null)
     let ok = 0, fail = 0
@@ -111,8 +111,8 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
     if (ok > 0) window.dispatchEvent(new Event('pg:records-changed'))
     setBulkApproving(false)
     setBulkMsg(fail === 0
-      ? { ok: true, text: `${ok} correcção(ões) aprovada(s).` }
-      : { ok: false, text: `${ok} aprovada(s), ${fail} falharam. Tenta novamente.` })
+      ? { ok: true, text: t('admin.corr.bulk_ok').replace('{n}', String(ok)) }
+      : { ok: false, text: t('admin.corr.bulk_fail').replace('{ok}', String(ok)).replace('{fail}', String(fail)) })
   }
 
   const actComp = async (id: string, action: 'approve' | 'reject', note?: string) => {
@@ -151,13 +151,14 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
             : (() => {
                 const totalPending = pending.length + compPending.length
                 return totalPending > 0
-                  ? `${totalPending} ${totalPending === 1 ? 'pedido pendente' : 'pedidos pendentes'}`
-                  : 'Sem pedidos pendentes'
+                  ? t('admin.corr.count').replace('{n}', String(totalPending))
+                  : t('admin.corr.none_all')
               })()}
         </div>
       </div>
       <div className="page-actions">
-        <button className="btn" onClick={load}><IconRefresh size={13}/> Atualizar</button>
+        {/* The subtitle counts corrections AND compensations — refresh both. */}
+        <button className="btn" onClick={() => { load(); loadComp() }}><IconRefresh size={13}/> {t('common.refresh')}</button>
       </div>
     </div>
   )
@@ -192,7 +193,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
             <SL style={{ margin: 0 }}>{t('admin.corr.pending')} {pending.length > 0 && `· ${pending.length}`}</SL>
             {pending.length > 1 && (
               <button onClick={approveAll} disabled={bulkApproving || !!actionId} className="btn primary sm">
-                {bulkApproving ? 'A aprovar…' : `✓ Aprovar todas (${pending.length})`}
+                {bulkApproving ? t('admin.corr.approving') : '✓ ' + t('admin.corr.approve_all').replace('{n}', String(pending.length))}
               </button>
             )}
           </div>

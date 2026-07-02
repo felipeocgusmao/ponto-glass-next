@@ -7,8 +7,10 @@ import { isCsrfSafe } from '@/lib/csrf'
 import webpush from 'web-push'
 
 if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  // web-push exige subject em forma de URL — sem o "mailto:" o setVapidDetails
+  // lança no carregamento do módulo e TODA a rota passa a responder 500 (#257).
   webpush.setVapidDetails(
-    process.env.VAPID_EMAIL,
+    `mailto:${process.env.VAPID_EMAIL}`,
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY,
   )
@@ -89,8 +91,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   await logAudit(user, `compensation_${action}` as any, null, { id: params.id })
 
-  // Push notification to employee
-  if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+  // Push notification to employee. Guard on the same three env vars as
+  // setVapidDetails above — with a partial config, sendNotification throws
+  // synchronously (after the credit was already applied).
+  if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
     const { data: subs } = await supabase
       .from('push_subscriptions')
       .select('subscription')
