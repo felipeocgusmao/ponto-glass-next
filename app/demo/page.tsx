@@ -13,10 +13,12 @@ const CREDENTIALS = [
     role: 'Admin',
     color: '#6366f1',
     badge: 'Admin',
-    username: 'admin',
+    // 'admin' (sem sufixo) é a conta real do dono da instância — a credencial
+    // pública de avaliação vive numa conta própria, no tenant isolado 'demo',
+    // semeada por supabase/seed-demo-tenant.sql.
+    username: 'admin_demo',
     password: 'demo1234',
     description: 'Acesso completo — dashboard, relatórios, gestão de funcionários, auditoria.',
-    href: '/admin',
   },
   {
     role: 'Gerente',
@@ -25,7 +27,6 @@ const CREDENTIALS = [
     username: 'gerente_demo',
     password: 'demo1234',
     description: 'Visão operacional — monitorização ao vivo, aprovação de correções, banco de horas.',
-    href: '/admin',
   },
   {
     role: 'Funcionário',
@@ -34,7 +35,6 @@ const CREDENTIALS = [
     username: 'funcionario_demo',
     password: 'demo1234',
     description: 'Vista do trabalhador — bater ponto, histórico, correções, holerite.',
-    href: '/ponto',
   },
 ]
 
@@ -115,7 +115,9 @@ export default function DemoPage() {
                   </span>
                   <span style={{ fontSize: 14, color: 'var(--fg-muted)' }}>{cred.description}</span>
                 </div>
-                <Link href={cred.href} style={{
+                {/* Sempre via /login?tenant=demo: as contas demo vivem no tenant
+                    'demo', que o host sozinho não resolve. */}
+                <Link href="/login?tenant=demo" style={{
                   padding: '8px 18px', background: 'var(--accent)', color: '#fff',
                   borderRadius: 'var(--r-sm)', textDecoration: 'none', fontSize: 13, fontWeight: 600,
                   whiteSpace: 'nowrap',

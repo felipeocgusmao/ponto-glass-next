@@ -87,6 +87,38 @@ describe('resolveLoginTenant — host routing', () => {
   })
 })
 
+describe('resolveLoginTenant — explicit tenant slug (/login?tenant=)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubEnv('NEXT_PUBLIC_TENANT_ROOT_DOMAIN', '')
+  })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  async function resolveSlug(slug: unknown, mocks: { domain?: string | null; slug?: string | null } = {}) {
+    mockSupabase(mocks)
+    const { resolveLoginTenant } = await import('../lib/tenant')
+    return resolveLoginTenant(reqWithHost('ponto-glass-next.vercel.app'), slug)
+  }
+
+  it('resolves an active tenant by explicit slug, beating host resolution', async () => {
+    expect(await resolveSlug('demo', { slug: 'tenant-demo' })).toBe('tenant-demo')
+  })
+
+  it('refuses an unknown explicit slug (null, not default)', async () => {
+    expect(await resolveSlug('nao-existe', {})).toBeNull()
+  })
+
+  it('ignores malformed slugs and falls back to host resolution', async () => {
+    expect(await resolveSlug('NOT a slug!', {})).toBe(DEFAULT)
+    expect(await resolveSlug({ evil: true }, {})).toBe(DEFAULT)
+    expect(await resolveSlug(undefined, {})).toBe(DEFAULT)
+  })
+
+  it("the reserved slug 'www' is never looked up", async () => {
+    expect(await resolveSlug('www', { slug: 'should-not-match' })).toBe(DEFAULT)
+  })
+})
+
 describe('resolveLoginTenant — subdomain routing disabled (no root domain)', () => {
   beforeEach(() => {
     vi.resetModules()

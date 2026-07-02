@@ -142,6 +142,9 @@ export default function LoginPage() {
   // 2FA second step: set when the password was right but the account has TOTP on.
   const [totpPending, setTotpPending] = useState('')
   const [totpCode, setTotpCode] = useState('')
+  // Explicit tenant slug from /login?tenant=<slug> (e.g. the /demo page links
+  // here with tenant=demo). Empty = resolve by host, the normal path.
+  const [tenantSlug, setTenantSlug] = useState('')
   const pwdRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -173,6 +176,7 @@ export default function LoginPage() {
     // (window.location instead of useSearchParams: no Suspense boundary needed.)
     if (new URLSearchParams(window.location.search).get('session') === 'expired')
       setNotice(t('login.session_expired'))
+    setTenantSlug(new URLSearchParams(window.location.search).get('tenant') ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -185,7 +189,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(tenantSlug ? { username, password, tenant: tenantSlug } : { username, password }),
       })
       const data = await res.json().catch(() => ({}))
 
