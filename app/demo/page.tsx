@@ -13,7 +13,10 @@ const CREDENTIALS = [
     role: 'Admin',
     color: '#6366f1',
     badge: 'Admin',
-    username: 'admin',
+    // 'admin' (sem sufixo) é a conta real do dono da instância — a credencial
+    // pública de avaliação vive numa conta própria, semeada por
+    // supabase/seed-demo-users.sql.
+    username: 'admin_demo',
     password: 'demo1234',
     description: 'Acesso completo — dashboard, relatórios, gestão de funcionários, auditoria.',
     href: '/admin',
