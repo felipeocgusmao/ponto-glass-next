@@ -22,6 +22,21 @@ function prevMonthParams(tenantId: string): ReportParams {
   return { year, month, tenantId }
 }
 
+// Raw archive of every punch in the month (#249) — attached to the admin's
+// monthly email so the inbox doubles as legal retention (punch records must be
+// kept for years). Semicolon-delimited + BOM so pt Excel opens it correctly.
+function buildMonthCsv(records: PunchRecord[]): string {
+  const esc = (v: unknown) => {
+    const s = v == null ? '' : String(v)
+    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const header = 'funcionario;data;tipo;timestamp;latitude;longitude;comentario'
+  const lines = records.map(r =>
+    [r.employee_name, r.date, r.type, r.timestamp, r.latitude ?? '', r.longitude ?? '', r.comment ?? '']
+      .map(esc).join(';'))
+  return '﻿' + [header, ...lines].join('\n')
+}
+
 function buildRange(p: ReportParams): { from: string; to: string; label: string } {
   const from  = `${p.year}-${String(p.month).padStart(2, '0')}-01`
   const last  = new Date(p.year, p.month, 0).getDate()
@@ -108,10 +123,19 @@ async function runReport(params: ReportParams) {
   }
 
   const admins = (employees as Employee[]).filter(e => (e.role === 'admin' || e.role === 'manager') && e.email)
+  // Archive covers EVERY record in the tenant's month (admins/managers included),
+  // not just the summarized non-admin rows — it's the raw legal record.
+  const csvAttachment = (records ?? []).length > 0
+    ? [{
+        filename: `pontoglass-registos-${params.year}-${String(params.month).padStart(2, '0')}.csv`,
+        content: buildMonthCsv(records as PunchRecord[]),
+      }]
+    : undefined
   for (const admin of admins) {
     const ok = await sendMonthlyReportAdminEmail({
       to: admin.email!, adminName: admin.name, period: label,
       rows: empRows, totalWorkedMin, totalEarnings, appUrl,
+      attachments: csvAttachment,
     })
     if (ok) sent++
   }

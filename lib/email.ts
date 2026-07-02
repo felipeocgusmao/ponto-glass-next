@@ -59,6 +59,30 @@ interface GraphMessage {
   subject: string
   body: { contentType: 'HTML' | 'Text'; content: string }
   toRecipients: { emailAddress: { address: string; name?: string } }[]
+  attachments?: {
+    '@odata.type': '#microsoft.graph.fileAttachment'
+    name: string
+    contentType: string
+    contentBytes: string // base64
+  }[]
+}
+
+// Plain-text attachment (e.g. the monthly CSV archive, #249) in a transport-
+// neutral shape; converted to Graph fileAttachment or nodemailer format below.
+export interface EmailAttachment {
+  filename: string
+  content: string
+  contentType?: string
+}
+
+function toGraphAttachments(atts?: EmailAttachment[]): GraphMessage['attachments'] {
+  if (!atts?.length) return undefined
+  return atts.map(a => ({
+    '@odata.type': '#microsoft.graph.fileAttachment' as const,
+    name: a.filename,
+    contentType: a.contentType ?? 'text/csv',
+    contentBytes: Buffer.from(a.content, 'utf8').toString('base64'),
+  }))
 }
 
 async function sendViaGraph(message: GraphMessage): Promise<boolean> {
@@ -207,6 +231,8 @@ export async function sendMonthlyReportAdminEmail(opts: {
   totalWorkedMin: number
   totalEarnings: number
   appUrl: string
+  /** Raw month archive (#249) — attached so the admin's inbox doubles as legal retention. */
+  attachments?: EmailAttachment[]
 }): Promise<boolean> {
   const subject = `Relatório consolidado — ${opts.period}`
   // Relatórios consolidados usam horas centesimais (base 100): 7h45 → "7,75".
@@ -265,12 +291,22 @@ export async function sendMonthlyReportAdminEmail(opts: {
 </div></body></html>`
 
   if (hasGraphConfig()) {
-    return sendViaGraph({ subject, body: { contentType: 'HTML', content: html }, toRecipients: [{ emailAddress: { address: opts.to, name: opts.adminName } }] })
+    return sendViaGraph({
+      subject,
+      body: { contentType: 'HTML', content: html },
+      toRecipients: [{ emailAddress: { address: opts.to, name: opts.adminName } }],
+      attachments: toGraphAttachments(opts.attachments),
+    })
   }
   const transporter = getTransporter()
   if (!transporter) return false
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
-  const result = await withRetry(() => transporter.sendMail({ from, to: opts.to, subject, html }))
+  const result = await withRetry(() => transporter.sendMail({
+    from, to: opts.to, subject, html,
+    attachments: opts.attachments?.map(a => ({
+      filename: a.filename, content: a.content, contentType: a.contentType ?? 'text/csv',
+    })),
+  }))
   return result !== false
 }
 
@@ -304,6 +340,39 @@ export async function sendCorrectionEmail(opts: {
   if (!transporter) return
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
   await withRetry(() => transporter.sendMail({ from, to: opts.to, subject, html }))
+}
+
+// Daily pending-requests digest for admins (#252) — the safety net for admins
+// without web push installed. Only ever called when there ARE pending items.
+export async function sendPendingRequestsEmail(opts: {
+  to: string
+  adminName: string
+  corrections: number
+  compensations: number
+}): Promise<boolean> {
+  const total = opts.corrections + opts.compensations
+  const subject = `${total} pedido(s) pendente(s) — PontoGlass`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const parts: string[] = []
+  if (opts.corrections > 0) parts.push(`<strong>${opts.corrections}</strong> correção(ões) de ponto`)
+  if (opts.compensations > 0) parts.push(`<strong>${opts.compensations}</strong> compensação(ões) de horas`)
+  const html = `<p>Olá <strong>${opts.adminName}</strong>,</p>
+    <p>Há pedidos de funcionários aguardando a sua revisão: ${parts.join(' e ')}.</p>
+    <p><a href="${appUrl}/admin" style="display:inline-block;padding:10px 20px;background:#6366f1;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Rever pedidos</a></p>
+    <p style="color:#6b7280;font-size:13px">Este resumo é enviado nos dias úteis enquanto houver pedidos por resolver.</p>`
+
+  if (hasGraphConfig()) {
+    return sendViaGraph({
+      subject,
+      body: { contentType: 'HTML', content: html },
+      toRecipients: [{ emailAddress: { address: opts.to, name: opts.adminName } }],
+    })
+  }
+  const transporter = getTransporter()
+  if (!transporter) return false
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER
+  const result = await withRetry(() => transporter.sendMail({ from, to: opts.to, subject, html }))
+  return result !== false
 }
 
 export async function sendEmailVerification(opts: {

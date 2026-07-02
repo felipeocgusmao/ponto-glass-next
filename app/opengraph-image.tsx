@@ -39,7 +39,9 @@ export default function OgImage() {
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),' +
+            // satori exige direção explícita — sem ela o parser falha
+            // ("Missing comma before color stops") e a rota inteira dá 500.
+            'linear-gradient(180deg, rgba(255,255,255,0.025) 1px, transparent 1px),' +
             'linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)',
           backgroundSize: '80px 80px',
           display: 'flex',
@@ -85,6 +87,9 @@ export default function OgImage() {
               Controlo de ponto digital
             </div>
             <div style={{
+              // satori exige display explícito em elementos com >1 filho;
+              // spans continuam a fluir como texto inline dentro do flex.
+              display: 'flex',
               fontSize: 72, fontWeight: 800, color: '#ffffff',
               lineHeight: 1.05, letterSpacing: '-2px',
             }}>
