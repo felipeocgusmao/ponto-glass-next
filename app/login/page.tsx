@@ -119,7 +119,8 @@ function BrandPanel() {
       <div className="login-brand-bottom">
         <div className="login-brand-stat"><div className="num tnum">∞</div><div className="lbl">funcionários</div></div>
         <div className="login-brand-stat"><div className="num tnum">99.9%</div><div className="lbl">uptime</div></div>
-        <div className="login-brand-stat"><div className="num tnum">8h</div><div className="lbl">sessão</div></div>
+        {/* The JWT + cookie actually last 30 days — don't advertise "8h". */}
+        <div className="login-brand-stat"><div className="num tnum">2FA</div><div className="lbl">TOTP</div></div>
       </div>
     </div>
   )
@@ -133,6 +134,7 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [forgotMode, setForgotMode] = useState(false)
   const [forgotUsername, setForgotUsername] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
@@ -146,69 +148,95 @@ export default function LoginPage() {
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault()
     setForgotLoading(true)
-    await fetch('/api/auth/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: forgotUsername }),
-    })
-    setForgotLoading(false)
-    setForgotDone(true)
+    setError('')
+    // Without the try/catch a network failure leaves the button stuck in
+    // "A enviar…" forever (#258) — same for the login and TOTP handlers below.
+    try {
+      await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: forgotUsername }),
+      })
+      setForgotDone(true)
+    } catch {
+      setError(t('login.err.connect'))
+    } finally {
+      setForgotLoading(false)
+    }
   }
 
   useEffect(() => {
     const saved = localStorage.getItem('pg.remembered_user') ?? ''
     if (saved) { setUsername(saved); setRemember(true) }
+    // The middleware bounces revoked sessions here with ?session=expired —
+    // tell the user why they landed on the login page instead of saying nothing.
+    // (window.location instead of useSearchParams: no Suspense boundary needed.)
+    if (new URLSearchParams(window.location.search).get('session') === 'expired')
+      setNotice(t('login.session_expired'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!username.trim() || !password) { setError(t('login.fill_fields')); return }
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setNotice('')
 
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    })
-    const data = await res.json()
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+      const data = await res.json().catch(() => ({}))
 
-    if (!res.ok) {
-      setError(data.error ?? t('auth.invalid'))
+      if (!res.ok) {
+        setError(data.error ?? t('auth.invalid'))
+        setLoading(false)
+        return
+      }
+
+      if (remember) localStorage.setItem('pg.remembered_user', username.trim())
+      else localStorage.removeItem('pg.remembered_user')
+
+      if (data.totp_required) {
+        setTotpPending(data.pending)
+        setLoading(false)
+        return
+      }
+
+      // Deliberately leave `loading` on — the button stays disabled while the
+      // redirect happens.
+      router.push(data.role === 'admin' || data.role === 'manager' ? '/admin' : '/ponto')
+    } catch {
+      setError(t('login.err.connect'))
       setLoading(false)
-      return
     }
-
-    if (remember) localStorage.setItem('pg.remembered_user', username.trim())
-    else localStorage.removeItem('pg.remembered_user')
-
-    if (data.totp_required) {
-      setTotpPending(data.pending)
-      setLoading(false)
-      return
-    }
-
-    router.push(data.role === 'admin' || data.role === 'manager' ? '/admin' : '/ponto')
   }
 
   const handleTotp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true); setError('')
-    const res = await fetch('/api/auth/login/totp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pending: totpPending, code: totpCode }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data.error ?? t('auth.invalid'))
-      setLoading(false)
-      // Expired pending token → back to the password step.
-      if (res.status === 401 && /expirada|inválida/i.test(data.error ?? '')) {
-        setTotpPending(''); setTotpCode('')
+    try {
+      const res = await fetch('/api/auth/login/totp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pending: totpPending, code: totpCode }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error ?? t('auth.invalid'))
+        setLoading(false)
+        // Expired pending token → back to the password step.
+        if (res.status === 401 && /expirada|inválida/i.test(data.error ?? '')) {
+          setTotpPending(''); setTotpCode('')
+        }
+        return
       }
-      return
+      router.push(data.role === 'admin' || data.role === 'manager' ? '/admin' : '/ponto')
+    } catch {
+      setError(t('login.err.connect'))
+      setLoading(false)
     }
-    router.push(data.role === 'admin' || data.role === 'manager' ? '/admin' : '/ponto')
   }
 
   return (
@@ -293,6 +321,11 @@ export default function LoginPage() {
           ) : (
 
           <form onSubmit={handleSubmit} className="login-form">
+            {notice && (
+              <div className="alert-inline warn" style={{ marginBottom: 4 }}>
+                {notice}
+              </div>
+            )}
             <div className="field">
               <label htmlFor="login-username">{t('auth.username')}</label>
               <input id="login-username" className="input" placeholder="seu.usuario" value={username}

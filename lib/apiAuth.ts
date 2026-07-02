@@ -46,9 +46,26 @@ export async function verifyApiAuth(token: string): Promise<ApiUser> {
   // leaking JWT_SECRET), the DB value still wins and limits the blast radius
   // to whatever the actual employee row allows.
   const fields = data as { tenant_id?: string; super_admin?: boolean }
+  const tenantId = fields.tenant_id ?? user.tenant_id ?? DEFAULT_TENANT_ID
+  const superAdmin = fields.super_admin === true
+
+  // Deactivating a company must cut its employees' access immediately — not
+  // 30 days later when their cookie expires (#256). Super admins are exempt
+  // (platform operators keep access regardless of any company's state), and
+  // the default tenant can't be deactivated, so no extra query there. A
+  // failed lookup degrades to allowing, like everything else in this file.
+  if (!superAdmin && tenantId !== DEFAULT_TENANT_ID) {
+    const { data: tenant, error: tenantErr } = await supabase
+      .from('tenants')
+      .select('active')
+      .eq('id', tenantId)
+      .maybeSingle()
+    if (!tenantErr && tenant?.active === false) throw new Error('Tenant inactive')
+  }
+
   return {
     ...user,
-    tenant_id: fields.tenant_id ?? user.tenant_id ?? DEFAULT_TENANT_ID,
-    super_admin: fields.super_admin === true,
+    tenant_id: tenantId,
+    super_admin: superAdmin,
   }
 }

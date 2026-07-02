@@ -92,6 +92,8 @@ describe('verifyApiAuth — super_admin flag', () => {
     const maybeSingle = vi.fn()
       .mockResolvedValueOnce({ data: null, error: { message: 'column employees.super_admin does not exist' } })
       .mockResolvedValueOnce({ data: { active: true, sessions_valid_from: null, tenant_id: 'tenant-A' }, error: null })
+      // Third call: the tenants.active check (#256) for the non-default tenant.
+      .mockResolvedValueOnce({ data: { active: true }, error: null })
     vi.doMock('../lib/supabase', () => ({
       supabase: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle }) }) }) },
     }))
@@ -103,8 +105,86 @@ describe('verifyApiAuth — super_admin flag', () => {
     }))
     const { verifyApiAuth } = await import('../lib/apiAuth')
     const user = await verifyApiAuth('token')
-    expect(maybeSingle).toHaveBeenCalledTimes(2)
+    expect(maybeSingle).toHaveBeenCalledTimes(3)
     expect(user.super_admin).toBe(false)
+    expect(user.tenant_id).toBe('tenant-A')
+  })
+})
+
+describe('verifyApiAuth — deactivated tenant (#256)', () => {
+  beforeEach(() => { vi.resetModules() })
+
+  // Table-aware supabase mock: employees lookup vs tenants.active lookup.
+  const mockDb = (employeeRow: unknown, tenantRow: { data: unknown; error: unknown }) => {
+    const tenantsMaybeSingle = vi.fn().mockResolvedValue(tenantRow)
+    vi.doMock('../lib/supabase', () => ({
+      supabase: {
+        from: (table: string) => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: table === 'tenants'
+                ? tenantsMaybeSingle
+                : vi.fn().mockResolvedValue({ data: employeeRow, error: null }),
+            }),
+          }),
+        }),
+      },
+    }))
+    return tenantsMaybeSingle
+  }
+
+  const mockUser = (tenantId: string) => {
+    vi.doMock('../lib/auth', () => ({
+      verifyJWTWithMeta: async () => ({
+        user: { id: 'u1', name: 'Alice', username: 'a', role: 'employee', tenant_id: tenantId },
+        iat: 1_700_000_000,
+      }),
+    }))
+  }
+
+  it('rejects a session whose tenant was deactivated', async () => {
+    mockDb(
+      { active: true, sessions_valid_from: null, tenant_id: 'tenant-A', super_admin: false },
+      { data: { active: false }, error: null },
+    )
+    mockUser('tenant-A')
+    const { verifyApiAuth } = await import('../lib/apiAuth')
+    await expect(verifyApiAuth('token')).rejects.toThrow(/tenant inactive/i)
+  })
+
+  it('keeps super admin sessions alive regardless of tenant state', async () => {
+    const tenantsMaybeSingle = mockDb(
+      { active: true, sessions_valid_from: null, tenant_id: 'tenant-A', super_admin: true },
+      { data: { active: false }, error: null },
+    )
+    mockUser('tenant-A')
+    const { verifyApiAuth } = await import('../lib/apiAuth')
+    const user = await verifyApiAuth('token')
+    expect(user.super_admin).toBe(true)
+    // Exempt users never pay the extra lookup.
+    expect(tenantsMaybeSingle).not.toHaveBeenCalled()
+  })
+
+  it('skips the lookup for the default tenant (cannot be deactivated)', async () => {
+    const tenantsMaybeSingle = mockDb(
+      { active: true, sessions_valid_from: null, tenant_id: DEFAULT, super_admin: false },
+      { data: { active: false }, error: null },
+    )
+    mockUser(DEFAULT)
+    const { verifyApiAuth } = await import('../lib/apiAuth')
+    const user = await verifyApiAuth('token')
+    expect(user.tenant_id).toBe(DEFAULT)
+    expect(tenantsMaybeSingle).not.toHaveBeenCalled()
+  })
+
+  it('degrades to allowing when the tenants lookup fails (resilience)', async () => {
+    mockDb(
+      { active: true, sessions_valid_from: null, tenant_id: 'tenant-A', super_admin: false },
+      { data: null, error: { message: 'transient' } },
+    )
+    mockUser('tenant-A')
+    const { verifyApiAuth } = await import('../lib/apiAuth')
+    const user = await verifyApiAuth('token')
     expect(user.tenant_id).toBe('tenant-A')
   })
 })
