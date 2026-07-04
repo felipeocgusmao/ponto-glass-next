@@ -103,7 +103,8 @@ WITH emp AS (
 )
 INSERT INTO records (tenant_id, employee_id, employee_name, type, timestamp, date)
 SELECT emp.tenant_id, emp.id, emp.name, r.type, r.ts, r.d
-FROM emp, LATERAL (
+FROM emp
+CROSS JOIN (
   VALUES
     ('entrada',       ((CURRENT_DATE - 2) + TIME '09:00') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 2),
     ('inicio_almoco', ((CURRENT_DATE - 2) + TIME '13:00') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 2),
