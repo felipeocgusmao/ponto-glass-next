@@ -69,25 +69,30 @@ UPDATE audit_logs SET tenant_id = (SELECT id FROM demo)
 WHERE actor_id IN (SELECT id FROM demo_emps)
   AND tenant_id <> (SELECT id FROM demo);
 
-WITH demo AS (SELECT id FROM tenants WHERE slug = 'demo'),
-     demo_emps AS (
-       SELECT id FROM employees
-       WHERE tenant_id = (SELECT id FROM demo)
-         AND username IN ('admin_demo', 'gerente_demo', 'funcionario_demo')
-     )
-UPDATE login_sessions SET tenant_id = (SELECT id FROM demo)
-WHERE employee_id IN (SELECT id FROM demo_emps)
-  AND tenant_id <> (SELECT id FROM demo);
+-- login_sessions e push_subscriptions podem não existir em instalações mais
+-- antigas (ver spin_off_tenant em 20260630_spin_off_tenant.sql) — o bloco DO
+-- ignora a tabela ausente sem abortar o resto do script.
+DO $$
+BEGIN
+  UPDATE login_sessions SET tenant_id = (SELECT id FROM tenants WHERE slug = 'demo')
+  WHERE employee_id IN (
+    SELECT id FROM employees
+    WHERE tenant_id = (SELECT id FROM tenants WHERE slug = 'demo')
+      AND username IN ('admin_demo', 'gerente_demo', 'funcionario_demo')
+  )
+    AND tenant_id <> (SELECT id FROM tenants WHERE slug = 'demo');
+EXCEPTION WHEN undefined_table THEN NULL; END $$;
 
-WITH demo AS (SELECT id FROM tenants WHERE slug = 'demo'),
-     demo_emps AS (
-       SELECT id FROM employees
-       WHERE tenant_id = (SELECT id FROM demo)
-         AND username IN ('admin_demo', 'gerente_demo', 'funcionario_demo')
-     )
-UPDATE push_subscriptions SET tenant_id = (SELECT id FROM demo)
-WHERE employee_id IN (SELECT id FROM demo_emps)
-  AND tenant_id <> (SELECT id FROM demo);
+DO $$
+BEGIN
+  UPDATE push_subscriptions SET tenant_id = (SELECT id FROM tenants WHERE slug = 'demo')
+  WHERE employee_id IN (
+    SELECT id FROM employees
+    WHERE tenant_id = (SELECT id FROM tenants WHERE slug = 'demo')
+      AND username IN ('admin_demo', 'gerente_demo', 'funcionario_demo')
+  )
+    AND tenant_id <> (SELECT id FROM tenants WHERE slug = 'demo');
+EXCEPTION WHEN undefined_table THEN NULL; END $$;
 
 -- 5. Dois dias de registros de exemplo para o funcionário demo, para que
 --    histórico, relatórios e holerite não abram vazios (só se não tiver nenhum)
