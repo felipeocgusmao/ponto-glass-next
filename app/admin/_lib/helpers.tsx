@@ -1,7 +1,7 @@
 'use client'
 
 import type { PunchRecord } from '@/lib/types'
-import { WORKING_TYPES, EXPLICIT_BREAK_TYPES, calcTimeBreakdown, calcNetMinutes, openPayslip, empColor } from '@/lib/utils'
+import { WORKING_TYPES, EXPLICIT_BREAK_TYPES, BUSINESS_TZ, calcTimeBreakdown, calcNetMinutes, openPayslip, empColor } from '@/lib/utils'
 export { openPayslip, empColor }
 
 export function SL({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -18,7 +18,9 @@ export function getWorkState(recs: PunchRecord[]): { state: WorkState; since: st
   if (recs.length === 0) return { state: 'off', since: null }
   const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   const last = sorted.at(-1)!
-  const since = new Date(last.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  // Business-TZ wall clock, not the runtime's: keeps the string identical between
+  // the server render (UTC) and the browser, and consistent with how workdays are cut.
+  const since = new Date(last.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: BUSINESS_TZ })
   if (last.type === 'inicio_almoco') return { state: 'lunch', since }
   if (last.type === 'pausa_cafe') return { state: 'coffee', since }
   if (last.type === 'saída') return { state: 'off', since }
@@ -26,7 +28,9 @@ export function getWorkState(recs: PunchRecord[]): { state: WorkState; since: st
   return { state: 'off', since }
 }
 
-export function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
+// `asOf` pins the "now" used for in-progress spans — the server-rendered dashboard
+// passes its seed timestamp so SSR HTML and hydration compute identical values.
+export function calcLiveMin(recs: PunchRecord[], lunchAuto: number, asOf: number = Date.now()): number {
   const hasBreaks = recs.some(r => EXPLICIT_BREAK_TYPES.includes(r.type))
   const { state } = getWorkState(recs)
   if (hasBreaks) {
@@ -35,13 +39,13 @@ export function calcLiveMin(recs: PunchRecord[], lunchAuto: number): number {
     if (state !== 'working' && state !== 'coffee') return completed
     const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     const lastRecord = sorted.at(-1)
-    const ongoing = lastRecord ? (Date.now() - new Date(lastRecord.timestamp).getTime()) / 60000 : 0
+    const ongoing = lastRecord ? (asOf - new Date(lastRecord.timestamp).getTime()) / 60000 : 0
     return Math.max(0, completed + ongoing)
   }
   const totalWorked = calcNetMinutes(recs, 0)
   const sorted = [...recs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   const lastEntry = state === 'working' ? sorted.slice().reverse().find(r => r.type === 'entrada') : undefined
-  const ongoing = lastEntry ? (Date.now() - new Date(lastEntry.timestamp).getTime()) / 60000 : 0
+  const ongoing = lastEntry ? (asOf - new Date(lastEntry.timestamp).getTime()) / 60000 : 0
   const gross = totalWorked + ongoing
   // While the worker is still IN (no saída yet), show gross elapsed time — deducting
   // the assumed lunch upfront would mislead someone who just punched in to see 0

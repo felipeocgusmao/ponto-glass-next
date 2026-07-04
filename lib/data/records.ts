@@ -53,3 +53,21 @@ export async function getTodayRecordsAllEmployees(user: ApiUser): Promise<PunchR
 
   return (data ?? []) as PunchRecord[]
 }
+
+// All of a tenant's punches inside [from, to] — the admin dashboard's chart window.
+// Same shape /api/reports returns; the cap matches that route's MAX_PAGE_SIZE so the
+// server-seeded first paint and the client's 60s refresh agree on truncation.
+export const RANGE_CAP = 2000
+
+export async function getRecordsRange(user: ApiUser, from: string, to: string): Promise<PunchRecord[]> {
+  const { data } = await supabase
+    .from('records')
+    .select('*')
+    .eq('tenant_id', user.tenant_id)
+    .gte('date', from)
+    .lte('date', to)
+    .order('timestamp', { ascending: true })
+    .limit(RANGE_CAP)
+
+  return (data ?? []) as PunchRecord[]
+}

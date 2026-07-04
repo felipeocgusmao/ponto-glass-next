@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { Employee, PunchRecord, DayException } from '@/lib/types'
-import { fmtMinutes, businessDate } from '@/lib/utils'
+import { fmtMinutes, businessDate, businessMinutesOfDay, BUSINESS_TZ } from '@/lib/utils'
+import type { DashboardSeed } from '../../_lib/types'
 import { empColor, getWorkState, calcLiveMin, fmtMin, getWorkingDays } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import { avatarInitials } from '@/lib/utils'
@@ -31,28 +32,38 @@ function Sparkline({ values }: { values: number[] }) {
   )
 }
 
-export function DashboardTab({ employees }: { employees: Employee[] }) {
+export function DashboardTab({ employees, initialData }: { employees: Employee[]; initialData?: DashboardSeed | null }) {
   const { t } = useLang()
-  const now = new Date()
-  const todayStr = businessDate()
-  const next30Str = new Date(now.getTime() + 30 * 86400000).toISOString().split('T')[0]
+  // The clock live counters and date windows derive from. Seeded from the server so
+  // the SSR HTML and the hydration render compute identical strings; every load()
+  // brings it back to the present. The derived date strings only change when the
+  // business day flips, so they're stable useCallback deps.
+  const [nowMs, setNowMs] = useState(() => initialData?.now ?? Date.now())
+  const now = new Date(nowMs)
+  const todayStr = businessDate(now)
+  const next30Str = new Date(nowMs + 30 * 86400000).toISOString().split('T')[0]
   // Chart wants last 14 working days regardless of month boundary; 30 calendar days back
   // covers it comfortably even after long weekends.
-  const chartFromStr = new Date(now.getTime() - 30 * 86400000).toISOString().split('T')[0]
+  const chartFromStr = new Date(nowMs - 30 * 86400000).toISOString().split('T')[0]
 
-  const [monthRecs, setMonthRecs] = useState<PunchRecord[]>([])
-  const [todayRecs, setTodayRecs] = useState<PunchRecord[]>([])
-  const [exceptions, setExceptions] = useState<DayException[]>([])
+  const [monthRecs, setMonthRecs] = useState<PunchRecord[]>(initialData?.monthRecs ?? [])
+  const [todayRecs, setTodayRecs] = useState<PunchRecord[]>(initialData?.todayRecs ?? [])
+  const [exceptions, setExceptions] = useState<DayException[]>(initialData?.exceptions ?? [])
   const [bankBalances, setBankBalances] = useState<Map<string, number>>(new Map())
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialData)
   // Day selected in the bar chart (null = default to the most recent day).
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
+  // No setLoading(true) here: swapping the whole tab back to skeletons on every
+  // 60s auto-refresh caused a visible flash and repeated layout shifts (CLS).
+  // The skeleton only shows while there has never been data to render.
   const load = useCallback(async () => {
-    setLoading(true)
+    setNowMs(Date.now())
     try {
+      // limit matches the server seed's RANGE_CAP so a refresh never shows fewer
+      // records than the first paint did.
       const [mRes, tRes, eRes] = await Promise.all([
-        fetch(`/api/reports?from=${chartFromStr}&to=${todayStr}`),
+        fetch(`/api/reports?from=${chartFromStr}&to=${todayStr}&limit=2000`),
         fetch('/api/records?today=true'),
         fetch(`/api/day-exceptions?from=${todayStr}&to=${next30Str}`),
       ])
@@ -63,7 +74,13 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     finally { setLoading(false) }
   }, [chartFromStr, todayStr, next30Str])
 
-  useEffect(() => { load() }, [load])
+  // Server-seeded data is fresh — skip the mount fetch and let the 60s interval
+  // (or a manual refresh) take over. Later recreations of load() (day flip) still run.
+  const seededRef = useRef(Boolean(initialData))
+  useEffect(() => {
+    if (seededRef.current) { seededRef.current = false; return }
+    load()
+  }, [load])
 
   // Auto-refresh every 60 seconds
   useEffect(() => {
@@ -116,12 +133,12 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     const latestRec = latestSorted.at(-1)
     const stateFromPriorDay = state !== 'off' && latestRec != null && latestRec.date !== todayStr
     // ...but only today's records contribute to today's worked minutes
-    const liveMin = calcLiveMin(todayRecsEmp, emp.lunch_break_minutes ?? 60)
+    const liveMin = calcLiveMin(todayRecsEmp, emp.lunch_break_minutes ?? 60, nowMs)
     const targetMin = emp.workday_hours * 60
     const earnings = emp.hourly_rate ? (liveMin / 60) * emp.hourly_rate : null
     // Use todayRecsEmp for `recs` so downstream displays (count, history) still reflect today.
     return { emp, recs: todayRecsEmp, state, since, liveMin, targetMin, earnings, stateFromPriorDay, latestRec }
-  }), [employees, todayByEmp, recentByEmp, todayStr])
+  }), [employees, todayByEmp, recentByEmp, todayStr, nowMs])
 
   // KPI values
   const { working, onBreak, absent, totalMinToday, totalEarnings } = useMemo(() => ({
@@ -158,7 +175,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
       let tot = 0
       empMap.forEach((recs, eid) => {
         const e = employees.find(x => x.id === eid)
-        tot += calcLiveMin(recs, e?.lunch_break_minutes ?? 60)
+        tot += calcLiveMin(recs, e?.lunch_break_minutes ?? 60, nowMs)
       })
       return { date, min: tot }
     })
@@ -166,7 +183,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
     const chartValues = chartData.map(d => d.min)
     const avgMin = chartValues.length ? Math.round(chartValues.reduce((a, b) => a + b, 0) / chartValues.length) : 0
     return { chartDays, chartData, chartMax, chartValues, avgMin }
-  }, [monthRecs, employees, chartFromStr, todayStr])
+  }, [monthRecs, employees, chartFromStr, todayStr, nowMs])
 
   const todayVsAvg = totalMinToday - avgMin
 
@@ -191,11 +208,12 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
         if (!firstEntrada) return null
         const arrived = new Date(firstEntrada.timestamp)
         const [eh, em] = emp.expected_start.split(':').map(Number)
-        const expectedToday = new Date(arrived)
-        expectedToday.setHours(eh, em, 0, 0)
-        const lateMin = Math.round((arrived.getTime() - expectedToday.getTime()) / 60_000)
+        // expected_start is a business-local wall time — compare in that timezone.
+        // (setHours would use the runtime's TZ: UTC on the server, the viewer's on
+        // the client, giving different "late" verdicts for the same punch.)
+        const lateMin = Math.round(businessMinutesOfDay(arrived) - (eh * 60 + em))
         if (lateMin <= 5) return null // ignore on-time arrivals (up to 5min grace)
-        const arrivedAt = arrived.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+        const arrivedAt = arrived.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: BUSINESS_TZ })
         return { emp, lateMin, arrivedAt, expectedAt: emp.expected_start }
       })
       .filter((x): x is { emp: Employee; lateMin: number; arrivedAt: string; expectedAt: string } => x !== null)
@@ -282,7 +300,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
         <div>
           <div className="page-title">Dashboard</div>
           <div className="page-sub">
-            {now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long' })}
+            {now.toLocaleDateString('pt-PT', { weekday: 'long', day: '2-digit', month: 'long', timeZone: BUSINESS_TZ })}
           </div>
         </div>
         <div className="page-actions">
@@ -578,7 +596,7 @@ export function DashboardTab({ employees }: { employees: Employee[] }) {
             ) : recentPunches.map(r => {
               const emp = employees.find(e => e.id === r.employee_id)
               const ci = emp ? empColor(emp.id) : 1
-              const time = new Date(r.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+              const time = new Date(r.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: BUSINESS_TZ })
               return (
                 <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
                   <div className={`avatar av-c${ci}`}>{avatarInitials(r.employee_name)}</div>
