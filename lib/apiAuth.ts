@@ -14,11 +14,14 @@ import type { ApiUser } from './types'
 export async function verifyApiAuth(token: string): Promise<ApiUser> {
   const { user, iat } = await verifyJWTWithMeta(token)
 
-  // Newest column set first; retry without super_admin for databases that
-  // haven't run the phase-5 migration yet, so revocation keeps working there.
+  // Newest column set first, with the tenant's active flag embedded through the
+  // tenant_id FK — one round trip instead of a follow-up tenants query, on a path
+  // that runs for every authenticated request (the extra serial query was pure
+  // TTFB). Retry without super_admin/embed for databases that haven't run the
+  // phase-5 (or multi-tenancy) migrations yet, so revocation keeps working there.
   let row = await supabase
     .from('employees')
-    .select('active, sessions_valid_from, tenant_id, super_admin')
+    .select('active, sessions_valid_from, tenant_id, super_admin, tenant:tenants(active)')
     .eq('id', user.id)
     .maybeSingle()
   if (row.error) {
@@ -45,22 +48,27 @@ export async function verifyApiAuth(token: string): Promise<ApiUser> {
   // scope. If a token were forged with a different tenant_id (would require
   // leaking JWT_SECRET), the DB value still wins and limits the blast radius
   // to whatever the actual employee row allows.
-  const fields = data as { tenant_id?: string; super_admin?: boolean }
+  const fields = data as { tenant_id?: string; super_admin?: boolean; tenant?: { active?: boolean } | null }
   const tenantId = fields.tenant_id ?? user.tenant_id ?? DEFAULT_TENANT_ID
   const superAdmin = fields.super_admin === true
 
   // Deactivating a company must cut its employees' access immediately — not
   // 30 days later when their cookie expires (#256). Super admins are exempt
   // (platform operators keep access regardless of any company's state), and
-  // the default tenant can't be deactivated, so no extra query there. A
-  // failed lookup degrades to allowing, like everything else in this file.
+  // the default tenant can't be deactivated. The flag normally arrives via the
+  // embed above; the separate query only remains for the fallback select (no
+  // embed), and a failed lookup degrades to allowing, like everything else here.
   if (!superAdmin && tenantId !== DEFAULT_TENANT_ID) {
-    const { data: tenant, error: tenantErr } = await supabase
-      .from('tenants')
-      .select('active')
-      .eq('id', tenantId)
-      .maybeSingle()
-    if (!tenantErr && tenant?.active === false) throw new Error('Tenant inactive')
+    let tenantActive = fields.tenant?.active
+    if (fields.tenant === undefined) {
+      const { data: tenant, error: tenantErr } = await supabase
+        .from('tenants')
+        .select('active')
+        .eq('id', tenantId)
+        .maybeSingle()
+      tenantActive = tenantErr ? undefined : tenant?.active
+    }
+    if (tenantActive === false) throw new Error('Tenant inactive')
   }
 
   return {

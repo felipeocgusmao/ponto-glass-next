@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import ChangePasswordModal from '@/components/ChangePasswordModal'
 import type { Employee, EmployeeProfile } from '@/lib/types'
-import { Tab, ALL_TABS, MANAGER_TABS, SUPER_ADMIN_TABS } from './_lib/types'
+import { Tab, ALL_TABS, MANAGER_TABS, SUPER_ADMIN_TABS, DashboardSeed } from './_lib/types'
 import Sidebar from './_components/Sidebar'
 import TopBar from './_components/TopBar'
 import CommandPalette from './_components/CommandPalette'
@@ -49,9 +49,10 @@ interface AdminClientProps {
   initialUser: EmployeeProfile
   initialEmployees: Employee[]
   initialPendingCorrections: number
+  initialDashboard?: DashboardSeed | null
 }
 
-export function AdminClient({ initialUser, initialEmployees, initialPendingCorrections }: AdminClientProps) {
+export function AdminClient({ initialUser, initialEmployees, initialPendingCorrections, initialDashboard }: AdminClientProps) {
   const { theme, isSystemTheme, accent, font, selectTheme, toggleTheme, changeAccent, changeFont } = useThemeSettings()
   const [user, setUser] = useState<EmployeeProfile | null>(initialUser)
   const { employees, activeEmployees, loadEmployees, setEmployees } = useEmployeeList(initialEmployees)
@@ -70,6 +71,10 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [pendingCorrections, setPendingCorrections] = useState(initialPendingCorrections)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  // The server-fetched dashboard payload is only valid for the tab mounted with the
+  // page. Any navigation drops it, so re-entering the dashboard fetches fresh data
+  // instead of resurrecting minutes-old numbers.
+  const [dashSeed, setDashSeed] = useState<DashboardSeed | null>(initialDashboard ?? null)
   const router = useRouter()
 
   const { items: notifItems } = useNotifications({ pendingCorrections, employees: activeEmployees })
@@ -163,10 +168,18 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
     await fetch('/api/auth/revoke-other-sessions', { method: 'POST' })
   }
 
+  // Single entry point for tab changes: invalidates the dashboard seed and keeps
+  // the corrections badge fresh, no matter which control triggered the navigation.
+  const navigateTab = useCallback((t: Tab) => {
+    setDashSeed(null)
+    setTab(t)
+    if (t === 'correcoes') refreshPendingCount()
+  }, [refreshPendingCount])
+
   const handleCmdAction = (id: string) => {
     if (id === 'toggle_theme') toggleTheme()
-    if (id === 'new_employee') setTab('funcionarios')
-    if (id === 'export_csv') setTab('relatorios')
+    if (id === 'new_employee') navigateTab('funcionarios')
+    if (id === 'export_csv') navigateTab('relatorios')
   }
 
   if (fetchError) return (
@@ -226,14 +239,14 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
         open={showCmdK}
         onClose={() => setShowCmdK(false)}
         tabs={visibleTabs}
-        onNavigate={t => { setTab(t); setShowCmdK(false) }}
+        onNavigate={t => { navigateTab(t); setShowCmdK(false) }}
         onAction={handleCmdAction}
         theme={theme}
       />
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         tab={tab}
-        setTab={t => { setTab(t); if (t === 'correcoes') refreshPendingCount() }}
+        setTab={navigateTab}
         tabs={visibleTabs}
         user={user}
         onOpenSettings={() => setShowSettings(true)}
@@ -252,14 +265,14 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
           onOpenCmdK={() => setShowCmdK(true)}
           notificationsOpen={notificationsOpen}
           onToggleNotifications={() => setNotificationsOpen(v => !v)}
-          onNavigate={t => { setTab(t); if (t === 'correcoes') refreshPendingCount() }}
+          onNavigate={navigateTab}
           notifItems={notifItems}
         />
         <div className="page" id="main-content">
           {!isPlatformOnly && <MissingExitBanner />}
           <ErrorBoundary>
             {tab === 'meu_ponto'    && <MeuPontoTab user={user} />}
-            {tab === 'dashboard'    && <DashboardTab employees={activeEmployees} />}
+            {tab === 'dashboard'    && <DashboardTab employees={activeEmployees} initialData={dashSeed} />}
             {tab === 'status'       && <StatusTab employees={activeEmployees} currentUserId={user.id} />}
             {tab === 'registros'    && <RegistrosTab employees={activeEmployees} />}
             {tab === 'funcionarios' && <FuncionariosTab employees={employees} onRefresh={loadEmployees} />}

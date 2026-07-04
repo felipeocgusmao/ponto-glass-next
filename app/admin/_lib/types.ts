@@ -1,6 +1,19 @@
 'use client'
 
+import type { PunchRecord, DayException } from '@/lib/types'
+
 export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes' | 'empresas' | 'alertas' | 'integracoes' | 'ausencias'
+
+// Server-fetched payload for the dashboard's first paint, so the landing tab
+// renders with data in the initial HTML instead of behind a client fetch wave.
+// `now` is the server's clock at fetch time — the tab derives its date window and
+// live counters from it so the SSR markup and hydration render agree exactly.
+export interface DashboardSeed {
+  monthRecs: PunchRecord[]
+  todayRecs: PunchRecord[]
+  exceptions: DayException[]
+  now: number
+}
 
 // Appended to ALL_TABS only for super-admins (platform operators).
 export const SUPER_ADMIN_TABS: { id: Tab; label: string }[] = [

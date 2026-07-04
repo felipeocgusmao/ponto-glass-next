@@ -37,6 +37,13 @@ export function businessDate(date: Date = new Date()): string {
   return tzParts(date).date
 }
 
+// Wall-clock minutes since midnight of an instant, in the business timezone.
+// Use for comparisons against HH:MM business-local times (expected_start etc.) —
+// Date.setHours() would use the runtime's TZ, which is UTC on the server.
+export function businessMinutesOfDay(date: Date): number {
+  return tzParts(date).minutes
+}
+
 // Work date for a punch, honouring an employee's shift_start — the LOCAL
 // (business-timezone) time of day at which a new workday begins. For night shifts
 // (e.g. 22:00), punches before that local time belong to the previous calendar day.
