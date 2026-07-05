@@ -11,21 +11,30 @@ interface UseThemeSettingsOptions {
 // (Chrome paints it with <meta name="theme-color">). Values mirror --bg in
 // tokens.css.
 //
-// On iOS, do NOT touch theme-color: the boot script in layout.tsx removed the
-// metas there, because any flat theme-color makes Safari paint an opaque band
-// behind its collapsed top/bottom bars — which can never match the app's
-// gradient background (the recurring "barra preta/branca", #248). Re-creating
-// or re-setting the meta here on a theme toggle would bring the band back.
+// On iOS there must be NO theme-color meta at all: a flat tint makes Safari
+// paint an opaque band behind its collapsed top/bottom bars, which can never
+// match the app's gradient background (the recurring "barra preta/branca",
+// #248/#269). The layout renders no theme-color and the boot script only
+// creates one on non-iOS; the removal here is defensive, so anything that
+// re-introduces the meta (hydration of a stale build, extensions) is cleaned
+// on mount and on every theme change.
 function applyThemeAttr(t: 'dark' | 'light') {
   document.documentElement.setAttribute('data-theme', t)
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  if (isIOS) return
+  if (isIOS) {
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove())
+    return
+  }
   const c = t === 'dark' ? '#08090b' : '#fafafa'
-  document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
-    m.removeAttribute('media')
-    m.setAttribute('content', c)
-  })
+  let meta = document.querySelector('meta[name="theme-color"]')
+  if (!meta) {
+    meta = document.createElement('meta')
+    meta.setAttribute('name', 'theme-color')
+    document.head.appendChild(meta)
+  }
+  meta.removeAttribute('media')
+  meta.setAttribute('content', c)
 }
 
 export function useThemeSettings({ onThemeChange }: UseThemeSettingsOptions = {}) {
