@@ -35,11 +35,13 @@ const lora = Lora({
 })
 
 export const viewport: Viewport = {
-  // iOS Safari tints the top/bottom browser bars with theme-color. A single
-  // hard-coded dark value kept the bottom bar black in light theme — pair it
-  // with the color scheme instead. The boot script + useThemeSettings then
-  // override the meta at runtime to follow the user's in-app theme choice
-  // (which can differ from the OS scheme).
+  // theme-color is for Android (Chrome tints the status bar with it; the boot
+  // script + useThemeSettings keep it in step with the in-app theme). On iOS the
+  // boot script REMOVES these metas entirely: any flat theme-color makes Safari
+  // paint an opaque band behind its collapsed top/bottom bars, which can never
+  // match the app's gradient background (the recurring "barra preta/branca" —
+  // #248). With no theme-color, Safari extends the page under its translucent
+  // bars and they blend with whatever is actually rendered.
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#fafafa' },
     { media: '(prefers-color-scheme: dark)', color: '#08090b' },
@@ -118,7 +120,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <GlassHighlight />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t){r.setAttribute('data-theme',t);}else{r.setAttribute('data-theme',window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);var c=r.getAttribute('data-theme')==='dark'?'#08090b':'#fafafa';document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.removeAttribute('media');m.setAttribute('content',c);});}catch(e){}})()`,
+            __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t){r.setAttribute('data-theme',t);}else{r.setAttribute('data-theme',window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);var ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);var ms=document.querySelectorAll('meta[name="theme-color"]');if(ios){ms.forEach(function(m){m.remove();});}else{var c=r.getAttribute('data-theme')==='dark'?'#08090b':'#fafafa';ms.forEach(function(m){m.removeAttribute('media');m.setAttribute('content',c);});}}catch(e){}})()`,
           }}
         />
       </body>
