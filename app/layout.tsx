@@ -35,17 +35,14 @@ const lora = Lora({
 })
 
 export const viewport: Viewport = {
-  // theme-color is for Android (Chrome tints the status bar with it; the boot
-  // script + useThemeSettings keep it in step with the in-app theme). On iOS the
-  // boot script REMOVES these metas entirely: any flat theme-color makes Safari
-  // paint an opaque band behind its collapsed top/bottom bars, which can never
-  // match the app's gradient background (the recurring "barra preta/branca" —
-  // #248). With no theme-color, Safari extends the page under its translucent
-  // bars and they blend with whatever is actually rendered.
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
-    { media: '(prefers-color-scheme: dark)', color: '#08090b' },
-  ],
+  // Deliberately NO themeColor here. A flat theme-color makes iOS Safari paint
+  // an opaque band behind its collapsed top/bottom bars, which can never match
+  // the app's gradient background (the recurring "barra preta/branca" — #248,
+  // #269). And it can't just be removed at runtime either: metas rendered here
+  // are part of the React tree, so hydration resurrects whatever a pre-paint
+  // script deletes (why #269 didn't stick). Instead the boot script CREATES the
+  // meta outside the React tree on non-iOS platforms only — Android Chrome uses
+  // it for the status-bar tint, where a flat color is correct.
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -120,7 +117,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <GlassHighlight />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t){r.setAttribute('data-theme',t);}else{r.setAttribute('data-theme',window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);var ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);var ms=document.querySelectorAll('meta[name="theme-color"]');if(ios){ms.forEach(function(m){m.remove();});}else{var c=r.getAttribute('data-theme')==='dark'?'#08090b':'#fafafa';ms.forEach(function(m){m.removeAttribute('media');m.setAttribute('content',c);});}}catch(e){}})()`,
+            __html: `(function(){try{var r=document.documentElement;var t=localStorage.getItem('pg.theme');if(t){r.setAttribute('data-theme',t);}else{r.setAttribute('data-theme',window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}var a=localStorage.getItem('pg.accent');if(a)r.setAttribute('data-accent',a);var f=localStorage.getItem('pg.font');if(f)r.setAttribute('data-font',f);var ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);if(!ios){var c=r.getAttribute('data-theme')==='dark'?'#08090b':'#fafafa';var m=document.querySelector('meta[name="theme-color"]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');document.head.appendChild(m);}m.setAttribute('content',c);}}catch(e){}})()`,
           }}
         />
       </body>
