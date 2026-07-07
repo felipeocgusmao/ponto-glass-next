@@ -815,10 +815,10 @@ RLS habilitado em todas as tabelas — acesso via `service_role` apenas no servi
 
 ## ◈ roadmap
 
-Mais de 90 funcionalidades entregues — a lista completa fica colapsada para não poluir o README. A seção [funcionalidades](#-funcionalidades) acima resume o que existe hoje por função.
+Mais de 100 funcionalidades entregues — a lista completa fica colapsada para não poluir o README. A seção [funcionalidades](#-funcionalidades) acima resume o que existe hoje por função.
 
 <details>
-<summary><strong>▸ Ver roadmap completo (90+ itens entregues)</strong></summary>
+<summary><strong>▸ Ver roadmap completo (100+ itens entregues)</strong></summary>
 
 <br/>
 
@@ -927,6 +927,13 @@ Mais de 90 funcionalidades entregues — a lista completa fica colapsada para n�
   ✓  Ícone da marca (relógio) em iOS, Android, PWA/desktop, favicon e apple-touch — fonte única em assets/
   ✓  Assets de PWA (ícones/manifest/sw) servidos sem auth — corrige ícone em branco no "Adicionar à Tela de Início" e install no Windows
   ✓  Gráfico 14 dias interativo no Dashboard — toque/clique na barra mostra as horas do dia + linha de média
+  ✓  Impersonation — super-admin entra em qualquer empresa como admin sem senha, com banner de saída e audit log
+  ✓  Reset senha por super-admin — redefinir senha de qualquer admin/manager de qualquer empresa
+  ✓  Stats detalhadas por tenant — última batida, último login, funcionários activos vs total
+  ✓  Logs globais — audit logs de todas as empresas com filtro por tenant
+  ✓  Plano editável — super-admin muda Free/Standard/Pro/Enterprise por empresa
+  ✓  Confirmação ao desativar empresa — modal com resumo do impacto antes de bloquear acessos
+  ✓  Configurações iniciais na criação — jornada padrão e pausa almoço definidas ao criar empresa
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
 
