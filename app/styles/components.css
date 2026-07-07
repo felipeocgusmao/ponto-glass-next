@@ -114,7 +114,7 @@
   text-align: left; font-weight: 500; font-size: 11.5px; color: var(--fg-muted);
   text-transform: uppercase; letter-spacing: 0.04em;
   padding: 10px 12px; border-bottom: 1px solid var(--divider);
-  background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  background: var(--thead-bg); backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   position: sticky; top: 0; z-index: 1;
 }
@@ -155,7 +155,7 @@
 .filter-pill {
   display: inline-flex; align-items: center; gap: 6px;
   height: 28px; padding: 0 10px; border-radius: var(--r-sm);
-  border: 1px solid var(--border); background: var(--surface);
+  border: 1px solid var(--border); background: var(--field-bg);
   font-size: 12.5px; color: var(--fg-muted); white-space: nowrap;
 }
 .filter-pill:hover { background: var(--hover); color: var(--fg); }
@@ -164,7 +164,7 @@
 .filter-pill.active { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-soft-fg); }
 .input {
   height: 30px; padding: 0 10px; font-size: 13px;
-  border: 1px solid var(--border); background: var(--surface);
+  border: 1px solid var(--border); background: var(--field-bg);
   border-radius: var(--r-sm); outline: none; color: var(--fg);
 }
 .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -244,7 +244,7 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 /* ─── Segmented control ─── */
 .seg { display: inline-flex; background: var(--surface-2); padding: 2px; border-radius: var(--r-sm); border: 1px solid var(--border); }
 .seg button { padding: 4px 10px; font-size: 12px; font-weight: 500; color: var(--fg-muted); border-radius: 4px; }
-.seg button.active { background: var(--surface); color: var(--fg); box-shadow: var(--shadow-sm); }
+.seg button.active { background: var(--raised-bg); color: var(--fg); box-shadow: var(--shadow-sm); }
 
 /* ─── Grid helpers ─── */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
