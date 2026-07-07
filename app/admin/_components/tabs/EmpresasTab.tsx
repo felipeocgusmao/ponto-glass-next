@@ -451,16 +451,17 @@ export function EmpresasTab() {
       <div style={{ marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input
           className="input input-glass"
-          style={{ height: 34, flex: '1 1 200px', minWidth: 180, maxWidth: 280 }}
+          style={{ height: 34, flex: '1 1 220px', minWidth: 180, maxWidth: 320 }}
           placeholder="Filtrar empresa ou slug…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 200, maxWidth: 360 }}>
+        <div style={{ position: 'relative', flex: '1 1 260px', minWidth: 220, maxWidth: 440 }}>
           <input
             className="input input-glass"
             style={{ height: 34, width: '100%' }}
-            placeholder="Pesquisar funcionário em todas as empresas…"
+            placeholder="Pesquisar funcionário…"
+            title="Pesquisar funcionário em todas as empresas"
             value={globalSearch}
             onChange={e => handleGlobalSearch(e.target.value)}
           />
