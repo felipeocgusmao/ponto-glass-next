@@ -37,6 +37,12 @@
   --hover-strong: rgba(0,0,0,0.06);
   --border: #e8e8eb;
   --border-strong: #d4d4d8;
+  /* Internal content separators (table rows, section headers inside a card,
+     drawer/modal head rules) — much softer than --border, which stays for
+     interactive-element outlines (buttons, inputs, chips) that need a
+     visible edge for affordance. This one should read as a whisper, not a
+     boundary, on glass surfaces (#requested: "linhas dividindo tudo"). */
+  --divider: rgba(15,17,24,0.06);
   --fg: #18181b;
   --fg-muted: #52525b;
   --fg-subtle: #a1a1aa;
@@ -95,6 +101,7 @@
   --hover-strong: rgba(255,255,255,0.07);
   --border: #232428;
   --border-strong: #2e2f34;
+  --divider: rgba(255,255,255,0.06);
   --fg: #ededed;
   --fg-muted: #a3a3a7;
   --fg-subtle: #71717a;

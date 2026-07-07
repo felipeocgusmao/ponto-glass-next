@@ -166,20 +166,22 @@
 .notif-pop {
   position: absolute; top: calc(100% + 6px); right: 0;
   width: 320px; max-width: calc(100vw - 24px);
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-md); box-shadow: var(--shadow-lg);
+  background: var(--glass-bg-panel); border: 1px solid var(--glass-border-panel);
+  border-radius: var(--r-md); box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
   z-index: 70; overflow: hidden;
 }
 .notif-head {
   display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px; border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
+  padding: 10px 12px; border-bottom: 1px solid var(--divider);
+  background: var(--glass-bg-panel);
 }
 .notif-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
 .notif-item {
   display: flex; align-items: flex-start; gap: 10px;
   padding: 10px 12px; border: none; background: none;
-  text-align: left; cursor: pointer; border-bottom: 1px solid var(--border);
+  text-align: left; cursor: pointer; border-bottom: 1px solid var(--divider);
   color: var(--fg); width: 100%;
 }
 .notif-item:last-child { border-bottom: none; }
