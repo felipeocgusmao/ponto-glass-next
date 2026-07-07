@@ -123,16 +123,16 @@
   --shadow-pop: 0 4px 12px rgba(0,0,0,0.5), 0 0 0 1px var(--border);
 
   /* Glass surfaces (dark) — blur/saturate inherit from :root. */
-  --glass-bg: rgba(255,255,255,0.05);
-  --glass-border: rgba(255,255,255,0.08);
-  --glass-bg-sidebar: rgba(255,255,255,0.04);
-  --glass-bg-bar: rgba(255,255,255,0.04);
-  --glass-bg-drawer: rgba(13,14,16,0.68);   --glass-border-drawer: rgba(255,255,255,0.07);
-  --glass-bg-cmdk: rgba(19,20,23,0.68);     --glass-border-cmdk: rgba(255,255,255,0.07);
-  --glass-bg-panel: rgba(13,14,16,0.78);    --glass-border-panel: rgba(255,255,255,0.07);
-  --glass-highlight: rgba(255,255,255,0.08);
+  --glass-bg: rgba(255,255,255,0.08);
+  --glass-border: rgba(255,255,255,0.14);
+  --glass-bg-sidebar: rgba(255,255,255,0.06);
+  --glass-bg-bar: rgba(255,255,255,0.06);
+  --glass-bg-drawer: rgba(13,14,16,0.6);    --glass-border-drawer: rgba(255,255,255,0.12);
+  --glass-bg-cmdk: rgba(19,20,23,0.6);      --glass-border-cmdk: rgba(255,255,255,0.12);
+  --glass-bg-panel: rgba(13,14,16,0.7);     --glass-border-panel: rgba(255,255,255,0.12);
+  --glass-highlight: rgba(255,255,255,0.14);
   --glass-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 14px 30px -20px rgba(0,0,0,0.6);
-  --glass-highlight-pointer: rgba(255,255,255,0.14);
+  --glass-highlight-pointer: rgba(255,255,255,0.2);
 }
 
 /* accent overrides */

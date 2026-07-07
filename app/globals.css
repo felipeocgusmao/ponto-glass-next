@@ -8,16 +8,16 @@ html, body { height: 100%; }
 /* Background gradient blobs — visible through glassy surfaces */
 html {
   background:
-    radial-gradient(ellipse 62% 50% at 10% 15%, rgba(94,106,210,0.48) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 60% at 90% 100%, rgba(124,58,237,0.36) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 30% at 55% 50%, rgba(8,145,178,0.24) 0%, transparent 65%),
+    radial-gradient(ellipse 75% 75% at 10% 10%, rgba(94,106,210,0.48) 0%, transparent 72%),
+    radial-gradient(ellipse 70% 85% at 90% 100%, rgba(124,58,237,0.36) 0%, transparent 72%),
+    radial-gradient(ellipse 60% 55% at 55% 55%, rgba(8,145,178,0.24) 0%, transparent 68%),
     var(--bg);
 }
 html[data-theme="dark"] {
   background:
-    radial-gradient(ellipse 62% 50% at 10% 15%, rgba(124,140,248,0.45) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 60% at 90% 100%, rgba(167,139,250,0.35) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 30% at 52% 48%, rgba(34,211,238,0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 75% 75% at 10% 10%, rgba(124,140,248,0.5) 0%, transparent 72%),
+    radial-gradient(ellipse 70% 85% at 90% 100%, rgba(167,139,250,0.4) 0%, transparent 72%),
+    radial-gradient(ellipse 60% 55% at 52% 52%, rgba(34,211,238,0.22) 0%, transparent 68%),
     #08090b;
 }
 
