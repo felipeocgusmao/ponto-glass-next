@@ -75,8 +75,13 @@ export function EmpresasTab() {
   // Impersonation
   const [impersonating, setImpersonating] = useState<string | null>(null)
 
-  // Search
+  // Company search (filter by name/slug)
   const [search, setSearch] = useState('')
+
+  // Global employee search
+  const [globalSearch, setGlobalSearch] = useState('')
+  const [globalResults, setGlobalResults] = useState<{ id: string; name: string; username: string; role: string; active: boolean; tenant: { name: string; slug: string } | null }[]>([])
+  const [globalSearching, setGlobalSearching] = useState(false)
 
   // Reset password
   const [resetTarget, setResetTarget] = useState<TenantRow | null>(null)
@@ -395,6 +400,15 @@ export function EmpresasTab() {
   const activeTenants = filteredTenants.filter(t => t.active)
   const inactiveTenants = filteredTenants.filter(t => !t.active)
 
+  const handleGlobalSearch = async (q: string) => {
+    setGlobalSearch(q)
+    if (q.trim().length < 2) { setGlobalResults([]); return }
+    setGlobalSearching(true)
+    const res = await fetch(`/api/tenants/search?q=${encodeURIComponent(q)}`)
+    if (res.ok) setGlobalResults(await res.json())
+    setGlobalSearching(false)
+  }
+
   function HealthBadges({ health, trialDaysLeft }: { health: TenantHealth; trialDaysLeft: number | null }) {
     const issues = []
     if (health.sem_admin) issues.push({ label: 'Sem admin', color: 'var(--err-fg, #c53030)' })
@@ -433,15 +447,56 @@ export function EmpresasTab() {
         </div>
       </div>
 
-      {/* Search */}
-      <div style={{ marginBottom: 12 }}>
+      {/* Search bar */}
+      <div style={{ marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input
           className="input"
-          style={{ height: 34, maxWidth: 320 }}
-          placeholder="Pesquisar empresa ou slug…"
+          style={{ height: 34, maxWidth: 280 }}
+          placeholder="Filtrar empresa ou slug…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
+          <input
+            className="input"
+            style={{ height: 34, width: '100%' }}
+            placeholder="Pesquisar funcionário em todas as empresas…"
+            value={globalSearch}
+            onChange={e => handleGlobalSearch(e.target.value)}
+          />
+          {(globalSearching || globalResults.length > 0) && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+              background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', marginTop: 4,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 300, overflowY: 'auto',
+            }}>
+              {globalSearching && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--fg-muted)' }}>A pesquisar…</div>}
+              {!globalSearching && globalResults.length === 0 && globalSearch.length >= 2 && (
+                <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--fg-muted)' }}>Sem resultados.</div>
+              )}
+              {globalResults.map(r => (
+                <div key={r.id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontWeight: 600 }}>{r.name}</span>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{r.username}</span>
+                    <span className="chip" style={{ fontSize: 10 }}>{r.role}</span>
+                    {!r.active && <span style={{ fontSize: 10, color: 'var(--fg-muted)' }}>inactivo</span>}
+                  </div>
+                  {r.tenant && (
+                    <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
+                      {r.tenant.name} <span className="mono">({r.tenant.slug})</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {globalResults.length > 0 && (
+                <div style={{ padding: '6px 14px' }}>
+                  <button className="btn ghost sm" onClick={() => { setGlobalSearch(''); setGlobalResults([]) }} style={{ fontSize: 11 }}>Fechar</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* KPIs */}

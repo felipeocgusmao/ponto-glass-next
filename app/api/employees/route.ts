@@ -119,5 +119,52 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await logAudit(actor, 'employee_create', { id: data.id, name: data.name }, { role })
+
+  // Notify platform super-admins when a company hits its plan limit after this insert
+  const newActiveCount = (activeCount ?? 0) + 1
+  if (Number.isFinite(limit) && newActiveCount >= limit) {
+    try {
+      const { data: tenantData } = await supabase.from('tenants').select('name, plan').eq('id', actor.tenant_id).single()
+      const { DEFAULT_TENANT_ID } = await import('@/lib/tenant')
+      // Log in the platform tenant so super-admins see it in their global logs
+      await supabase.from('audit_logs').insert({
+        tenant_id: DEFAULT_TENANT_ID,
+        actor_id: null,
+        actor_name: 'Sistema',
+        action: 'plan_limit_reached',
+        target_name: tenantData?.name ?? actor.tenant_id,
+        details: { tenant_id: actor.tenant_id, plan: tenantData?.plan, limit, active_count: newActiveCount },
+      })
+      // Push notification to active super-admins
+      const { data: superAdmins } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('tenant_id', DEFAULT_TENANT_ID)
+        .eq('super_admin', true)
+        .eq('active', true)
+      if (superAdmins?.length) {
+        const { data: subs } = await supabase
+          .from('push_subscriptions')
+          .select('subscription')
+          .in('employee_id', superAdmins.map(sa => sa.id))
+        if (subs?.length) {
+          const webpush = (await import('web-push')).default
+          if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+            webpush.setVapidDetails(`mailto:${process.env.VAPID_EMAIL}`, process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY)
+            const payload = JSON.stringify({
+              title: '⚠ Limite de plano atingido',
+              body: `"${tenantData?.name ?? 'Empresa'}" atingiu o limite de ${limit} funcionários (plano ${tenantData?.plan ?? ''}).`,
+              tag: 'plan-limit',
+              url: '/admin?tab=empresas',
+            })
+            for (const s of subs) {
+              if (s.subscription) await webpush.sendNotification(s.subscription as Parameters<typeof webpush.sendNotification>[0], payload).catch(() => {})
+            }
+          }
+        }
+      }
+    } catch { /* non-fatal — limit notification must not block the employee creation response */ }
+  }
+
   return NextResponse.json(data, { status: 201 })
 }

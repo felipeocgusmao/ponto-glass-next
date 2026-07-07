@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { isValidTenantSlug } from '@/lib/tenant'
 import { employeeLimitFor } from '@/lib/planLimits'
+import { firePlatformWebhook } from '@/lib/platformWebhook'
 
 // Tenant management is platform-operator territory: requires an active admin
 // with the super_admin flag (loaded from the DB on every request, never from
@@ -150,5 +151,11 @@ export async function POST(request: NextRequest) {
   await logAudit(actor, 'tenant_create', { id: tenant.id, name: tenant.name }, {
     slug: tenant.slug, domain: tenant.domain, admin_username: trimmedAdminUsername,
   })
+
+  // Fire platform webhook (non-blocking)
+  firePlatformWebhook('tenant.created', {
+    tenant_id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan,
+  })
+
   return NextResponse.json({ ...tenant, employee_count: 1 }, { status: 201 })
 }

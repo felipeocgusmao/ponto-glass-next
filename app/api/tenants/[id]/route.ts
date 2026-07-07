@@ -5,6 +5,7 @@ import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { DEFAULT_TENANT_ID } from '@/lib/tenant'
+import { firePlatformWebhook } from '@/lib/platformWebhook'
 
 async function requireSuperAdmin(): Promise<ApiUser | null> {
   const token = cookies().get('ponto_token')?.value
@@ -78,6 +79,19 @@ export async function PATCH(
   await logAudit(actor, 'tenant_update', { id: data.id, name: data.name }, {
     fields: Object.keys(updates),
   })
+
+  // Webhook for activation/deactivation events
+  if (updates.active !== undefined) {
+    firePlatformWebhook(data.active ? 'tenant.activated' : 'tenant.deactivated', {
+      tenant_id: data.id, name: data.name, slug: data.slug,
+    })
+  }
+  if (updates.plan !== undefined) {
+    firePlatformWebhook('tenant.plan_changed', {
+      tenant_id: data.id, name: data.name, plan: data.plan,
+    })
+  }
+
   return NextResponse.json(data)
 }
 
