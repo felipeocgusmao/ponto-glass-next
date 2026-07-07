@@ -31,15 +31,29 @@ export async function GET() {
   // Per-tenant HEAD counts instead of shipping every employees/records row just
   // to count them client-side — records grows unbounded (one row per punch),
   // so the old full-table select made this endpoint slower every single day.
-  // Tenant count is small, so 2 count queries per tenant stay cheap.
+  // Tenant count is small, so parallel queries per tenant stay cheap.
   const withCounts = await Promise.all((tenants ?? []).map(async t => {
-    const [emp, rec] = await Promise.all([
+    const [empActive, empTotal, rec, lastPunch, lastLogin] = await Promise.all([
       supabase.from('employees').select('*', { count: 'exact', head: true })
         .eq('tenant_id', t.id).eq('active', true),
+      supabase.from('employees').select('*', { count: 'exact', head: true })
+        .eq('tenant_id', t.id),
       supabase.from('records').select('*', { count: 'exact', head: true })
         .eq('tenant_id', t.id),
+      supabase.from('records').select('timestamp')
+        .eq('tenant_id', t.id).order('timestamp', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('audit_logs').select('created_at')
+        .eq('tenant_id', t.id).eq('action', 'employee_login')
+        .order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
-    return { ...t, employee_count: emp.count ?? 0, record_count: rec.count ?? 0 }
+    return {
+      ...t,
+      employee_count: empActive.count ?? 0,
+      employee_total: empTotal.count ?? 0,
+      record_count: rec.count ?? 0,
+      last_punch_at: lastPunch.data?.timestamp ?? null,
+      last_login_at: lastLogin.data?.created_at ?? null,
+    }
   }))
 
   return NextResponse.json(withCounts, { headers: { 'Cache-Control': 'no-store' } })
@@ -49,7 +63,7 @@ export async function POST(request: NextRequest) {
   const actor = await requireSuperAdmin()
   if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { name, slug, domain, plan, admin_name, admin_username, admin_password } = await request.json()
+  const { name, slug, domain, plan, admin_name, admin_username, admin_password, workday_hours, lunch_break_minutes } = await request.json()
 
   const trimmedName = String(name ?? '').trim()
   if (trimmedName.length < 2 || trimmedName.length > 100)
@@ -85,6 +99,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 })
   }
 
+  const parsedWorkday = workday_hours ? Number(workday_hours) : 8
+  const parsedLunch = lunch_break_minutes ? Number(lunch_break_minutes) : 60
+
   const hash = await bcrypt.hash(admin_password, 10)
   const { error: eErr } = await supabase.from('employees').insert({
     tenant_id: tenant.id,
@@ -92,6 +109,8 @@ export async function POST(request: NextRequest) {
     username: trimmedAdminUsername,
     password_hash: hash,
     role: 'admin',
+    workday_hours: isNaN(parsedWorkday) ? 8 : parsedWorkday,
+    lunch_break_minutes: isNaN(parsedLunch) ? 60 : parsedLunch,
   })
   if (eErr) {
     // Roll the tenant back rather than leaving an unreachable shell behind.

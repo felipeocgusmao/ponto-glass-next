@@ -11,6 +11,7 @@ import TopBar from './_components/TopBar'
 import CommandPalette from './_components/CommandPalette'
 import SettingsModal from './_components/SettingsModal'
 import MissingExitBanner from './_components/MissingExitBanner'
+import ImpersonationBanner from './_components/ImpersonationBanner'
 import { ErrorBoundary } from '@/app/_components/ErrorBoundary'
 // Eagerly loaded — these are the default landing tabs for admin and manager roles.
 import { MeuPontoTab } from './_components/tabs/MeuPontoTab'
@@ -269,6 +270,7 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
           notifItems={notifItems}
         />
         <div className="page" id="main-content">
+          <ImpersonationBanner />
           {!isPlatformOnly && <MissingExitBanner />}
           <ErrorBoundary>
             {tab === 'meu_ponto'    && <MeuPontoTab user={user} />}
