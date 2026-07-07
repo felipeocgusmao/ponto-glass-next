@@ -22,7 +22,7 @@ export async function PATCH(
   const actor = await requireSuperAdmin()
   if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { name, domain, plan, active } = await request.json()
+  const { name, domain, plan, active, trial_ends_at } = await request.json()
   const updates: Record<string, unknown> = {}
 
   // slug is deliberately immutable: it's the company's URL — changing it would
@@ -46,6 +46,11 @@ export async function PATCH(
     updates.plan = String(plan).trim() || 'standard'
   }
 
+  if (trial_ends_at !== undefined) {
+    // null = remove trial (permanent plan); ISO string = set/extend trial
+    updates.trial_ends_at = trial_ends_at === null ? null : new Date(trial_ends_at).toISOString()
+  }
+
   if (active !== undefined) {
     // Deactivating the default tenant would lock the platform operators out
     // (they live in it) — refuse.
@@ -61,7 +66,7 @@ export async function PATCH(
     .from('tenants')
     .update(updates)
     .eq('id', params.id)
-    .select('id, name, slug, domain, plan, active, created_at')
+    .select('id, name, slug, domain, plan, active, created_at, trial_ends_at')
     .single()
   if (error || !data) {
     const msg = error && /duplicate|unique/i.test(error.message)

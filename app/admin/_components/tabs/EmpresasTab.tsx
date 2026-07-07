@@ -3,8 +3,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Tenant } from '@/lib/types'
 import { IconBuilding, IconUserPlus, IconUsers, IconPulse } from '../icons'
-import { limitLabel } from '@/lib/planLimits'
+import { limitLabel, PLANS } from '@/lib/planLimits'
 import { Modal } from '../Modal'
+
+type TenantHealth = {
+  sem_admin: boolean
+  sem_actividade_30d: boolean
+  limite_atingido: boolean
+  trial_expirado: boolean
+}
 
 type TenantRow = Tenant & {
   employee_count: number
@@ -12,6 +19,9 @@ type TenantRow = Tenant & {
   record_count: number
   last_punch_at: string | null
   last_login_at: string | null
+  trial_days_left: number | null
+  trial_ends_at: string | null
+  health: TenantHealth
 }
 
 type AdminRow = { id: string; name: string; username: string; active: boolean }
@@ -20,8 +30,6 @@ const inputStyle = { height: 34 } as const
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_TENANT_ROOT_DOMAIN ?? ''
 const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
-
-const PLANS = ['free', 'standard', 'pro', 'enterprise'] as const
 
 function tenantUrl(t: { slug: string; domain: string | null }): string {
   if (t.domain) return `https://${t.domain}`
@@ -67,12 +75,33 @@ export function EmpresasTab() {
   // Impersonation
   const [impersonating, setImpersonating] = useState<string | null>(null)
 
+  // Search
+  const [search, setSearch] = useState('')
+
   // Reset password
   const [resetTarget, setResetTarget] = useState<TenantRow | null>(null)
   const [resetAdmins, setResetAdmins] = useState<AdminRow[]>([])
   const [resetEmployeeId, setResetEmployeeId] = useState('')
   const [resetPassword, setResetPassword] = useState('')
   const [resetting, setResetting] = useState(false)
+
+  // Manage admins
+  const [adminsTarget, setAdminsTarget] = useState<TenantRow | null>(null)
+  const [adminsList, setAdminsList] = useState<(AdminRow & { role: string })[]>([])
+  const [newAdminName, setNewAdminName] = useState('')
+  const [newAdminUsername, setNewAdminUsername] = useState('')
+  const [newAdminPassword, setNewAdminPassword] = useState('')
+  const [newAdminRole, setNewAdminRole] = useState('admin')
+  const [creatingAdmin, setCreatingAdmin] = useState(false)
+  const [togglingAdmin, setTogglingAdmin] = useState<string | null>(null)
+
+  // Trial management
+  const [trialTarget, setTrialTarget] = useState<TenantRow | null>(null)
+  const [trialDays, setTrialDays] = useState('14')
+  const [savingTrial, setSavingTrial] = useState(false)
+
+  // Export
+  const [exporting, setExporting] = useState<string | null>(null)
 
   // Audit logs
   const [showAudit, setShowAudit] = useState(false)
@@ -287,9 +316,103 @@ export function EmpresasTab() {
     finally { setSpinningOff(false) }
   }
 
+  const openAdmins = async (t: TenantRow) => {
+    setAdminsTarget(t); setNewAdminName(''); setNewAdminUsername(''); setNewAdminPassword(''); setNewAdminRole('admin'); setErr('')
+    const res = await fetch(`/api/tenants/${t.id}/admins`)
+    if (res.ok) setAdminsList(await res.json())
+  }
+
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!adminsTarget) return
+    setCreatingAdmin(true); setErr('')
+    const res = await fetch(`/api/tenants/${adminsTarget.id}/admins`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newAdminName, username: newAdminUsername, password: newAdminPassword, role: newAdminRole }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setErr(data.error ?? 'Erro ao criar admin'); setCreatingAdmin(false); return }
+    setAdminsList(prev => [...prev, data])
+    setNewAdminName(''); setNewAdminUsername(''); setNewAdminPassword('')
+    setCreatingAdmin(false)
+    flash('Admin criado com sucesso.')
+  }
+
+  const handleToggleAdmin = async (employeeId: string, active: boolean) => {
+    if (!adminsTarget) return
+    setTogglingAdmin(employeeId)
+    const res = await fetch(`/api/tenants/${adminsTarget.id}/admins`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employee_id: employeeId, active }),
+    })
+    if (res.ok) setAdminsList(prev => prev.map(a => a.id === employeeId ? { ...a, active } : a))
+    setTogglingAdmin(null)
+  }
+
+  const handleSetTrial = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!trialTarget) return
+    setSavingTrial(true); setErr('')
+    const days = Number(trialDays)
+    const trialEndsAt = days > 0
+      ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+      : null
+    const res = await fetch(`/api/tenants/${trialTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trial_ends_at: trialEndsAt }),
+    })
+    if (res.ok) {
+      setTrialTarget(null)
+      flash(trialEndsAt ? `Trial definido para ${days} dias.` : 'Trial removido.')
+      await load()
+    }
+    setSavingTrial(false)
+  }
+
+  const handleExport = async (t: TenantRow) => {
+    setExporting(t.id)
+    try {
+      const res = await fetch(`/api/tenants/${t.id}/export`)
+      if (!res.ok) { setErr('Erro ao exportar'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `export-${t.slug}-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch { setErr('Erro de conexão') }
+    finally { setExporting(null) }
+  }
+
   const defaultTenant = tenants.find(t => t.id === DEFAULT_TENANT_ID)
-  const activeTenants = tenants.filter(t => t.active)
-  const inactiveTenants = tenants.filter(t => !t.active)
+  const filteredTenants = search.trim()
+    ? tenants.filter(t => t.name.toLowerCase().includes(search.toLowerCase()) || t.slug.includes(search.toLowerCase()))
+    : tenants
+  const activeTenants = filteredTenants.filter(t => t.active)
+  const inactiveTenants = filteredTenants.filter(t => !t.active)
+
+  function HealthBadges({ health, trialDaysLeft }: { health: TenantHealth; trialDaysLeft: number | null }) {
+    const issues = []
+    if (health.sem_admin) issues.push({ label: 'Sem admin', color: 'var(--err-fg, #c53030)' })
+    if (health.trial_expirado) issues.push({ label: 'Trial expirado', color: 'var(--err-fg, #c53030)' })
+    if (health.limite_atingido) issues.push({ label: 'Limite atingido', color: '#d97706' })
+    if (health.sem_actividade_30d) issues.push({ label: 'Inactivo 30d', color: '#6b7280' })
+    if (trialDaysLeft !== null && trialDaysLeft <= 3) issues.push({ label: `Trial: ${trialDaysLeft}d`, color: '#d97706' })
+    if (issues.length === 0) return null
+    return (
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+        {issues.map(i => (
+          <span key={i.label} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: `color-mix(in srgb, ${i.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${i.color} 30%, transparent)`, color: i.color, fontWeight: 600 }}>
+            {i.label}
+          </span>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -310,6 +433,17 @@ export function EmpresasTab() {
         </div>
       </div>
 
+      {/* Search */}
+      <div style={{ marginBottom: 12 }}>
+        <input
+          className="input"
+          style={{ height: 34, maxWidth: 320 }}
+          placeholder="Pesquisar empresa ou slug…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <div className="kpi">
@@ -327,7 +461,7 @@ export function EmpresasTab() {
       </div>
 
       {ok && <div className="alert-inline ok" style={{ marginBottom: 12 }}>{ok}</div>}
-      {err && !editing && !resetTarget && !deleteTarget && !deactivateTarget && (
+      {err && !editing && !resetTarget && !deleteTarget && !deactivateTarget && !adminsTarget && !trialTarget && (
         <div className="alert-inline err" style={{ marginBottom: 12 }}>{err}<button onClick={() => setErr('')} style={{ marginLeft: 8, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 'inherit' }}>×</button></div>
       )}
 
@@ -395,9 +529,15 @@ export function EmpresasTab() {
                          className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)', textDecoration: 'none' }}>
                         {tenantUrl(t)}
                       </a>
+                      {t.health && <HealthBadges health={t.health} trialDaysLeft={t.trial_days_left ?? null} />}
                     </td>
                     <td>
-                      <span className="chip" style={{ fontSize: 11 }}>{t.plan}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span className="chip" style={{ fontSize: 11 }}>{t.plan}</span>
+                        {t.trial_days_left !== null && t.trial_days_left > 0 && (
+                          <span style={{ fontSize: 10, color: '#d97706' }}>Trial: {t.trial_days_left}d</span>
+                        )}
+                      </div>
                     </td>
                     <td className="tnum" style={{ textAlign: 'right' }} title={`${t.employee_count} activos / ${t.employee_total} total`}>
                       {t.employee_count} <span style={{ color: 'var(--fg-subtle)', fontSize: 11 }}>/ {limitLabel(t.plan)}</span>
@@ -409,24 +549,17 @@ export function EmpresasTab() {
                       <button className="btn ghost sm" onClick={() => openEdit(t)}>Editar</button>
                       {t.id !== DEFAULT_TENANT_ID && (
                         <>
-                          <button
-                            className="btn ghost sm"
-                            disabled={impersonating === t.id}
-                            onClick={() => handleImpersonate(t)}
-                            style={{ marginLeft: 6 }}
-                            title="Entrar como admin desta empresa"
-                          >
+                          <button className="btn ghost sm" disabled={impersonating === t.id} onClick={() => handleImpersonate(t)} style={{ marginLeft: 6 }} title="Entrar como admin desta empresa">
                             {impersonating === t.id ? '…' : 'Entrar como'}
                           </button>
-                          <button className="btn ghost sm" onClick={() => openReset(t)} style={{ marginLeft: 6 }}>
-                            Reset senha
+                          <button className="btn ghost sm" onClick={() => openAdmins(t)} style={{ marginLeft: 6 }}>Admins</button>
+                          <button className="btn ghost sm" onClick={() => openReset(t)} style={{ marginLeft: 6 }}>Reset senha</button>
+                          <button className="btn ghost sm" onClick={() => openAudit(t.id)} style={{ marginLeft: 6 }}>Logs</button>
+                          <button className="btn ghost sm" disabled={exporting === t.id} onClick={() => handleExport(t)} style={{ marginLeft: 6 }}>
+                            {exporting === t.id ? '…' : 'Export'}
                           </button>
-                          <button className="btn ghost sm" onClick={() => openAudit(t.id)} style={{ marginLeft: 6 }}>
-                            Logs
-                          </button>
-                          <button className="btn ghost sm" onClick={() => { setDeactivateTarget(t); setErr('') }} style={{ marginLeft: 6 }}>
-                            Desativar
-                          </button>
+                          <button className="btn ghost sm" onClick={() => { setTrialTarget(t); setTrialDays(String(t.trial_days_left ?? 14)); setErr('') }} style={{ marginLeft: 6 }}>Trial</button>
+                          <button className="btn ghost sm" onClick={() => { setDeactivateTarget(t); setErr('') }} style={{ marginLeft: 6 }}>Desativar</button>
                         </>
                       )}
                       {t.id === DEFAULT_TENANT_ID && (
@@ -697,6 +830,81 @@ export function EmpresasTab() {
               </div>
             )}
           </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: Gerir admins ── */}
+      {adminsTarget && (
+        <Modal title={`Admins — ${adminsTarget.name}`} onClose={() => { setAdminsTarget(null); setErr('') }} width={580}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {err && <div className="alert-inline err">{err}</div>}
+            <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+              <table className="table" style={{ width: '100%', fontSize: 12 }}>
+                <thead><tr><th>Nome</th><th>Usuário</th><th>Cargo</th><th>Estado</th><th></th></tr></thead>
+                <tbody>
+                  {adminsList.map(a => (
+                    <tr key={a.id}>
+                      <td style={{ fontWeight: 600 }}>{a.name}</td>
+                      <td className="mono" style={{ fontSize: 11 }}>{a.username}</td>
+                      <td><span className="chip" style={{ fontSize: 10 }}>{a.role}</span></td>
+                      <td><span style={{ fontSize: 11, color: a.active ? 'var(--ok-fg, #2ea043)' : 'var(--fg-muted)' }}>{a.active ? 'Activo' : 'Inactivo'}</span></td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button className="btn ghost sm" disabled={togglingAdmin === a.id} onClick={() => handleToggleAdmin(a.id, !a.active)}>
+                          {togglingAdmin === a.id ? '…' : a.active ? 'Desativar' : 'Ativar'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {adminsList.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--fg-muted)', padding: 16 }}>Nenhum admin encontrado.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-muted)', marginBottom: 10 }}>Criar novo admin</div>
+              <form onSubmit={handleCreateAdmin} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+                  <div className="field"><label>Nome</label><input className="input" style={inputStyle} value={newAdminName} onChange={e => setNewAdminName(e.target.value)} required /></div>
+                  <div className="field"><label>Usuário</label><input className="input" style={inputStyle} value={newAdminUsername} onChange={e => setNewAdminUsername(e.target.value)} autoCapitalize="none" required /></div>
+                  <div className="field"><label>Senha (mín. 6)</label><input className="input" style={inputStyle} type="password" value={newAdminPassword} onChange={e => setNewAdminPassword(e.target.value)} minLength={6} required /></div>
+                  <div className="field">
+                    <label>Cargo</label>
+                    <select className="input" style={inputStyle} value={newAdminRole} onChange={e => setNewAdminRole(e.target.value)}>
+                      <option value="admin">Admin</option>
+                      <option value="manager">Manager</option>
+                    </select>
+                  </div>
+                </div>
+                <button type="submit" className="btn primary sm" disabled={creatingAdmin} style={{ alignSelf: 'flex-start' }}>
+                  {creatingAdmin ? 'A criar…' : 'Criar admin'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: Trial ── */}
+      {trialTarget && (
+        <Modal title={`Trial — ${trialTarget.name}`} onClose={() => { setTrialTarget(null); setErr('') }} width={380}>
+          <form onSubmit={handleSetTrial} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {err && <div className="alert-inline err">{err}</div>}
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.6 }}>
+              {trialTarget.trial_days_left !== null && trialTarget.trial_days_left > 0
+                ? <>Trial activo: <strong>{trialTarget.trial_days_left} dias restantes</strong>.</>
+                : trialTarget.trial_ends_at
+                  ? <span style={{ color: 'var(--err-fg)' }}>Trial <strong>expirado</strong>.</span>
+                  : 'Sem trial activo.'
+              }
+            </div>
+            <div className="field">
+              <label>Dias de trial (0 = remover trial)</label>
+              <input className="input" style={inputStyle} type="number" min={0} max={365} value={trialDays} onChange={e => setTrialDays(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" className="btn primary sm" disabled={savingTrial}>{savingTrial ? '…' : 'Aplicar'}</button>
+              <button type="button" className="btn ghost sm" onClick={() => setTrialTarget(null)}>Cancelar</button>
+            </div>
+          </form>
         </Modal>
       )}
 

@@ -21,7 +21,7 @@ export async function verifyApiAuth(token: string): Promise<ApiUser> {
   // phase-5 (or multi-tenancy) migrations yet, so revocation keeps working there.
   let row = await supabase
     .from('employees')
-    .select('active, sessions_valid_from, tenant_id, super_admin, tenant:tenants(active)')
+    .select('active, sessions_valid_from, tenant_id, super_admin, tenant:tenants(active, trial_ends_at)')
     .eq('id', user.id)
     .maybeSingle()
   if (row.error) {
@@ -48,27 +48,24 @@ export async function verifyApiAuth(token: string): Promise<ApiUser> {
   // scope. If a token were forged with a different tenant_id (would require
   // leaking JWT_SECRET), the DB value still wins and limits the blast radius
   // to whatever the actual employee row allows.
-  const fields = data as { tenant_id?: string; super_admin?: boolean; tenant?: { active?: boolean } | null }
+  const fields = data as { tenant_id?: string; super_admin?: boolean; tenant?: { active?: boolean; trial_ends_at?: string | null } | null }
   const tenantId = fields.tenant_id ?? user.tenant_id ?? DEFAULT_TENANT_ID
   const superAdmin = fields.super_admin === true
 
-  // Deactivating a company must cut its employees' access immediately — not
-  // 30 days later when their cookie expires (#256). Super admins are exempt
-  // (platform operators keep access regardless of any company's state), and
-  // the default tenant can't be deactivated. The flag normally arrives via the
-  // embed above; the separate query only remains for the fallback select (no
-  // embed), and a failed lookup degrades to allowing, like everything else here.
   if (!superAdmin && tenantId !== DEFAULT_TENANT_ID) {
     let tenantActive = fields.tenant?.active
+    let trialEndsAt = fields.tenant?.trial_ends_at
     if (fields.tenant === undefined) {
       const { data: tenant, error: tenantErr } = await supabase
         .from('tenants')
-        .select('active')
+        .select('active, trial_ends_at')
         .eq('id', tenantId)
         .maybeSingle()
       tenantActive = tenantErr ? undefined : tenant?.active
+      trialEndsAt = tenantErr ? undefined : tenant?.trial_ends_at
     }
     if (tenantActive === false) throw new Error('Tenant inactive')
+    if (trialEndsAt && new Date(trialEndsAt) < new Date()) throw new Error('Trial expired')
   }
 
   return {
