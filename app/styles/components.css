@@ -294,7 +294,7 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
   backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
   -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
 }
-.cmdk-input { width: 100%; height: 48px; padding: 0 16px; font-size: 14px; background: transparent; border: 0; border-bottom: 1px solid var(--border); outline: none; color: var(--fg); }
+.cmdk-input { width: 100%; height: 48px; padding: 0 16px; font-size: 14px; background: transparent; border: 0; border-bottom: 1px solid var(--divider); outline: none; color: var(--fg); }
 .cmdk-list { max-height: 360px; overflow: auto; padding: 6px; }
 .cmdk-section { padding: 6px 10px 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-subtle); font-weight: 600; }
 .cmdk-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: var(--r-sm); font-size: 13px; color: var(--fg); cursor: pointer; }
@@ -371,17 +371,17 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 /* Respect the OS "reduce transparency" setting: drop the blur and paint opaque
    surfaces so text never sits on a low-contrast frosted background. */
 @media (prefers-reduced-transparency: reduce) {
-  .card, .kpi, .drawer, .cmdk, .modal-glass-panel, .chip, .sidebar, .topbar {
+  .card, .kpi, .drawer, .cmdk, .modal-glass-panel, .chip, .sidebar, .topbar, .notif-pop, .login-modal {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
   }
-  .card, .kpi, .drawer, .cmdk, .modal-glass-panel, .sidebar, .topbar {
+  .card, .kpi, .drawer, .cmdk, .modal-glass-panel, .sidebar, .topbar, .notif-pop, .login-modal {
     background: var(--surface) !important;
   }
 }
 /* Browsers without backdrop-filter at all → same opaque fallback. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .card, .kpi, .drawer, .cmdk, .modal-glass-panel, .sidebar, .topbar {
+  .card, .kpi, .drawer, .cmdk, .modal-glass-panel, .sidebar, .topbar, .notif-pop, .login-modal {
     background: var(--surface) !important;
   }
 }

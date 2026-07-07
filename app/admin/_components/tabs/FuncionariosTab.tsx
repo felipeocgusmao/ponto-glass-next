@@ -135,7 +135,7 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
         </div>
 
         {showCreate && (
-          <div className="card-body" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="card-body" style={{ borderBottom: '1px solid var(--divider)' }}>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div className="form-grid-2">
                 <div className="field">
@@ -191,7 +191,7 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
           {!loading && templates.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {templates.map(tmpl => (
-                <div key={tmpl.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div key={tmpl.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{tmpl.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
@@ -310,7 +310,7 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
           <option value="disabled">{t('emp.geo.disabled')}</option>
         </select>
       </div>
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 2 }}>
+      <div style={{ borderTop: '1px solid var(--divider)', paddingTop: 10, marginTop: 2 }}>
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 8 }}>{t('emp.schedule')}</div>
         <div className="form-grid-2">
           <div className="field">

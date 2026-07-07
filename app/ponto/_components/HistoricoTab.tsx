@@ -179,7 +179,7 @@ export const HistoricoTab = memo(function HistoricoTab({
             if (type === 'absent') {
               const dt = new Date(date + 'T12:00:00')
               return (
-                <div key={`absent-${date}`} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={`absent-${date}`} style={{ padding: '12px 0', borderBottom: '1px solid var(--divider)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-muted)', textTransform: 'capitalize' }}>
                     {dt.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
                   </span>
@@ -193,7 +193,7 @@ export const HistoricoTab = memo(function HistoricoTab({
             const dt = new Date(date + 'T12:00:00')
             const isToday = date === today
             return (
-              <div key={date} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+              <div key={date} style={{ padding: '12px 0', borderBottom: '1px solid var(--divider)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div>
                     <span style={{ fontSize: 13, fontWeight: 600, color: isToday ? 'var(--accent)' : 'var(--fg)', textTransform: 'capitalize' }}>

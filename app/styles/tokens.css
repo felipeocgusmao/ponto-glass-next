@@ -80,13 +80,13 @@
   --glass-blur-bar: 20px;      --glass-saturate-bar: 1.6; /* topbar */
   --glass-blur-sm: 10px;       --glass-saturate-sm: 1.4;  /* chips */
   --glass-bg: rgba(255,255,255,0.32);
-  --glass-border: rgba(255,255,255,0.8);
+  --glass-border: rgba(255,255,255,0.5);
   --glass-bg-sidebar: rgba(248,248,250,0.45);
   --glass-bg-bar: rgba(250,250,252,0.52);
-  --glass-bg-drawer: rgba(255,255,255,0.5);    --glass-border-drawer: rgba(255,255,255,0.5);
-  --glass-bg-cmdk: rgba(252,252,253,0.5);      --glass-border-cmdk: rgba(255,255,255,0.55);
-  --glass-bg-panel: rgba(252,252,253,0.6);     --glass-border-panel: rgba(255,255,255,0.7);
-  --glass-highlight: rgba(255,255,255,0.9);    /* inset top specular line (#215) */
+  --glass-bg-drawer: rgba(255,255,255,0.45);   --glass-border-drawer: rgba(255,255,255,0.45);
+  --glass-bg-cmdk: rgba(252,252,253,0.45);     --glass-border-cmdk: rgba(255,255,255,0.45);
+  --glass-bg-panel: rgba(252,252,253,0.5);     --glass-border-panel: rgba(255,255,255,0.5);
+  --glass-highlight: rgba(255,255,255,0.75);   /* inset top specular line (#215) */
   --glass-shadow: 0 1px 3px rgba(15,17,24,0.12), 0 10px 28px -18px rgba(15,17,24,0.3); /* card elevation (#216) */
   --glass-highlight-pointer: rgba(255,255,255,0.8); /* pointer-following radial highlight (#217) */
 }
@@ -129,15 +129,19 @@
   --shadow-lg: 0 24px 48px -12px rgba(0,0,0,0.65), 0 8px 16px -8px rgba(0,0,0,0.45);
   --shadow-pop: 0 4px 12px rgba(0,0,0,0.5), 0 0 0 1px var(--border);
 
-  /* Glass surfaces (dark) — blur/saturate inherit from :root. */
+  /* Glass surfaces (dark) — blur/saturate inherit from :root.
+     Panels (modal/drawer/cmdk) use the same translucent-white recipe as the
+     cards: the old near-black rgba(13,14,16,0.6-0.7) bases read as flat matte
+     ("fundo fosco") over an already-dark page instead of glass. A slightly
+     higher white alpha than the cards keeps overlaid text legible. */
   --glass-bg: rgba(255,255,255,0.08);
-  --glass-border: rgba(255,255,255,0.14);
+  --glass-border: rgba(255,255,255,0.08);
   --glass-bg-sidebar: rgba(255,255,255,0.06);
   --glass-bg-bar: rgba(255,255,255,0.06);
-  --glass-bg-drawer: rgba(13,14,16,0.6);    --glass-border-drawer: rgba(255,255,255,0.12);
-  --glass-bg-cmdk: rgba(19,20,23,0.6);      --glass-border-cmdk: rgba(255,255,255,0.12);
-  --glass-bg-panel: rgba(13,14,16,0.7);     --glass-border-panel: rgba(255,255,255,0.12);
-  --glass-highlight: rgba(255,255,255,0.14);
+  --glass-bg-drawer: rgba(255,255,255,0.08);   --glass-border-drawer: rgba(255,255,255,0.08);
+  --glass-bg-cmdk: rgba(255,255,255,0.08);     --glass-border-cmdk: rgba(255,255,255,0.08);
+  --glass-bg-panel: rgba(255,255,255,0.09);    --glass-border-panel: rgba(255,255,255,0.09);
+  --glass-highlight: rgba(255,255,255,0.10);
   --glass-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 14px 30px -20px rgba(0,0,0,0.6);
   --glass-highlight-pointer: rgba(255,255,255,0.2);
 }

@@ -53,7 +53,7 @@ function LoginSessionsSection() {
         const ua = s.user_agent.length > 44 ? s.user_agent.slice(0, 44) + '…' : s.user_agent
         const date = new Date(s.created_at).toLocaleString(LANG_TO_LOCALE[lang], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
         return (
-          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--divider)', fontSize: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg)', fontSize: 10.5 }}>{date} · {s.ip}</div>
               <div style={{ color: 'var(--fg-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{ua}</div>

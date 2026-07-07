@@ -130,7 +130,7 @@ export function FeriadosTab() {
               <>
                 <SL>{exceptions.length} {t('common.records')}</SL>
                 {exceptions.map(exc => (
-                  <div key={exc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div key={exc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--divider)' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{exc.description}</div>
                       <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>

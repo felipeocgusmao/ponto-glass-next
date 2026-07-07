@@ -222,7 +222,7 @@ function BulkModal({ employees, onClose, onCreated }: {
         width: '100%', maxWidth: 540, maxHeight: '90vh', overflowY: 'auto',
         display: 'flex', flexDirection: 'column', gap: 0,
       }}>
-        <div className="card-head" style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--surface)' }}>
+        <div className="card-head" style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--glass-bg)', backdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))', WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(var(--glass-saturate))' }}>
           <div className="card-title">{t('reg.bulk_title')}</div>
           <button onClick={onClose} className="btn ghost sm">✕</button>
         </div>
@@ -565,7 +565,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
             ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {[0,1,2,3,4].map(i => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--divider)' }}>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <div className="skeleton skeleton-title" style={{ width: '35%' }} />
                       <div className="skeleton skeleton-text" style={{ width: '50%' }} />
@@ -617,7 +617,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                     const isCommenting = commentingId === r.id
                     return (
                       <div key={r.id}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: isEditing || isCommenting ? 'none' : '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: isEditing || isCommenting ? 'none' : '1px solid var(--divider)' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{empName(r)}</div>
                             <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 3 }}>
@@ -646,7 +646,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                           </div>
                         </div>
                         {isCommenting && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
                             <input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder={t('reg.add_comment')} maxLength={500} className="input" style={{ flex: 1, fontSize: 13 }} />
                             <button onClick={() => handleSaveComment(r.id)} disabled={commentSaving} className="btn primary sm">
                               {commentSaving ? '…' : 'OK'}
@@ -655,7 +655,7 @@ export function RegistrosTab({ employees }: { employees: Employee[] }) {
                           </div>
                         )}
                         {isEditing && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
                             <input type="datetime-local" value={editTs} onChange={e => setEditTs(e.target.value)} className="input" style={{ flex: 1, fontSize: 13 }} />
                             <button onClick={() => handleEdit(r.id)} disabled={editSaving} className="btn primary sm">
                               {editSaving ? '…' : 'OK'}

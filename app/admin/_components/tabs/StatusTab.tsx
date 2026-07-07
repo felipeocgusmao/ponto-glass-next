@@ -294,7 +294,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                       <div style={{ fontSize: 12, color: msg.kind === 'success' ? 'var(--success-fg)' : 'var(--danger-fg)' }}>{msg.text}</div>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 6, padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                  <div style={{ display: 'flex', gap: 6, padding: '10px 14px', borderTop: '1px solid var(--divider)', background: 'var(--surface-2)' }}>
                     <button
                       onClick={() => handlePunch(emp, isIn ? 'saída' : 'entrada')}
                       disabled={punching === emp.id}

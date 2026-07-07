@@ -48,7 +48,7 @@ export default function DemoPage() {
       {/* Nav */}
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 32px', borderBottom: '1px solid var(--border)',
+        padding: '16px 32px', borderBottom: '1px solid var(--divider)',
         background: 'var(--surface)',
       }}>
         <Link href="/" style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.3px', color: 'var(--accent)', textDecoration: 'none' }}>
@@ -160,7 +160,7 @@ export default function DemoPage() {
 
         {/* Footer links */}
         <div style={{
-          paddingTop: 24, borderTop: '1px solid var(--border)',
+          paddingTop: 24, borderTop: '1px solid var(--divider)',
           display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center',
         }}>
           <Link href="/" style={{ color: 'var(--fg-muted)', textDecoration: 'none', fontSize: 14 }}>

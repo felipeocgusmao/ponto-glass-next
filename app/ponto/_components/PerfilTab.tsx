@@ -46,7 +46,7 @@ export const PerfilTab = memo(function PerfilTab({
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 16 }}>
         {t('profile.info')}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '12px 0', borderBottom: '1px solid var(--divider)' }}>
         <div className={`avatar size-30 av-c${(user.id.charCodeAt(0) % 8) + 1}`}>{user.name.split(' ').slice(0,2).map(w=>w[0]?.toUpperCase()??'').join('')}</div>
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{user.name}</div>
@@ -123,10 +123,10 @@ export const PerfilTab = memo(function PerfilTab({
           <button className="btn-emp primary-big" onClick={changePassword} disabled={pwdSaving || !pwdCurrent || !pwdNext}>
             {pwdSaving ? t('pwd.saving') : t('pwd.save')}
           </button>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
+          <div style={{ borderTop: '1px solid var(--divider)', paddingTop: 12, marginTop: 4 }}>
             <TotpSection />
           </div>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
+          <div style={{ borderTop: '1px solid var(--divider)', paddingTop: 12, marginTop: 4 }}>
             <button
               className="btn-emp"
               style={{ width: '100%', justifyContent: 'center' }}

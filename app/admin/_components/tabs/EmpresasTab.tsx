@@ -477,7 +477,7 @@ export function EmpresasTab() {
                 <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--fg-muted)' }}>Sem resultados.</div>
               )}
               {globalResults.map(r => (
-                <div key={r.id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+                <div key={r.id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--divider)', fontSize: 13 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontWeight: 600 }}>{r.name}</span>
                     <span className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{r.username}</span>
@@ -672,7 +672,7 @@ export function EmpresasTab() {
                   </tbody>
                 </table>
               </div>
-              <div style={{ padding: '8px 16px', fontSize: 11, color: 'var(--fg-muted)', borderTop: '1px solid var(--border)' }}>
+              <div style={{ padding: '8px 16px', fontSize: 11, color: 'var(--fg-muted)', borderTop: '1px solid var(--divider)' }}>
                 &ldquo;Eliminar&rdquo; disponível apenas para empresas sem registos de ponto.
               </div>
             </div>
@@ -916,7 +916,7 @@ export function EmpresasTab() {
                 </tbody>
               </table>
             </div>
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+            <div style={{ borderTop: '1px solid var(--divider)', paddingTop: 14 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-muted)', marginBottom: 10 }}>Criar novo admin</div>
               <form onSubmit={handleCreateAdmin} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>

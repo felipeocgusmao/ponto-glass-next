@@ -164,7 +164,7 @@ export function AusenciasTab({ employees }: Props) {
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--divider)' }}>
                     <th style={{ textAlign: 'left', padding: '6px 0', fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('aus.col.emp')}</th>
                     <th style={{ textAlign: 'center', padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('aus.col.absences')}</th>
                     <th style={{ textAlign: 'center', padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('aus.col.late')}</th>
@@ -173,7 +173,7 @@ export function AusenciasTab({ employees }: Props) {
                 </thead>
                 <tbody>
                   {rows.map(row => (
-                    <tr key={row.employee_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <tr key={row.employee_id} style={{ borderBottom: '1px solid var(--divider)' }}>
                       <td style={{ padding: '10px 0', fontWeight: 500 }}>{row.employee_name}</td>
                       <td style={{ textAlign: 'center', padding: '10px 8px' }}>
                         {row.absences > 0
