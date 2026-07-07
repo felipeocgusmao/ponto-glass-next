@@ -73,16 +73,16 @@
   --glass-blur-lg: 40px;       --glass-saturate-lg: 2.2; /* drawer, cmdk, modal */
   --glass-blur-bar: 20px;      --glass-saturate-bar: 1.6; /* topbar */
   --glass-blur-sm: 10px;       --glass-saturate-sm: 1.4;  /* chips */
-  --glass-bg: rgba(255,255,255,0.52);
-  --glass-border: var(--border);
-  --glass-bg-sidebar: rgba(248,248,250,0.68);
-  --glass-bg-bar: rgba(250,250,252,0.75);
-  --glass-bg-drawer: rgba(255,255,255,0.72);   --glass-border-drawer: rgba(255,255,255,0.25);
-  --glass-bg-cmdk: rgba(252,252,253,0.72);     --glass-border-cmdk: rgba(255,255,255,0.3);
-  --glass-bg-panel: rgba(252,252,253,0.82);    --glass-border-panel: rgba(255,255,255,0.45);
-  --glass-highlight: rgba(255,255,255,0.55);   /* inset top specular line (#215) */
-  --glass-shadow: 0 1px 3px rgba(15,17,24,0.05), 0 10px 28px -18px rgba(15,17,24,0.14); /* card elevation (#216) */
-  --glass-highlight-pointer: rgba(255,255,255,0.45); /* pointer-following radial highlight (#217) */
+  --glass-bg: rgba(255,255,255,0.42);
+  --glass-border: rgba(255,255,255,0.65);
+  --glass-bg-sidebar: rgba(248,248,250,0.58);
+  --glass-bg-bar: rgba(250,250,252,0.65);
+  --glass-bg-drawer: rgba(255,255,255,0.62);   --glass-border-drawer: rgba(255,255,255,0.4);
+  --glass-bg-cmdk: rgba(252,252,253,0.62);     --glass-border-cmdk: rgba(255,255,255,0.45);
+  --glass-bg-panel: rgba(252,252,253,0.72);    --glass-border-panel: rgba(255,255,255,0.6);
+  --glass-highlight: rgba(255,255,255,0.75);   /* inset top specular line (#215) */
+  --glass-shadow: 0 1px 3px rgba(15,17,24,0.08), 0 10px 28px -18px rgba(15,17,24,0.2); /* card elevation (#216) */
+  --glass-highlight-pointer: rgba(255,255,255,0.6); /* pointer-following radial highlight (#217) */
 }
 
 [data-theme="dark"] {
