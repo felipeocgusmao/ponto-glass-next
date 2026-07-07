@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { DEFAULT_TENANT_ID } from '@/lib/tenant'
 import { firePlatformWebhook } from '@/lib/platformWebhook'
+import { TENANT_DEPENDENT_TABLES } from '@/lib/tenantDependents'
 
 async function requireSuperAdmin(): Promise<ApiUser | null> {
   const token = cookies().get('ponto_token')?.value
@@ -127,17 +128,19 @@ export async function DELETE(
     }, { status: 400 })
 
   // Delete all dependent rows in safe order before removing the tenant.
-  const dependents = [
-    'push_subscriptions',
-    'correction_requests',
-    'hour_bank_adjustments',
-    'day_exceptions',
-    'records',
-    'employees',
-    'audit_logs',
-  ] as const
-  for (const table of dependents)
-    await supabase.from(table).delete().eq('tenant_id', id)
+  // Delete all dependent rows in FK-safe order before removing the tenant.
+  // The order (and its FK-safety invariant) lives in TENANT_DEPENDENT_TABLES,
+  // guarded by __tests__/tenantDependents.test.ts.
+  for (const table of TENANT_DEPENDENT_TABLES) {
+    const { error } = await supabase.from(table).delete().eq('tenant_id', id)
+    // Don't swallow: a failed child delete leaves the tenant undeletable and the
+    // real cause invisible. Report which table blocked so it's actionable.
+    if (error)
+      return NextResponse.json(
+        { error: `Falha ao eliminar dependências em "${table}": ${error.message}` },
+        { status: 500 },
+      )
+  }
 
   const { error: delErr } = await supabase.from('tenants').delete().eq('id', id)
   if (delErr)

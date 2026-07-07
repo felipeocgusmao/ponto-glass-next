@@ -31,8 +31,20 @@
   --bg: #fafafa;
   --bg-app: #f6f6f7;
   --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --surface-3: #ebebed;
+  /* surface-2/3 are translucent so chips, segmented controls, kbd hints etc.
+     composite over whatever glass they sit on instead of punching opaque
+     gray/black patches into it — the values match the old #f4f4f5/#ebebed
+     when composited over white. */
+  --surface-2: rgba(15,17,24,0.05);
+  --surface-3: rgba(15,17,24,0.09);
+  /* Form controls (inputs, default buttons, filter pills). Opaque white in
+     light mode; translucent in dark so fields read as etched glass instead
+     of black bars on the frosted panels. */
+  --field-bg: #ffffff;
+  --raised-bg: #ffffff; /* seg active pill */
+  /* Sticky table-header backing: high alpha so scrolled rows never ghost
+     through the header text (readability beats transparency here). */
+  --thead-bg: rgba(252,252,253,0.85);
   --hover: rgba(0,0,0,0.035);
   --hover-strong: rgba(0,0,0,0.06);
   --border: #e8e8eb;
@@ -75,10 +87,14 @@
      cards, modals, sidebar and topbar (consumed in components.css / layout.css).
      Foundation for the liquid-glass roadmap (#214). Blur/saturate are
      theme-independent; only the translucent bg/border change per theme. */
-  --glass-blur: 28px;          --glass-saturate: 2.0;   /* cards, KPIs, sidebar */
-  --glass-blur-lg: 40px;       --glass-saturate-lg: 2.2; /* drawer, cmdk, modal */
-  --glass-blur-bar: 20px;      --glass-saturate-bar: 1.6; /* topbar */
-  --glass-blur-sm: 10px;       --glass-saturate-sm: 1.4;  /* chips */
+  /* Saturation is deliberately mild (≤1.45): the old 2.0-2.2 amplified
+     whatever background hue sat behind each region, making the sidebar read
+     electric indigo while cards read teal — surfaces must share one ambient
+     tint (#requested: "padrão nas cores"). */
+  --glass-blur: 28px;          --glass-saturate: 1.35;  /* cards, KPIs, sidebar */
+  --glass-blur-lg: 40px;       --glass-saturate-lg: 1.45; /* drawer, cmdk, modal */
+  --glass-blur-bar: 20px;      --glass-saturate-bar: 1.3; /* topbar */
+  --glass-blur-sm: 10px;       --glass-saturate-sm: 1.2;  /* chips */
   --glass-bg: rgba(255,255,255,0.32);
   --glass-border: rgba(255,255,255,0.5);
   --glass-bg-sidebar: rgba(248,248,250,0.45);
@@ -95,8 +111,11 @@
   --bg: #08090b;
   --bg-app: #0d0e10;
   --surface: #131417;
-  --surface-2: #1a1b1f;
-  --surface-3: #232428;
+  --surface-2: rgba(255,255,255,0.055);
+  --surface-3: rgba(255,255,255,0.095);
+  --field-bg: rgba(255,255,255,0.05);
+  --raised-bg: rgba(255,255,255,0.13);
+  --thead-bg: rgba(26,28,35,0.85);
   --hover: rgba(255,255,255,0.04);
   --hover-strong: rgba(255,255,255,0.07);
   --border: #232428;
