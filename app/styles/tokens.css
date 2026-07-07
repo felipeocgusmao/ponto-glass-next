@@ -61,8 +61,16 @@
   --fg-muted: #52525b;
   --fg-subtle: #a1a1aa;
   --fg-dim: #d4d4d8;
-  --scroll: #d4d4d8;
-  --scroll-hover: #a1a1aa;
+  /* Translucent so the scrollbar reads as a subtle floating pill (macOS-style)
+     over any surface, not a solid gray rail. Paired with a transparent border
+     + background-clip:padding-box in globals.css to thin the visible thumb. */
+  --scroll: rgba(0,0,0,0.20);
+  --scroll-hover: rgba(0,0,0,0.34);
+
+  /* Modal/drawer sticky header backing — high enough alpha to hide content
+     scrolling under it (the translucent 'inherit' backing let the language
+     picker ghost up behind the "Configurações" title). */
+  --modal-head-bg: rgba(252,252,253,0.9);
 
   --accent: #5e6ad2;
   --accent-fg: #ffffff;
@@ -127,8 +135,9 @@
   --fg-muted: #a3a3a7;
   --fg-subtle: #71717a;
   --fg-dim: #3f3f46;
-  --scroll: #2e2f34;
-  --scroll-hover: #4b4c52;
+  --scroll: rgba(255,255,255,0.16);
+  --scroll-hover: rgba(255,255,255,0.30);
+  --modal-head-bg: rgba(20,22,28,0.9);
 
   --accent: #7c8cf8;
   --accent-soft: rgba(124,140,248,0.13);
