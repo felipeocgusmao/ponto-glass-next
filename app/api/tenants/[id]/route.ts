@@ -8,6 +8,17 @@ import { DEFAULT_TENANT_ID } from '@/lib/tenant'
 import { firePlatformWebhook } from '@/lib/platformWebhook'
 import { TENANT_DEPENDENT_TABLES } from '@/lib/tenantDependents'
 
+// A Supabase/PostgREST error that means "this table isn't in the DB". Happens
+// when a deployment hasn't run every migration, so an optional dependent table
+// (kiosk_photos, timesheet_approvals, …) is absent. PGRST205 = schema-cache
+// miss; 42P01 = Postgres undefined_table; the message check is a belt-and-braces
+// fallback in case the code field is ever absent.
+function isMissingTableError(e: { code?: string; message?: string } | null): boolean {
+  if (!e) return false
+  return e.code === 'PGRST205' || e.code === '42P01' ||
+    /could not find the table|does not exist/i.test(e.message ?? '')
+}
+
 async function requireSuperAdmin(): Promise<ApiUser | null> {
   const token = cookies().get('ponto_token')?.value
   if (!token) return null
@@ -127,19 +138,26 @@ export async function DELETE(
       error: 'A empresa tem registos de ponto — não é possível eliminar. Use "Desativar".',
     }, { status: 400 })
 
-  // Delete all dependent rows in safe order before removing the tenant.
   // Delete all dependent rows in FK-safe order before removing the tenant.
   // The order (and its FK-safety invariant) lives in TENANT_DEPENDENT_TABLES,
   // guarded by __tests__/tenantDependents.test.ts.
   for (const table of TENANT_DEPENDENT_TABLES) {
     const { error } = await supabase.from(table).delete().eq('tenant_id', id)
-    // Don't swallow: a failed child delete leaves the tenant undeletable and the
-    // real cause invisible. Report which table blocked so it's actionable.
-    if (error)
+    if (error) {
+      // Some optional tables (kiosk_photos, timesheet_approvals, …) may not
+      // exist in a given deployment because their migration hasn't been applied.
+      // PostgREST surfaces that as PGRST205 / "Could not find the table … in the
+      // schema cache" (Postgres itself: 42P01 undefined_table). A table that
+      // doesn't exist holds no rows referencing this tenant, so skip it rather
+      // than blocking the whole delete on a missing optional dependency.
+      if (isMissingTableError(error)) continue
+      // Don't swallow real failures: a blocked child delete leaves the tenant
+      // undeletable and the cause invisible. Report which table blocked.
       return NextResponse.json(
         { error: `Falha ao eliminar dependências em "${table}": ${error.message}` },
         { status: 500 },
       )
+    }
   }
 
   const { error: delErr } = await supabase.from('tenants').delete().eq('id', id)

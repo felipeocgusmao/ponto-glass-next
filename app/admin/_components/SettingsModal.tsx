@@ -126,8 +126,9 @@ export default function SettingsModal({
         style={{ maxWidth: 480, width: '100%', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: 0, borderRadius: 'var(--r-xl)' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="drawer-head" style={{ position: 'sticky', top: 0, zIndex: 1, background: 'inherit', backdropFilter: 'inherit', WebkitBackdropFilter: 'inherit' }}>
+        {/* Header — solid-ish glass backing so the sections below don't ghost up
+            behind the title as the modal scrolls (`inherit` was translucent). */}
+        <div className="drawer-head" style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--modal-head-bg)', backdropFilter: 'blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg))', WebkitBackdropFilter: 'blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg))' }}>
           <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>{t('settings.title')}</span>
           <button className="btn ghost sm icon" onClick={onClose} title={t('common.close')}>
             <IconX size={14} />
