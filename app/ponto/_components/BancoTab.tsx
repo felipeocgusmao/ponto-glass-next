@@ -60,7 +60,7 @@ export const BancoTab = memo(function BancoTab({
         <div className="alert-inline info">{t('bank.load_error')}</div>
       )}
 
-      <div style={{ borderTop: '1px solid var(--border)', marginTop: 20, paddingTop: 20 }}>
+      <div style={{ borderTop: '1px solid var(--divider)', marginTop: 20, paddingTop: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--fg-subtle)', textTransform: 'uppercase', marginBottom: 14 }}>
           {t('comp.title')}
         </div>
@@ -93,7 +93,7 @@ export const BancoTab = memo(function BancoTab({
               {t('comp.my_requests')}
             </div>
             {compList.map(cr => (
-              <div key={cr.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div key={cr.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--divider)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <span style={{ fontSize: 13, fontWeight: 500 }}>{cr.date.split('-').reverse().join('/')} · {cr.hours_requested}h</span>
                   <span className={`chip ${cr.status === 'approved' ? 'success' : cr.status === 'rejected' ? 'danger' : 'warn'}`} style={{ fontSize: 10 }}>

@@ -169,7 +169,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
       <div className="card">
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[0,1,2].map(i => (
-            <div key={i} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div key={i} style={{ padding: '14px 0', borderBottom: '1px solid var(--divider)', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div className="skeleton skeleton-title" style={{ width: '40%' }} />
               <div className="skeleton skeleton-text" style={{ width: '60%' }} />
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -211,7 +211,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
           )}
 
           {pending.map(cr => (
-            <div key={cr.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+            <div key={cr.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--divider)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{cr.employee_name}</div>
@@ -283,7 +283,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
           <div style={{ padding: '16px 20px' }}>
             <SL>{t('admin.corr.history')}</SL>
             {resolved.map(cr => (
-              <div key={cr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div key={cr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--divider)' }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{cr.employee_name}</div>
                   <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
@@ -319,7 +319,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
             : compPending.length === 0
               ? <div className="alert-inline ok">{t('admin.comp.none_pending')}</div>
               : compPending.map(cr => (
-                <div key={cr.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+                <div key={cr.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--divider)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{cr.employee_name}</div>
@@ -367,7 +367,7 @@ export function CorrecoesTab({ onAction }: { onAction?: () => void }) {
             <>
               <SL style={{ marginTop: 20 }}>{t('admin.comp.history')}</SL>
               {compResolved.map(cr => (
-                <div key={cr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <div key={cr.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--divider)' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{cr.employee_name}</div>
                     <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>

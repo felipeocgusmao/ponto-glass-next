@@ -247,7 +247,7 @@ export function KioskClient({ initialEmployees, initialRecords }: KioskClientPro
 
       <main className="emp-main">
         <div className="emp-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--divider)' }}>
             <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('kiosk.subtitle')}</div>
           </div>
 

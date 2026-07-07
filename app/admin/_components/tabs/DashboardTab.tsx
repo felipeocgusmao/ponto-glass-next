@@ -598,7 +598,7 @@ export function DashboardTab({ employees, initialData }: { employees: Employee[]
               const ci = emp ? empColor(emp.id) : 1
               const time = new Date(r.timestamp).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: BUSINESS_TZ })
               return (
-                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--divider)' }}>
                   <div className={`avatar av-c${ci}`}>{avatarInitials(r.employee_name)}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 500 }}>{r.employee_name}</div>

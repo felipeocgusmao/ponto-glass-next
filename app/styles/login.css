@@ -66,12 +66,15 @@
 .login-alert.ok { background: var(--success-soft); color: var(--success-fg); }
 .login-remember { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--fg-muted); cursor: pointer; user-select: none; }
 .login-remember input { accent-color: var(--accent); }
-.login-footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.login-footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--divider); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .login-secure { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--fg-subtle); }
 .login-modal {
   position: fixed; top: 22vh; left: 50%; transform: translateX(-50%);
-  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-xl);
-  box-shadow: var(--shadow-lg); padding: 24px; width: 90%; max-width: 420px; z-index: 60;
+  background: var(--glass-bg-panel); border: 1px solid var(--glass-border-panel); border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
+  padding: 24px; width: 90%; max-width: 420px; z-index: 60;
   animation: pg-slideUp 0.2s ease;
 }
 @keyframes pg-slideUp { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }

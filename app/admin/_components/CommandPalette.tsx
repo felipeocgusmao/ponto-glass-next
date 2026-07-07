@@ -135,7 +135,7 @@ export default function CommandPalette({
   return (
     <div className="cmdk-overlay" onClick={onClose}>
       <div className="cmdk" onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', borderBottom: '1px solid var(--divider)' }}>
           <IconSearch size={14} />
           <input
             ref={inputRef}

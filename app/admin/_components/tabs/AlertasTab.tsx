@@ -155,7 +155,7 @@ export function AlertasTab() {
               <button className="btn ghost" onClick={load} disabled={loading}>{t('common.cancel')}</button>
             </div>
 
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+            <div style={{ borderTop: '1px solid var(--divider)', paddingTop: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{t('alertas.test_btn')}</div>
               <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>
                 {t('alertas.note_text')}

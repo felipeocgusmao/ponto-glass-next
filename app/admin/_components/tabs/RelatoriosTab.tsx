@@ -48,7 +48,7 @@ function PunctualitySection({ from, to }: { from: string; to: string }) {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--divider)' }}>
                     <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--fg-muted)' }}>Funcionário</th>
                     <th style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--fg-muted)' }}>Esperado</th>
                     <th style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--fg-muted)' }}>Dias</th>
@@ -63,7 +63,7 @@ function PunctualitySection({ from, to }: { from: string; to: string }) {
                     const h = Math.floor(r.avg_late_min / 60)
                     const m = r.avg_late_min % 60
                     return (
-                      <tr key={r.empId} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <tr key={r.empId} style={{ borderBottom: '1px solid var(--divider)' }}>
                         <td style={{ padding: '8px 12px', fontWeight: 500 }}>{r.name}</td>
                         <td style={{ padding: '8px 12px', textAlign: 'center', color: 'var(--fg-muted)' }}>{r.expected_start ?? '—'}</td>
                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>{r.total_days}</td>
@@ -131,7 +131,7 @@ function AbsencesSection({ from, to }: { from: string; to: string }) {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--divider)' }}>
                     <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--fg-muted)' }}>Funcionário</th>
                     <th style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--fg-muted)' }}>Ausências</th>
                     <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--fg-muted)' }}>Dias</th>
@@ -139,7 +139,7 @@ function AbsencesSection({ from, to }: { from: string; to: string }) {
                 </thead>
                 <tbody>
                   {rows.map(r => (
-                    <tr key={r.empId} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <tr key={r.empId} style={{ borderBottom: '1px solid var(--divider)' }}>
                       <td style={{ padding: '8px 12px', fontWeight: 500 }}>{r.name}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                         <span className="chip danger" style={{ fontSize: 11 }}>{r.absent_count}</span>
@@ -473,15 +473,15 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                   </tbody>
                   <tfoot>
                     <tr style={{ background: 'var(--surface-2)', fontWeight: 600 }}>
-                      <td style={{ padding: 12, borderTop: '1px solid var(--border)' }}>Total</td>
-                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--border)' }}>{totals.days}</td>
-                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--border)' }}>{fmtCentesimal(totals.workedMin)}</td>
-                      <td className="right tnum muted" style={{ padding: 12, borderTop: '1px solid var(--border)' }}>{fmtCentesimal(totals.expectedMin)}</td>
-                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--border)', color: totals.overtime >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
+                      <td style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>Total</td>
+                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{totals.days}</td>
+                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{fmtCentesimal(totals.workedMin)}</td>
+                      <td className="right tnum muted" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{fmtCentesimal(totals.expectedMin)}</td>
+                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--divider)', color: totals.overtime >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
                         {fmtCentesimalSigned(totals.overtime)}
                       </td>
-                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--border)' }}>{fmtEur(totals.earnings)}</td>
-                      {view === 'detailed' && <td style={{ borderTop: '1px solid var(--border)' }}></td>}
+                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{fmtEur(totals.earnings)}</td>
+                      {view === 'detailed' && <td style={{ borderTop: '1px solid var(--divider)' }}></td>}
                     </tr>
                   </tfoot>
                 </table>

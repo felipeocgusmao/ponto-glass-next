@@ -117,7 +117,7 @@ export function IntegracoesTab() {
 
       {/* Add form */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13 }}>{t('integ.add_title')}</div>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--divider)', fontWeight: 600, fontSize: 13 }}>{t('integ.add_title')}</div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="field" style={{ marginBottom: 0 }}>
             <label>{t('integ.url_label')} <span style={{ color: 'var(--danger-fg)' }}>*</span></label>
@@ -153,7 +153,7 @@ export function IntegracoesTab() {
 
       {/* Kiosk token */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13 }}>{t('kiosk.admin.title')}</div>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--divider)', fontWeight: 600, fontSize: 13 }}>{t('kiosk.admin.title')}</div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>{t('kiosk.admin.desc')}</div>
           {kioskLoading ? (
@@ -190,7 +190,7 @@ export function IntegracoesTab() {
 
       {/* List */}
       <div className="card">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: 13 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--divider)', fontWeight: 600, fontSize: 13 }}>
           {t('integ.list_title')} {hooks.length > 0 && <span className="chip" style={{ fontSize: 11, marginLeft: 6 }}>{hooks.length}</span>}
         </div>
         {loading ? (
@@ -205,7 +205,7 @@ export function IntegracoesTab() {
         ) : (
           <div style={{ padding: '8px 0' }}>
             {hooks.map(h => (
-              <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--border)' }}>
+              <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--divider)' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)', wordBreak: 'break-all', opacity: h.active ? 1 : 0.5 }}>{h.url}</div>
                   <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>

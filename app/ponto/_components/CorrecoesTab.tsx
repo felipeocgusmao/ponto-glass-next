@@ -88,7 +88,7 @@ export const CorrecoesTab = memo(function CorrecoesTab({
             const dateStr = cr.req_date.split('-').reverse().join('/')
             const timeStr = d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
             return (
-              <div key={cr.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div key={cr.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--divider)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <span style={{ fontSize: 13, fontWeight: 500 }}>{t(`punch.${cr.req_type}` as Parameters<typeof t>[0]) || cr.req_type} · {dateStr} {timeStr}</span>
                   <span className={`chip ${cr.status === 'approved' ? 'success' : cr.status === 'rejected' ? 'danger' : 'warn'}`} style={{ fontSize: 10 }}>
