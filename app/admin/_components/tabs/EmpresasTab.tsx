@@ -450,15 +450,15 @@ export function EmpresasTab() {
       {/* Search bar */}
       <div style={{ marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input
-          className="input"
-          style={{ height: 34, maxWidth: 280 }}
+          className="input input-glass"
+          style={{ height: 34, flex: '1 1 200px', minWidth: 180, maxWidth: 280 }}
           placeholder="Filtrar empresa ou slug…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
+        <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 200, maxWidth: 360 }}>
           <input
-            className="input"
+            className="input input-glass"
             style={{ height: 34, width: '100%' }}
             placeholder="Pesquisar funcionário em todas as empresas…"
             value={globalSearch}
@@ -467,7 +467,8 @@ export function EmpresasTab() {
           {(globalSearching || globalResults.length > 0) && (
             <div style={{
               position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-              background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', marginTop: 4,
+              background: 'var(--glass-bg)', backdropFilter: 'blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg))', WebkitBackdropFilter: 'blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg))',
+              border: '1px solid var(--glass-border)', borderRadius: 'var(--r-md)', marginTop: 4,
               boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 300, overflowY: 'auto',
             }}>
               {globalSearching && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--fg-muted)' }}>A pesquisar…</div>}
