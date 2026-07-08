@@ -126,13 +126,20 @@ export default function SettingsModal({
   return (
     <div
       className="drawer-overlay"
-      style={{ zIndex: 60, display: 'grid', placeItems: 'center', padding: '16px' }}
+      style={{
+        zIndex: 60, display: 'grid', placeItems: 'center',
+        // Keep the panel clear of the notch/status bar and the home indicator —
+        // without this the "Configurações" header collided with the top bar.
+        paddingTop: 'max(16px, calc(env(safe-area-inset-top) + 8px))',
+        paddingBottom: 'max(16px, calc(env(safe-area-inset-bottom) + 8px))',
+        paddingLeft: '16px', paddingRight: '16px',
+      }}
       onClick={onClose}
     >
       <div
         ref={panelRef}
         className="cmdk"
-        style={{ maxWidth: 480, width: '100%', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: 0, borderRadius: 'var(--r-xl)' }}
+        style={{ maxWidth: 480, width: '100%', maxHeight: 'calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom))', overflowY: 'auto', padding: 0, borderRadius: 'var(--r-xl)' }}
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
