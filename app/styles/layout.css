@@ -166,7 +166,7 @@
 .notif-pop {
   position: absolute; top: calc(100% + 6px); right: 0;
   width: 320px; max-width: calc(100vw - 24px);
-  background: var(--glass-bg-panel); border: 1px solid var(--glass-border-panel);
+  background: var(--popover-bg); border: 1px solid var(--glass-border-panel);
   border-radius: var(--r-md); box-shadow: var(--glass-shadow);
   backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
   -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(var(--glass-saturate-lg));
@@ -175,7 +175,7 @@
 .notif-head {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px; border-bottom: 1px solid var(--divider);
-  background: var(--glass-bg-panel);
+  background: transparent;
 }
 .notif-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
 .notif-item {

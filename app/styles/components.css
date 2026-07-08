@@ -216,13 +216,17 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 }
 
 /* ─── Detail drawer ─── */
+/* Scrim behind modals/drawers. The dim is intentionally substantial: with a
+   near-transparent scrim the saturated background blobs bled straight through
+   the frosted panel (e.g. an indigo band behind the settings language row).
+   Muting the background first keeps the panel reading as clean glass. */
 .drawer-overlay {
   position: fixed; inset: 0; z-index: 50; animation: pg-fadeIn 0.15s ease;
-  background: rgba(0,0,0,0.06);
+  background: rgba(0,0,0,0.28);
   backdrop-filter: blur(14px) saturate(1.6);
   -webkit-backdrop-filter: blur(14px) saturate(1.6);
 }
-[data-theme="dark"] .drawer-overlay { background: rgba(0,0,0,0.10); }
+[data-theme="dark"] .drawer-overlay { background: rgba(0,0,0,0.5); }
 @keyframes pg-fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .drawer {
   position: fixed; top: 0; right: 0; bottom: 0; width: 480px; max-width: 92vw;
@@ -282,11 +286,11 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 /* ─── Command palette ─── */
 .cmdk-overlay {
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: flex-start center; padding-top: 14vh;
-  background: rgba(0,0,0,0.06);
+  background: rgba(0,0,0,0.28);
   backdrop-filter: blur(16px) saturate(1.6);
   -webkit-backdrop-filter: blur(16px) saturate(1.6);
 }
-[data-theme="dark"] .cmdk-overlay { background: rgba(0,0,0,0.10); }
+[data-theme="dark"] .cmdk-overlay { background: rgba(0,0,0,0.5); }
 .cmdk {
   width: 100%; max-width: 580px;
   background: var(--glass-bg-cmdk); border: 1px solid var(--glass-border-cmdk);
@@ -326,14 +330,14 @@ html[data-theme="dark"] .status-row:hover { background: rgba(255,255,255,0.06); 
 /* ─── Glass modal (centered) ─── */
 .modal-glass-overlay {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(0,0,0,0.06);
+  background: rgba(0,0,0,0.28);
   backdrop-filter: blur(16px) saturate(1.6);
   -webkit-backdrop-filter: blur(16px) saturate(1.6);
   display: flex; align-items: center; justify-content: center;
   padding: 24px 16px;
   animation: pg-fadeIn 0.15s ease;
 }
-[data-theme="dark"] .modal-glass-overlay { background: rgba(0,0,0,0.14); }
+[data-theme="dark"] .modal-glass-overlay { background: rgba(0,0,0,0.5); }
 .modal-glass-panel {
   background: var(--glass-bg-panel);
   border: 1px solid var(--glass-border-panel);
