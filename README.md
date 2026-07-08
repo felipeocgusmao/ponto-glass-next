@@ -118,7 +118,7 @@ Existe **um URL** e **uma senha**.
 │   PDF         →   jsPDF + jsPDF-AutoTable  (client)     │
 │   Cron        →   Vercel Cron Jobs  (ausência, saída, mensal, semanal, alertas, bank-cap)│
 │   Voz         →   Web Speech API  (reconhecimento + TTS)│
-│   Testes      →   Vitest  (197 unit) + Playwright  (E2E) │
+│   Testes      →   Vitest  (244 unit) + Playwright  (E2E) │
 │   Monitor     →   Sentry  (erros cliente + servidor)    │
 │   Geofencing  →   Haversine  (raio por funcionário)     │
 │   Horas       →   Centesimal  (base 100, quarto de hora)│
@@ -140,7 +140,7 @@ Cada peça foi escolhida com intenção:
 | **Microsoft Graph + SMTP** | Graph API como transporte principal (OAuth Client Credentials), SMTP como fallback automático |
 | **jsPDF + AutoTable** | Geração de PDF no cliente, sem dependências de servidor |
 | **Vercel Cron Jobs** | Tarefas agendadas: alerta de ausência (manhã) e alerta de saída não registada (17h) |
-| **Vitest** | 197 testes unitários: horas, auth, rate limit, geofencing, de-dup, voz, tenancy, TOTP, importação e **enforcement de auth nas rotas** |
+| **Vitest** | 244 testes unitários: horas, auth, rate limit, geofencing, de-dup, voz, tenancy, TOTP, importação e **enforcement de auth nas rotas** |
 | **Playwright** | Testes E2E: acesso à raiz/login, auth, demo, privacidade (robots/noindex) + **fluxos do /ponto** |
 | **Web Speech API** | Reconhecimento de voz (SpeechRecognition) + síntese de fala (TTS) no `/kiosk/glass` |
 | **Sentry** | Captura de erros e source maps automáticos via `withSentryConfig` |
@@ -573,7 +573,7 @@ ponto_glass_next/
 ├── sentry.server.config.ts    ← inicialização Sentry no servidor
 ├── vitest.config.ts           ← configuração Vitest (jsdom, exclui e2e/)
 ├── playwright.config.ts        ← configuração Playwright (E2E, Chromium)
-├── __tests__/                 ← 197 testes unitários (utils, auth, tenancy, totp, employeeImport, punchQueue, enforcement de auth nas rotas…)
+├── __tests__/                 ← 244 testes unitários (utils, auth, tenancy, totp, employeeImport, punchQueue, enforcement de auth nas rotas…)
 ├── e2e/                       ← testes E2E (raiz/login, auth, demo, privacidade, fluxos do /ponto)
 ├── extension/                 ← extensão Chrome MV3 (popup por função, geolocalização offscreen)
 │   ├── manifest.json          ← MV3: host_permissions, background SW, offscreen, ícones
@@ -874,7 +874,7 @@ Mais de 100 funcionalidades entregues — a lista completa fica colapsada para n
   ✓  Comentário em registo (nota livre do admin/gerente, ≤ 500 chars)
   ✓  Aviso de shift_start incomum (alerta amarelo ao configurar turno diurno com horário > 00:00)
   ✓  E-mail via Microsoft Graph API (OAuth Client Credentials) com fallback SMTP automático
-  ✓  Testes Vitest (197 unit: utils, auth, tenancy, TOTP, importação, fila offline, rotas…) + E2E Playwright
+  ✓  Testes Vitest (244 unit: utils, auth, tenancy, TOTP, importação, fila offline, rotas…) + E2E Playwright
   ✓  Monitorização Sentry (cliente + servidor, source maps)
   ✓  Horas centesimais (base 100) com arredondamento ao quarto de hora em relatórios/banco/ganhos
   ✓  Lembrete push de quarto de hora (bater entrada/saída em :00/:15/:30/:45)
@@ -934,6 +934,12 @@ Mais de 100 funcionalidades entregues — a lista completa fica colapsada para n
   ✓  Plano editável — super-admin muda Free/Standard/Pro/Enterprise por empresa
   ✓  Confirmação ao desativar empresa — modal com resumo do impacto antes de bloquear acessos
   ✓  Configurações iniciais na criação — jornada padrão e pausa almoço definidas ao criar empresa
+  ✓  Redesign glass — tom ambiente unificado (sidebar/conteúdo), bordas suaves, cabeçalho de tabela e scrollbar frosted (claro/escuro)
+  ✓  Acessibilidade de diálogos — focus trap, role=dialog, aria-modal e restauração de foco em todos os modais
+  ✓  PWA edge-to-edge no mobile — fundo contínuo até a borda física (sem barra preta no iOS standalone) + shell nativo Android/iOS sob as barras do sistema
+  ✓  color-scheme claro/escuro — dropdowns e controles nativos seguem o tema
+  ✓  Slug auto-derivado do nome + normalização de domínio custom (aceita URL colada); link de acesso da empresa com ?tenant=<slug>
+  ✓  Eliminação de empresa robusta — deleção de dependências em ordem FK-safe + tolerância a tabelas ausentes (migration idempotente para instalações antigas)
   ☐  App móvel nativa (Capacitor ou Expo)                  → issue #58
 ```
 
@@ -951,7 +957,7 @@ Mais de 100 funcionalidades entregues — a lista completa fica colapsada para n
 - [`docs/TENANTS.md`](docs/TENANTS.md) — multi-tenancy: subdomínio por slug, domínio custom, DNS e fases
 - [`extension/README.md`](extension/README.md) — extensão Chrome: arquitetura, geolocalização offscreen e instalação
 - [`extension/STORE.md`](extension/STORE.md) — publicação na Chrome Web Store: listagem, permissões e privacidade
-- [`supabase/schema.sql`](supabase/schema.sql) — schema completo + migrações v1→v13 (multi-tenancy fases 1 + 3)
+- [`supabase/schema.sql`](supabase/schema.sql) — schema completo + migrações datadas em `supabase/migrations/` (multi-tenancy, super-admin, TOTP, compensação, trial, tabelas em falta em produção)
 - [`.env.example`](.env.example) — todas as variáveis com comentários e instruções
 
 <br/>
