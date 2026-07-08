@@ -45,6 +45,7 @@ const CorrecoesTab  = dynamic(() => import('./_components/tabs/CorrecoesTab').th
 const EmpresasTab   = dynamic(() => import('./_components/tabs/EmpresasTab').then(m => ({ default: m.EmpresasTab })), { loading: TabSkeleton })
 const AlertasTab    = dynamic(() => import('./_components/tabs/AlertasTab').then(m => ({ default: m.AlertasTab })), { loading: TabSkeleton })
 const IntegracoesTab = dynamic(() => import('./_components/tabs/IntegracoesTab').then(m => ({ default: m.IntegracoesTab })), { loading: TabSkeleton })
+const AjustesTab    = dynamic(() => import('./_components/tabs/AjustesTab').then(m => ({ default: m.AjustesTab })), { loading: TabSkeleton })
 const AusenciasTab   = dynamic(() => import('./_components/tabs/AusenciasTab').then(m => ({ default: m.AusenciasTab })), { loading: TabSkeleton })
 
 interface AdminClientProps {
@@ -294,6 +295,7 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
             {tab === 'empresas'     && user.super_admin === true && <EmpresasTab />}
             {tab === 'alertas'      && user.role === 'admin' && <AlertasTab />}
             {tab === 'integracoes'  && user.role === 'admin' && <IntegracoesTab />}
+            {tab === 'ajustes'      && user.role === 'admin' && <AjustesTab />}
           </ErrorBoundary>
         </div>
       </div>

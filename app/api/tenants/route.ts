@@ -117,9 +117,20 @@ export async function POST(request: NextRequest) {
   // lets them explore all features before committing.
   const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
 
+  const parsedWorkday = workday_hours ? Number(workday_hours) : 8
+  const parsedLunch = lunch_break_minutes ? Number(lunch_break_minutes) : 60
+  const safeWorkday = isNaN(parsedWorkday) ? 8 : parsedWorkday
+  const safeLunch = isNaN(parsedLunch) ? 60 : parsedLunch
+
   const { data: tenant, error: tErr } = await supabase
     .from('tenants')
-    .insert({ name: trimmedName, slug, domain: trimmedDomain, plan: chosenPlan, trial_ends_at: trialEndsAt })
+    .insert({
+      name: trimmedName, slug, domain: trimmedDomain, plan: chosenPlan, trial_ends_at: trialEndsAt,
+      // Persist the "Configurações padrão" from the create form as the company
+      // default journey, so the Empresa settings tab and new-employee form
+      // reflect what was chosen at creation.
+      alert_settings: { default_workday_hours: safeWorkday, default_lunch_break_minutes: safeLunch },
+    })
     .select('id, name, slug, domain, plan, active, created_at, trial_ends_at')
     .single()
   if (tErr) {
@@ -129,9 +140,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 })
   }
 
-  const parsedWorkday = workday_hours ? Number(workday_hours) : 8
-  const parsedLunch = lunch_break_minutes ? Number(lunch_break_minutes) : 60
-
   const hash = await bcrypt.hash(admin_password, 10)
   const { error: eErr } = await supabase.from('employees').insert({
     tenant_id: tenant.id,
@@ -139,8 +147,8 @@ export async function POST(request: NextRequest) {
     username: trimmedAdminUsername,
     password_hash: hash,
     role: 'admin',
-    workday_hours: isNaN(parsedWorkday) ? 8 : parsedWorkday,
-    lunch_break_minutes: isNaN(parsedLunch) ? 60 : parsedLunch,
+    workday_hours: safeWorkday,
+    lunch_break_minutes: safeLunch,
   })
   if (eErr) {
     // Roll the tenant back rather than leaving an unreachable shell behind.

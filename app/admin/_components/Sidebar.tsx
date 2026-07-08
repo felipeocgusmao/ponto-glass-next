@@ -24,6 +24,7 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   relatorios:   <IconBar />,
   auditoria:    <IconAudit />,
   empresas:     <IconBuilding />,
+  ajustes:      <IconBuilding />,
   alertas:      <IconBell />,
   integracoes:  <IconSettings />,
 }
@@ -47,7 +48,7 @@ const NAV_GROUPS: { key: string; labels: Record<Lang, string>; tabs: Tab[] }[] =
   {
     key: 'sistema',
     labels: { 'pt-PT': 'Sistema', 'pt-BR': 'Sistema', 'en': 'System', 'es': 'Sistema' },
-    tabs: ['alertas', 'integracoes'],
+    tabs: ['ajustes', 'alertas', 'integracoes'],
   },
   {
     key: 'plataforma',

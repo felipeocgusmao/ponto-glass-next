@@ -33,6 +33,7 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
   relatorios:   <IconBar size={15} />,
   auditoria:    <IconAudit size={15} />,
   empresas:     <IconBuilding size={15} />,
+  ajustes:      <IconBuilding size={15} />,
   alertas:      <IconBell size={15} />,
   integracoes:  <IconSettings size={15} />,
 }
