@@ -123,6 +123,9 @@ export function EmpresasTab() {
   // Create form
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
+  // Auto-derive the slug from the name until the user edits the slug by hand,
+  // so they never have to fill it (or paste a URL into) it themselves.
+  const [slugTouched, setSlugTouched] = useState(false)
   const [domain, setDomain] = useState('')
   const [adminName, setAdminName] = useState('')
   const [adminUsername, setAdminUsername] = useState('')
@@ -176,7 +179,7 @@ export function EmpresasTab() {
       const data = await res.json()
       if (!res.ok) { setErr(data.error ?? 'Erro ao criar empresa'); return }
       const createdUsername = adminUsername.trim().toLowerCase()
-      setName(''); setSlug(''); setDomain(''); setAdminName(''); setAdminUsername(''); setAdminPassword('')
+      setName(''); setSlug(''); setSlugTouched(false); setDomain(''); setAdminName(''); setAdminUsername(''); setAdminPassword('')
       setWorkdayHours('8'); setLunchMinutes('60')
       setShowCreate(false)
       setCreated({ tenant: data, adminUsername: createdUsername, url: tenantUrl(data) })
@@ -447,7 +450,7 @@ export function EmpresasTab() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn ghost sm" onClick={() => openAudit()}>Logs globais</button>
-          <button className="btn primary" onClick={() => { setShowCreate(true); setErr('') }}>
+          <button className="btn primary" onClick={() => { setShowCreate(true); setErr(''); setName(''); setSlug(''); setSlugTouched(false) }}>
             <IconUserPlus size={13} /> Nova empresa
           </button>
         </div>
@@ -694,11 +697,11 @@ export function EmpresasTab() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
               <div className="field">
                 <label>Nome</label>
-                <input className="input" style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Empresa A" required autoFocus />
+                <input className="input" style={inputStyle} value={name} onChange={e => { setName(e.target.value); if (!slugTouched) setSlug(slugifyTenantInput(e.target.value)) }} placeholder="Empresa A" required autoFocus />
               </div>
               <div className="field">
                 <label>Slug (subdomínio)</label>
-                <input className="input" style={inputStyle} value={slug} onChange={e => setSlug(e.target.value)} onBlur={e => setSlug(slugifyTenantInput(e.target.value))} placeholder="empresa-a" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required />
+                <input className="input" style={inputStyle} value={slug} onChange={e => { setSlugTouched(true); setSlug(e.target.value) }} onBlur={e => setSlug(slugifyTenantInput(e.target.value))} placeholder="gerado do nome" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required />
               </div>
               <div className="field">
                 <label>Domínio custom (opcional)</label>
