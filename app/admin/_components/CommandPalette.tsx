@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useLang } from '@/lib/LangContext'
+import { useFocusTrap } from '@/lib/useFocusTrap'
 import type { Tab } from '../_lib/types'
 import {
   IconClock, IconDashboard, IconStatus, IconList, IconUsers,
@@ -55,6 +56,7 @@ export default function CommandPalette({
   const [query, setQuery] = useState('')
   const [sel, setSel] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const panelRef = useFocusTrap<HTMLDivElement>(open)
 
   useEffect(() => {
     if (open) {
@@ -134,7 +136,7 @@ export default function CommandPalette({
 
   return (
     <div className="cmdk-overlay" onClick={onClose}>
-      <div className="cmdk" onClick={e => e.stopPropagation()}>
+      <div ref={panelRef} className="cmdk" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Paleta de comandos" tabIndex={-1}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', borderBottom: '1px solid var(--divider)' }}>
           <IconSearch size={14} />
           <input
