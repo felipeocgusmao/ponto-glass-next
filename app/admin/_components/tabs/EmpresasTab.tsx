@@ -35,7 +35,12 @@ const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 function tenantUrl(t: { slug: string; domain: string | null }): string {
   if (t.domain) return `https://${t.domain}`
   if (ROOT_DOMAIN) return `https://${t.slug}.${ROOT_DOMAIN}`
-  if (typeof window !== 'undefined') return window.location.origin
+  if (typeof window !== 'undefined')
+    // No per-tenant host (no custom domain / subdomain): login resolves the
+    // company from the ?tenant=<slug> query, so this link works from the main
+    // URL. Without the query it would hit the default tenant and the company's
+    // admin couldn't sign in.
+    return `${window.location.origin}/login?tenant=${encodeURIComponent(t.slug)}`
   return ''
 }
 

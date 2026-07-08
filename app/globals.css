@@ -10,26 +10,30 @@ html, body { height: 100%; }
    under the sidebar) picks up a saturated hue the rest of the page lacks. The
    goal is one soft ambient wash, not three distinct colour zones
    (#requested: "padrão nas cores, sem diferença drástica"). */
-/* Painted on BOTH html and body. In an iOS standalone PWA the home-indicator
-   safe area at the bottom is painted with the BODY's background; a transparent
-   body there falls back to the window default (black) — the persistent
-   "barra preta embaixo". Giving body the same ambient wash as html makes the
-   app reach the physical screen edge as one continuous surface. */
-html, body {
+/* Solid base colour on html AND body so any safe-area / overscroll region is
+   the app's base tone, never a black fallback (iOS standalone paints the
+   home-indicator area with the body background). */
+html, body { background-color: var(--bg); }
+html[data-theme="dark"], html[data-theme="dark"] body { background-color: #08090b; }
+
+/* The ambient gradient wash is a SINGLE fixed, full-viewport layer behind
+   everything — not painted on html+body separately, which left a visible seam
+   between the scrollable content and the bottom safe area on iOS. One surface =
+   continuous edge-to-edge, no division. pointer-events:none so it never eats
+   taps; z-index:-1 keeps it behind the app; the scroll container is a separate
+   element so this fixed layer never repaints on scroll. */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
     radial-gradient(ellipse 120% 110% at 12% 0%, rgba(94,106,210,0.20) 0%, transparent 60%),
     radial-gradient(ellipse 120% 110% at 92% 100%, rgba(124,58,237,0.16) 0%, transparent 62%),
-    radial-gradient(ellipse 100% 90% at 50% 50%, rgba(8,145,178,0.08) 0%, transparent 70%),
-    var(--bg);
-  background-attachment: fixed;
+    radial-gradient(ellipse 100% 90% at 50% 50%, rgba(8,145,178,0.08) 0%, transparent 70%);
 }
-html[data-theme="dark"], html[data-theme="dark"] body {
+html[data-theme="dark"] body::before {
   background:
     radial-gradient(ellipse 120% 110% at 12% 0%, rgba(124,140,248,0.20) 0%, transparent 60%),
     radial-gradient(ellipse 120% 110% at 92% 100%, rgba(167,139,250,0.15) 0%, transparent 62%),
-    radial-gradient(ellipse 100% 90% at 50% 50%, rgba(34,211,238,0.07) 0%, transparent 70%),
-    #08090b;
-  background-attachment: fixed;
+    radial-gradient(ellipse 100% 90% at 50% 50%, rgba(34,211,238,0.07) 0%, transparent 70%);
 }
 
 /* ─── Mobile performance ─── On phones the glass is expensive: a fixed
@@ -43,7 +47,6 @@ html[data-theme="dark"], html[data-theme="dark"] body {
     --glass-blur: 16px;      --glass-blur-lg: 22px;
     --glass-blur-bar: 12px;  --glass-blur-sm: 6px;
   }
-  html, body, html[data-theme="dark"], html[data-theme="dark"] body { background-attachment: scroll; }
   .chip { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
