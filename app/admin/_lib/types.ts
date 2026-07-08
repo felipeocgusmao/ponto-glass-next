@@ -2,7 +2,7 @@
 
 import type { PunchRecord, DayException } from '@/lib/types'
 
-export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes' | 'empresas' | 'alertas' | 'integracoes' | 'ausencias'
+export type Tab = 'meu_ponto' | 'status' | 'registros' | 'funcionarios' | 'relatorios' | 'dashboard' | 'auditoria' | 'banco' | 'feriados' | 'correcoes' | 'empresas' | 'alertas' | 'integracoes' | 'ausencias' | 'ajustes'
 
 // Server-fetched payload for the dashboard's first paint, so the landing tab
 // renders with data in the initial HTML instead of behind a client fetch wave.
@@ -33,6 +33,7 @@ export const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'relatorios',   label: 'Relatório'    },
   { id: 'alertas',      label: 'Alertas'      },
   { id: 'integracoes',  label: 'Integrações'  },
+  { id: 'ajustes',      label: 'Empresa'      },
   { id: 'auditoria',    label: 'Auditoria'    },
 ]
 

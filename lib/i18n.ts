@@ -22,6 +22,7 @@ const t = {
     'tab.auditoria':    'Auditoria',
     'tab.empresas':     'Empresas',
     'tab.alertas':      'Alertas',
+    'tab.ajustes':      'Empresa',
     'tab.integracoes':  'Integrações',
 
     // ── Common ───────────────────────────────────────────────────────────
@@ -709,6 +710,7 @@ const t = {
     'tab.auditoria':    'Auditoria',
     'tab.empresas':     'Empresas',
     'tab.alertas':      'Alertas',
+    'tab.ajustes':      'Empresa',
     'tab.integracoes':  'Integrações',
 
     'common.save':      'Salvar',
@@ -1345,6 +1347,7 @@ const t = {
     'tab.auditoria':    'Audit',
     'tab.empresas':     'Companies',
     'tab.alertas':      'Alerts',
+    'tab.ajustes':      'Company',
     'tab.integracoes':  'Integrations',
 
     'common.save':      'Save',
@@ -1981,6 +1984,7 @@ const t = {
     'tab.auditoria':    'Auditoría',
     'tab.empresas':     'Empresas',
     'tab.alertas':      'Alertas',
+    'tab.ajustes':      'Empresa',
     'tab.integracoes':  'Integraciones',
 
     'common.save':      'Guardar',

@@ -48,6 +48,19 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
 
   useEffect(() => { load() }, [])
 
+  // Pre-fill the new-employee journey from the company default (Empresa tab),
+  // so a freshly-created company's defaults flow through without retyping.
+  useEffect(() => {
+    fetch('/api/tenant-settings')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d) return
+        if (d.default_workday_hours != null) setWorkdayHours(String(d.default_workday_hours))
+        if (d.default_lunch_break_minutes != null) setLunchMin(String(d.default_lunch_break_minutes))
+      })
+      .catch(() => {})
+  }, [])
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setCreating(true)
     try {

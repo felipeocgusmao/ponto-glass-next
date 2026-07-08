@@ -36,11 +36,11 @@ export default function OnboardingBanner({ employeeCount, onNavigate }: Onboardi
       action: null,
     },
     {
-      done: employeeCount > 1,
-      label: 'Configurar jornada da equipa',
-      desc: 'Define horas/dia e pausa de almoço ao adicionar funcionários (ou em modelos de turno).',
-      action: () => onNavigate('funcionarios'),
-      actionLabel: 'Ir para Equipe',
+      done: false,
+      label: 'Configurar jornada padrão',
+      desc: 'Define horas/dia e pausa de almoço aplicados a novos funcionários.',
+      action: () => onNavigate('ajustes'),
+      actionLabel: 'Abrir Empresa',
     },
     {
       done: employeeCount > 1,
