@@ -277,7 +277,6 @@ export function AdminClient({ initialUser, initialEmployees, initialPendingCorre
             <OnboardingBanner
               employeeCount={employees.length}
               onNavigate={navigateTab}
-              onOpenSettings={() => setShowSettings(true)}
             />
           )}
           <ErrorBoundary>
