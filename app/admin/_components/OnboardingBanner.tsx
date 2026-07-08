@@ -8,12 +8,11 @@ const STORAGE_KEY = 'pg.onboarding-dismissed'
 interface OnboardingBannerProps {
   employeeCount: number
   onNavigate: (tab: Tab) => void
-  onOpenSettings: () => void
 }
 
 // Shown to admins who just set up their account and have no team yet.
 // Dismissed permanently via localStorage.
-export default function OnboardingBanner({ employeeCount, onNavigate, onOpenSettings }: OnboardingBannerProps) {
+export default function OnboardingBanner({ employeeCount, onNavigate }: OnboardingBannerProps) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -37,11 +36,11 @@ export default function OnboardingBanner({ employeeCount, onNavigate, onOpenSett
       action: null,
     },
     {
-      done: false,
-      label: 'Configurar jornada padrão',
-      desc: 'Define horas/dia, pausa de almoço e fuso horário.',
-      action: () => onOpenSettings(),
-      actionLabel: 'Abrir configurações',
+      done: employeeCount > 1,
+      label: 'Configurar jornada da equipa',
+      desc: 'Define horas/dia e pausa de almoço ao adicionar funcionários (ou em modelos de turno).',
+      action: () => onNavigate('funcionarios'),
+      actionLabel: 'Ir para Equipe',
     },
     {
       done: employeeCount > 1,
