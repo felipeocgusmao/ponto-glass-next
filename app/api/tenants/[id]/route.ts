@@ -6,18 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { DEFAULT_TENANT_ID } from '@/lib/tenant'
 import { firePlatformWebhook } from '@/lib/platformWebhook'
-import { TENANT_DEPENDENT_TABLES } from '@/lib/tenantDependents'
-
-// A Supabase/PostgREST error that means "this table isn't in the DB". Happens
-// when a deployment hasn't run every migration, so an optional dependent table
-// (kiosk_photos, timesheet_approvals, …) is absent. PGRST205 = schema-cache
-// miss; 42P01 = Postgres undefined_table; the message check is a belt-and-braces
-// fallback in case the code field is ever absent.
-function isMissingTableError(e: { code?: string; message?: string } | null): boolean {
-  if (!e) return false
-  return e.code === 'PGRST205' || e.code === '42P01' ||
-    /could not find the table|does not exist/i.test(e.message ?? '')
-}
+import { TENANT_DEPENDENT_TABLES, isMissingTableError } from '@/lib/tenantDependents'
 
 async function requireSuperAdmin(): Promise<ApiUser | null> {
   const token = cookies().get('ponto_token')?.value

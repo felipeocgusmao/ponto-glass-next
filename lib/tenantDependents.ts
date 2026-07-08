@@ -45,3 +45,15 @@ export const EMPLOYEE_REFERENCING_TABLES: readonly string[] = [
 // Tables that hold a foreign key into records — each MUST be ordered before
 // 'records'.
 export const RECORD_REFERENCING_TABLES: readonly string[] = ['kiosk_photos']
+
+// A Supabase/PostgREST error that means "this table isn't in the DB". Happens
+// when a deployment hasn't run every migration, so an optional dependent table
+// (kiosk_photos, timesheet_approvals, …) is absent. PGRST205 = schema-cache
+// miss; 42P01 = Postgres undefined_table; the message check is a belt-and-braces
+// fallback in case the code field is ever absent. Deleting a tenant skips these
+// so a missing optional table can't block the whole operation.
+export function isMissingTableError(e: { code?: string; message?: string } | null | undefined): boolean {
+  if (!e) return false
+  return e.code === 'PGRST205' || e.code === '42P01' ||
+    /could not find the table|does not exist/i.test(e.message ?? '')
+}

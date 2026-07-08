@@ -411,8 +411,8 @@ export function EmpresasTab() {
 
   function HealthBadges({ health, trialDaysLeft }: { health: TenantHealth; trialDaysLeft: number | null }) {
     const issues = []
-    if (health.sem_admin) issues.push({ label: 'Sem admin', color: 'var(--err-fg, #c53030)' })
-    if (health.trial_expirado) issues.push({ label: 'Trial expirado', color: 'var(--err-fg, #c53030)' })
+    if (health.sem_admin) issues.push({ label: 'Sem admin', color: 'var(--danger-fg)' })
+    if (health.trial_expirado) issues.push({ label: 'Trial expirado', color: 'var(--danger-fg)' })
     if (health.limite_atingido) issues.push({ label: 'Limite atingido', color: '#d97706' })
     if (health.sem_actividade_30d) issues.push({ label: 'Inactivo 30d', color: '#6b7280' })
     if (trialDaysLeft !== null && trialDaysLeft <= 3) issues.push({ label: `Trial: ${trialDaysLeft}d`, color: '#d97706' })
@@ -524,13 +524,13 @@ export function EmpresasTab() {
 
       {/* Created result */}
       {created && (
-        <div className="card" style={{ marginBottom: 16, border: '1px solid var(--ok-fg, #2ea043)', background: 'color-mix(in srgb, var(--ok-fg, #2ea043) 6%, transparent)' }}>
+        <div className="card" style={{ marginBottom: 16, border: '1px solid var(--success-fg)', background: 'color-mix(in srgb, var(--success-fg) 6%, transparent)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 16 }}>✓</span>
             <div style={{ fontSize: 13, fontWeight: 700 }}>Empresa &quot;{created.tenant.name}&quot; criada</div>
           </div>
           <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 10 }}>Envia esta página ao admin para começar:</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--bg-subtle, rgba(0,0,0,0.04))', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'var(--mono)', fontSize: 12, wordBreak: 'break-all' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 12, wordBreak: 'break-all' }}>
             <a href={created.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--fg)', textDecoration: 'none', flex: 1 }}>{created.url}</a>
             <button type="button" className="btn ghost sm" onClick={() => copyUrl(created.url)}>{copied ? '✓ Copiado' : 'Copiar'}</button>
           </div>
@@ -542,7 +542,7 @@ export function EmpresasTab() {
       )}
 
       {spinOffResult && (
-        <div className="card" style={{ marginBottom: 16, border: '1px solid var(--ok-fg, #2ea043)', background: 'color-mix(in srgb, var(--ok-fg, #2ea043) 6%, transparent)' }}>
+        <div className="card" style={{ marginBottom: 16, border: '1px solid var(--success-fg)', background: 'color-mix(in srgb, var(--success-fg) 6%, transparent)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 16 }}>✓</span>
             <div style={{ fontSize: 13, fontWeight: 700 }}>Plataforma separada</div>
@@ -662,7 +662,7 @@ export function EmpresasTab() {
                           <button className="btn ghost sm" onClick={() => openEdit(t)}>Editar</button>
                           <button className="btn ghost sm" onClick={() => { setDeactivateTarget(t); setErr('') }} style={{ marginLeft: 6 }}>Reativar</button>
                           {t.record_count === 0 && (
-                            <button className="btn ghost sm" disabled={saving} onClick={() => { setDeleteTarget(t); setDeleteConfirm('') }} style={{ marginLeft: 6, color: 'var(--err-fg, #c53030)' }}>
+                            <button className="btn ghost sm" disabled={saving} onClick={() => { setDeleteTarget(t); setDeleteConfirm('') }} style={{ marginLeft: 6, color: 'var(--danger-fg)' }}>
                               Eliminar
                             </button>
                           )}
@@ -781,7 +781,7 @@ export function EmpresasTab() {
                 className="btn sm"
                 disabled={saving}
                 onClick={confirmToggleActive}
-                style={deactivateTarget.active ? { background: 'var(--err-fg, #c53030)', color: '#fff' } : {}}
+                style={deactivateTarget.active ? { background: 'var(--danger-fg)', color: '#fff' } : {}}
               >
                 {saving ? '…' : deactivateTarget.active ? 'Desativar' : 'Reativar'}
               </button>
@@ -828,7 +828,7 @@ export function EmpresasTab() {
             {err && <div className="alert-inline err">{err}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn sm" disabled={deleteConfirm !== deleteTarget.name || deleting} onClick={handleDelete}
-                style={{ background: deleteConfirm === deleteTarget.name ? 'var(--err-fg, #c53030)' : undefined, color: deleteConfirm === deleteTarget.name ? '#fff' : undefined, opacity: deleteConfirm !== deleteTarget.name ? 0.45 : 1 }}>
+                style={{ background: deleteConfirm === deleteTarget.name ? 'var(--danger-fg)' : undefined, color: deleteConfirm === deleteTarget.name ? '#fff' : undefined, opacity: deleteConfirm !== deleteTarget.name ? 0.45 : 1 }}>
                 {deleting ? 'A eliminar…' : 'Eliminar permanentemente'}
               </button>
               <button className="btn ghost sm" onClick={() => { setDeleteTarget(null); setDeleteConfirm(''); setErr('') }}>Cancelar</button>
@@ -904,7 +904,7 @@ export function EmpresasTab() {
                       <td style={{ fontWeight: 600 }}>{a.name}</td>
                       <td className="mono" style={{ fontSize: 11 }}>{a.username}</td>
                       <td><span className="chip" style={{ fontSize: 10 }}>{a.role}</span></td>
-                      <td><span style={{ fontSize: 11, color: a.active ? 'var(--ok-fg, #2ea043)' : 'var(--fg-muted)' }}>{a.active ? 'Activo' : 'Inactivo'}</span></td>
+                      <td><span style={{ fontSize: 11, color: a.active ? 'var(--success-fg)' : 'var(--fg-muted)' }}>{a.active ? 'Activo' : 'Inactivo'}</span></td>
                       <td style={{ textAlign: 'right' }}>
                         <button className="btn ghost sm" disabled={togglingAdmin === a.id} onClick={() => handleToggleAdmin(a.id, !a.active)}>
                           {togglingAdmin === a.id ? '…' : a.active ? 'Desativar' : 'Ativar'}
@@ -949,7 +949,7 @@ export function EmpresasTab() {
               {trialTarget.trial_days_left !== null && trialTarget.trial_days_left > 0
                 ? <>Trial activo: <strong>{trialTarget.trial_days_left} dias restantes</strong>.</>
                 : trialTarget.trial_ends_at
-                  ? <span style={{ color: 'var(--err-fg)' }}>Trial <strong>expirado</strong>.</span>
+                  ? <span style={{ color: 'var(--danger-fg)' }}>Trial <strong>expirado</strong>.</span>
                   : 'Sem trial activo.'
               }
             </div>
@@ -990,7 +990,7 @@ export function EmpresasTab() {
             <input className="input" style={{ height: 34 }} value={spConfirm} onChange={e => setSpConfirm(e.target.value)} placeholder={defaultTenant.name} />
             <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
               <button type="submit" className="btn sm" disabled={spConfirm !== defaultTenant.name || spinningOff}
-                style={{ background: spConfirm === defaultTenant.name ? 'var(--err-fg, #c53030)' : undefined, color: spConfirm === defaultTenant.name ? '#fff' : undefined, opacity: spConfirm !== defaultTenant.name ? 0.45 : 1 }}>
+                style={{ background: spConfirm === defaultTenant.name ? 'var(--danger-fg)' : undefined, color: spConfirm === defaultTenant.name ? '#fff' : undefined, opacity: spConfirm !== defaultTenant.name ? 0.45 : 1 }}>
                 {spinningOff ? 'A separar…' : 'Separar plataforma'}
               </button>
               <button type="button" className="btn ghost sm" onClick={() => { setShowSpinOff(false); setSpConfirm(''); setErr('') }}>Cancelar</button>

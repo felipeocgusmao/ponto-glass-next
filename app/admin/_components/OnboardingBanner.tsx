@@ -101,7 +101,7 @@ export default function OnboardingBanner({ employeeCount, onNavigate, onOpenSett
             padding: '10px 12px',
             background: step.done
               ? 'color-mix(in srgb, var(--accent) 6%, transparent)'
-              : 'var(--bg-subtle, rgba(0,0,0,0.03))',
+              : 'var(--surface-2)',
             borderRadius: 'var(--r-sm, 6px)',
             border: '1px solid var(--border)',
             opacity: step.done ? 0.7 : 1,

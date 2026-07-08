@@ -226,7 +226,7 @@ export function TokenKioskClient({ token }: { token: string }) {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: 'var(--sidebar-bg)',
+              background: 'var(--surface)',
               borderRadius: 'var(--r-lg) var(--r-lg) 0 0',
               padding: '24px 20px 48px',
               width: '100%',
