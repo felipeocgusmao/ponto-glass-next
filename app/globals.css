@@ -10,7 +10,12 @@ html, body { height: 100%; }
    under the sidebar) picks up a saturated hue the rest of the page lacks. The
    goal is one soft ambient wash, not three distinct colour zones
    (#requested: "padrão nas cores, sem diferença drástica"). */
-html {
+/* Painted on BOTH html and body. In an iOS standalone PWA the home-indicator
+   safe area at the bottom is painted with the BODY's background; a transparent
+   body there falls back to the window default (black) — the persistent
+   "barra preta embaixo". Giving body the same ambient wash as html makes the
+   app reach the physical screen edge as one continuous surface. */
+html, body {
   background:
     radial-gradient(ellipse 120% 110% at 12% 0%, rgba(94,106,210,0.20) 0%, transparent 60%),
     radial-gradient(ellipse 120% 110% at 92% 100%, rgba(124,58,237,0.16) 0%, transparent 62%),
@@ -18,7 +23,7 @@ html {
     var(--bg);
   background-attachment: fixed;
 }
-html[data-theme="dark"] {
+html[data-theme="dark"], html[data-theme="dark"] body {
   background:
     radial-gradient(ellipse 120% 110% at 12% 0%, rgba(124,140,248,0.20) 0%, transparent 60%),
     radial-gradient(ellipse 120% 110% at 92% 100%, rgba(167,139,250,0.15) 0%, transparent 62%),
@@ -38,7 +43,7 @@ html[data-theme="dark"] {
     --glass-blur: 16px;      --glass-blur-lg: 22px;
     --glass-blur-bar: 12px;  --glass-blur-sm: 6px;
   }
-  html, html[data-theme="dark"] { background-attachment: scroll; }
+  html, body, html[data-theme="dark"], html[data-theme="dark"] body { background-attachment: scroll; }
   .chip { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
@@ -47,7 +52,8 @@ body {
   font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--fg);
-  background: transparent;
+  /* No `background: transparent` here — body must keep the ambient wash from the
+     rule above so the iOS home-indicator area isn't painted black. */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'cv11', 'ss01', 'ss03';

@@ -4,7 +4,7 @@
   "description": "Controle de ponto digital — o tempo, finalmente, tem forma.",
   "start_url": "/ponto",
   "display": "standalone",
-  "background_color": "#0a0c14",
+  "background_color": "#08090b",
   "theme_color": "#5e6ad2",
   "orientation": "portrait",
   "lang": "pt-BR",
