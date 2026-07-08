@@ -27,6 +27,21 @@ html[data-theme="dark"] {
   background-attachment: fixed;
 }
 
+/* ─── Mobile performance ─── On phones the glass is expensive: a fixed
+   background repaints every scroll frame, and dozens of stacked backdrop-filter
+   layers (cards, KPIs, chips, sticky header) tax the GPU. Shrink the blur radii
+   (cost scales with radius), drop the barely-visible blur on tiny chips, and
+   let the background scroll normally. The frosted look is preserved — just
+   cheaper — so scrolling stays smooth on low-end devices. */
+@media (max-width: 768px) {
+  :root {
+    --glass-blur: 16px;      --glass-blur-lg: 22px;
+    --glass-blur-bar: 12px;  --glass-blur-sm: 6px;
+  }
+  html, html[data-theme="dark"] { background-attachment: scroll; }
+  .chip { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
 body {
   font-family: var(--font-sans);
   font-size: var(--text-sm);

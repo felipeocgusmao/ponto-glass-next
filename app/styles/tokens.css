@@ -74,6 +74,10 @@
      scrolling under it (the translucent 'inherit' backing let the language
      picker ghost up behind the "Configurações" title). */
   --modal-head-bg: rgba(252,252,253,0.9);
+  /* Floating popovers (notifications) sit directly over page content with no
+     scrim, so they need a near-opaque backing — a translucent panel let the
+     page's buttons show straight through. */
+  --popover-bg: rgba(252,252,253,0.95);
 
   --accent: #5e6ad2;
   --accent-fg: #ffffff;
@@ -143,6 +147,7 @@
   --scroll: rgba(255,255,255,0.16);
   --scroll-hover: rgba(255,255,255,0.30);
   --modal-head-bg: rgba(20,22,28,0.9);
+  --popover-bg: rgba(18,20,26,0.95);
 
   --accent: #7c8cf8;
   --accent-soft: rgba(124,140,248,0.13);

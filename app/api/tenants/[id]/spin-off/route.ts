@@ -5,7 +5,7 @@ import { verifyApiAuth } from '@/lib/apiAuth'
 import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
-import { isValidTenantSlug, DEFAULT_TENANT_ID } from '@/lib/tenant'
+import { isValidTenantSlug, DEFAULT_TENANT_ID, normalizeCustomDomain } from '@/lib/tenant'
 
 // Tenant management is platform-operator territory: requires an active admin
 // with the super_admin flag (loaded from the DB on every request, never from
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (!isValidTenantSlug(slug))
     return NextResponse.json({ error: 'Slug inválido: use minúsculas a-z0-9 com hífens, 2-40 caracteres' }, { status: 400 })
 
-  const trimmedDomain = domain ? String(domain).trim().toLowerCase() : null
+  const trimmedDomain = normalizeCustomDomain(domain)
   if (trimmedDomain && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(trimmedDomain))
     return NextResponse.json({ error: 'Domínio inválido' }, { status: 400 })
 

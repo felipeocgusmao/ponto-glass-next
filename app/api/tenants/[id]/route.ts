@@ -4,7 +4,7 @@ import { verifyApiAuth } from '@/lib/apiAuth'
 import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
-import { DEFAULT_TENANT_ID } from '@/lib/tenant'
+import { DEFAULT_TENANT_ID, normalizeCustomDomain } from '@/lib/tenant'
 import { firePlatformWebhook } from '@/lib/platformWebhook'
 import { TENANT_DEPENDENT_TABLES, isMissingTableError } from '@/lib/tenantDependents'
 
@@ -38,7 +38,7 @@ export async function PATCH(
   }
 
   if (domain !== undefined) {
-    const trimmed = domain ? String(domain).trim().toLowerCase() : null
+    const trimmed = normalizeCustomDomain(domain)
     if (trimmed && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(trimmed))
       return NextResponse.json({ error: 'Domínio inválido' }, { status: 400 })
     updates.domain = trimmed

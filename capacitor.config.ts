@@ -9,6 +9,10 @@ const config: CapacitorConfig = {
   appId: 'app.pontoglass.ponto',
   appName: 'PontoGlass',
   webDir: 'out',
+  // Native web-view background. Matches the app's dark base (--bg) so any area
+  // the web content doesn't cover (safe areas, overscroll) shows the app colour
+  // instead of a black bar — the app reaches the screen edges as one surface.
+  backgroundColor: '#08090b',
   server: {
     url: serverUrl,
     cleartext: false,
@@ -27,7 +31,9 @@ const config: CapacitorConfig = {
     },
     StatusBar: {
       style: 'Dark',
-      backgroundColor: '#0f172a',
+      // Overlay the web view (transparent bar) instead of painting a solid
+      // band, so the app background runs under the status bar too.
+      overlaysWebView: true,
     },
     Geolocation: {
       // iOS: prompt for "When in Use" permission on first geo request.

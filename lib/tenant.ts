@@ -22,6 +22,10 @@ export function isValidTenantSlug(slug: unknown): slug is string {
     && slug !== 'www'
 }
 
+// normalizeCustomDomain / slugifyTenantInput live in ./tenantDomain (pure, no
+// server deps) so client components can import them too.
+export { normalizeCustomDomain, slugifyTenantInput } from './tenantDomain'
+
 /** Ids of every active tenant — what the cron jobs iterate over. Falls back
  * to the default tenant when the table is missing (pre-phase-1 databases) or
  * the lookup fails, preserving single-tenant behaviour. */

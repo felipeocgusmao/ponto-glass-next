@@ -3,6 +3,7 @@
 import { useLang, LANG_LABELS, type Lang } from '@/lib/LangContext'
 import { SunIcon, MoonIcon, MonitorIcon, LockSmIcon, IconX, IconLogout } from './icons'
 import { TotpSection } from '@/app/_components/TotpSection'
+import { useFocusTrap } from '@/lib/useFocusTrap'
 import { useState, useEffect } from 'react'
 
 const LANGS: Lang[] = ['pt-PT', 'pt-BR', 'en', 'es']
@@ -114,6 +115,13 @@ export default function SettingsModal({
   onClose: () => void
 }) {
   const { lang, setLang, t } = useLang()
+  const panelRef = useFocusTrap<HTMLDivElement>(true)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
     <div
@@ -122,9 +130,14 @@ export default function SettingsModal({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
         className="cmdk"
         style={{ maxWidth: 480, width: '100%', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: 0, borderRadius: 'var(--r-xl)' }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('settings.title')}
+        tabIndex={-1}
       >
         {/* Header — solid-ish glass backing so the sections below don't ghost up
             behind the title as the modal scrolls (`inherit` was translucent). */}

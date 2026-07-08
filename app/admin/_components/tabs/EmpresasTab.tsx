@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Tenant } from '@/lib/types'
 import { IconBuilding, IconUserPlus, IconUsers, IconPulse } from '../icons'
 import { limitLabel, PLANS } from '@/lib/planLimits'
+import { normalizeCustomDomain, slugifyTenantInput } from '@/lib/tenantDomain'
 import { Modal } from '../Modal'
 
 type TenantHealth = {
@@ -692,11 +693,11 @@ export function EmpresasTab() {
               </div>
               <div className="field">
                 <label>Slug (subdomínio)</label>
-                <input className="input" style={inputStyle} value={slug} onChange={e => setSlug(e.target.value)} placeholder="empresa-a" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required />
+                <input className="input" style={inputStyle} value={slug} onChange={e => setSlug(e.target.value)} onBlur={e => setSlug(slugifyTenantInput(e.target.value))} placeholder="empresa-a" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required />
               </div>
               <div className="field">
                 <label>Domínio custom (opcional)</label>
-                <input className="input" style={inputStyle} value={domain} onChange={e => setDomain(e.target.value)} placeholder="ponto.empresa.com" />
+                <input className="input" style={inputStyle} value={domain} onChange={e => setDomain(e.target.value)} onBlur={e => setDomain(normalizeCustomDomain(e.target.value) ?? '')} placeholder="ponto.empresa.com" />
               </div>
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -749,7 +750,7 @@ export function EmpresasTab() {
             </div>
             <div className="field">
               <label>Domínio custom (vazio = remover)</label>
-              <input className="input" style={inputStyle} value={editDomain} onChange={e => setEditDomain(e.target.value)} placeholder="ponto.empresa.com" />
+              <input className="input" style={inputStyle} value={editDomain} onChange={e => setEditDomain(e.target.value)} onBlur={e => setEditDomain(normalizeCustomDomain(e.target.value) ?? '')} placeholder="ponto.empresa.com" />
             </div>
             <div className="field">
               <label>Plano</label>
@@ -978,8 +979,8 @@ export function EmpresasTab() {
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
               <div className="field"><label>Nome</label><input className="input" style={inputStyle} value={spName} onChange={e => setSpName(e.target.value)} placeholder={defaultTenant.name} required autoFocus /></div>
-              <div className="field"><label>Slug</label><input className="input" style={inputStyle} value={spSlug} onChange={e => setSpSlug(e.target.value)} placeholder="dac-industrial" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required /></div>
-              <div className="field"><label>Domínio custom{ROOT_DOMAIN ? ' (opcional)' : ' — obrigatório'}</label><input className="input" style={inputStyle} value={spDomain} onChange={e => setSpDomain(e.target.value)} placeholder="ponto.empresa.com" required={!ROOT_DOMAIN} /></div>
+              <div className="field"><label>Slug</label><input className="input" style={inputStyle} value={spSlug} onChange={e => setSpSlug(e.target.value)} onBlur={e => setSpSlug(slugifyTenantInput(e.target.value))} placeholder="dac-industrial" pattern="[a-z0-9]+(-[a-z0-9]+)*" minLength={2} maxLength={40} required /></div>
+              <div className="field"><label>Domínio custom{ROOT_DOMAIN ? ' (opcional)' : ' — obrigatório'}</label><input className="input" style={inputStyle} value={spDomain} onChange={e => setSpDomain(e.target.value)} onBlur={e => setSpDomain(normalizeCustomDomain(e.target.value) ?? '')} placeholder="ponto.empresa.com" required={!ROOT_DOMAIN} /></div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
               <div className="field"><label>Nome do controlador</label><input className="input" style={inputStyle} value={spControllerName} onChange={e => setSpControllerName(e.target.value)} required /></div>
