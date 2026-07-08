@@ -3,6 +3,7 @@ import {
   TENANT_DEPENDENT_TABLES,
   EMPLOYEE_REFERENCING_TABLES,
   RECORD_REFERENCING_TABLES,
+  isMissingTableError,
 } from '@/lib/tenantDependents'
 
 // Regression guard for the tenant-delete FK ordering bug: deleting a company
@@ -41,5 +42,27 @@ describe('tenant dependent deletion order', () => {
   it('has no duplicate entries', () => {
     const set = new Set(TENANT_DEPENDENT_TABLES)
     expect(set.size).toBe(TENANT_DEPENDENT_TABLES.length)
+  })
+})
+
+describe('isMissingTableError', () => {
+  it('detects PostgREST schema-cache miss (PGRST205)', () => {
+    expect(isMissingTableError({ code: 'PGRST205', message: "Could not find the table 'public.kiosk_photos' in the schema cache" })).toBe(true)
+  })
+
+  it('detects Postgres undefined_table (42P01)', () => {
+    expect(isMissingTableError({ code: '42P01', message: 'relation "x" does not exist' })).toBe(true)
+  })
+
+  it('falls back to the message when code is absent', () => {
+    expect(isMissingTableError({ message: 'Could not find the table foo' })).toBe(true)
+    expect(isMissingTableError({ message: 'relation does not exist' })).toBe(true)
+  })
+
+  it('does NOT match real FK / permission errors', () => {
+    expect(isMissingTableError({ code: '23503', message: 'violates foreign key constraint' })).toBe(false)
+    expect(isMissingTableError({ code: '42501', message: 'permission denied' })).toBe(false)
+    expect(isMissingTableError(null)).toBe(false)
+    expect(isMissingTableError(undefined)).toBe(false)
   })
 })

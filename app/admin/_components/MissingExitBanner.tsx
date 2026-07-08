@@ -86,7 +86,7 @@ export default function MissingExitBanner() {
           {alerts.map((a) => (
             <div key={`${a.name}-${a.date}`} style={{ fontSize: 12 }}>
               {a.name} — {new Date(a.date + 'T12:00:00').toLocaleDateString(LANG_TO_LOCALE[lang] ?? 'pt-PT', { weekday: 'short', day: '2-digit', month: 'short' })}
-              <span style={{ color: 'var(--fg-dim)', marginLeft: 6 }}>({a.reason})</span>
+              <span style={{ color: 'var(--fg-subtle)', marginLeft: 6 }}>({a.reason})</span>
             </div>
           ))}
         </div>

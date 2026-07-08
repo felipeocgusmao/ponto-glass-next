@@ -59,7 +59,10 @@
   --divider: rgba(15,17,24,0.06);
   --fg: #18181b;
   --fg-muted: #52525b;
-  --fg-subtle: #a1a1aa;
+  /* Was #a1a1aa (~2.3:1 — failed WCAG AA even for large text). Darkened to
+     clear the 3:1 large-text threshold while staying clearly weaker than
+     --fg-muted so the type hierarchy holds. */
+  --fg-subtle: #7e7e88;
   --fg-dim: #d4d4d8;
   /* Translucent so the scrollbar reads as a subtle floating pill (macOS-style)
      over any surface, not a solid gray rail. Paired with a transparent border
@@ -133,7 +136,9 @@
   --divider: rgba(255,255,255,0.06);
   --fg: #ededed;
   --fg-muted: #a3a3a7;
-  --fg-subtle: #71717a;
+  /* Was #71717a (~3.5:1). Lightened to ~4.4:1 (near AA normal) while staying
+     below --fg-muted. */
+  --fg-subtle: #7c7c84;
   --fg-dim: #3f3f46;
   --scroll: rgba(255,255,255,0.16);
   --scroll-hover: rgba(255,255,255,0.30);

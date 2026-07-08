@@ -58,7 +58,7 @@ function QrModal({ emp, onClose }: { emp: Employee; onClose: () => void }) {
   }, [emp.id])
   return (
     <div className="drawer-overlay" onClick={onClose} style={{ zIndex: 90 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--sidebar-bg)', borderRadius: 16, padding: 28, textAlign: 'center', maxWidth: 320, margin: 'auto' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 16, padding: 28, textAlign: 'center', maxWidth: 320, margin: 'auto' }}>
         <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{emp.name}</div>
         <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginBottom: 20 }}>Digitalize para registar ponto com o telemóvel</div>
         {loading && <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)' }}>A gerar QR…</div>}
@@ -338,7 +338,7 @@ export function KioskClient({ initialEmployees, initialRecords }: KioskClientPro
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: 'var(--sidebar-bg)',
+              background: 'var(--surface)',
               borderRadius: 'var(--r-lg) var(--r-lg) 0 0',
               padding: '24px 20px 48px',
               width: '100%',

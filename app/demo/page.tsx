@@ -84,7 +84,7 @@ export default function DemoPage() {
 
         {/* Warning banner */}
         <div style={{
-          padding: '14px 18px', borderRadius: 'var(--r)',
+          padding: '14px 18px', borderRadius: 'var(--r-md)',
           background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.25)',
           color: 'var(--warning-fg, #b45309)', fontSize: 13, marginBottom: 32,
           display: 'flex', gap: 10, alignItems: 'flex-start',
@@ -101,7 +101,7 @@ export default function DemoPage() {
           {CREDENTIALS.map((cred) => (
             <div key={cred.role} style={{
               padding: '24px', background: 'var(--surface)',
-              border: '1px solid var(--border)', borderRadius: 'var(--r)',
+              border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
               display: 'flex', flexDirection: 'column', gap: 16,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
