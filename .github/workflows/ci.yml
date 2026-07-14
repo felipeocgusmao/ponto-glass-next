@@ -41,7 +41,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ci-only-not-used
           JWT_SECRET: ci-only-jwt-secret-min-32-characters-1234
-          NEXT_PUBLIC_BUSINESS_TZ: Europe/Madrid
+          NEXT_PUBLIC_BUSINESS_TZ: Europe/Lisbon
         run: npm run build
 
   e2e:
@@ -60,7 +60,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
       SUPABASE_SERVICE_ROLE_KEY: ci-only-not-used
       JWT_SECRET: ci-only-jwt-secret-min-32-characters-1234
-      NEXT_PUBLIC_BUSINESS_TZ: Europe/Madrid
+      NEXT_PUBLIC_BUSINESS_TZ: Europe/Lisbon
     steps:
       - uses: actions/checkout@v4
 

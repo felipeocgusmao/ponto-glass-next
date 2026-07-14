@@ -237,7 +237,7 @@ flowchart TD
 
 ### Date stamping
 
-`calcWorkDate(timestamp, shift_start)` devolve o "dia de trabalho" no fuso configurado (`NEXT_PUBLIC_BUSINESS_TZ`, padrão `Europe/Madrid`). Para turnos noturnos (`shift_start='22:00'`), uma entrada às 23:30 conta para o **dia da entrada**, não para o dia seguinte.
+`calcWorkDate(timestamp, shift_start)` devolve o "dia de trabalho" no fuso configurado (`NEXT_PUBLIC_BUSINESS_TZ`, padrão `Europe/Lisbon`). Para turnos noturnos (`shift_start='22:00'`), uma entrada às 23:30 conta para o **dia da entrada**, não para o dia seguinte.
 
 ### Tipos de batida
 

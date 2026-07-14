@@ -8,10 +8,10 @@ export const WORKING_TYPES  = ['entrada', 'fim_almoco', 'retorno_cafe']
 // The timezone the business operates in. A work "day" is the local calendar day
 // in THIS zone — never UTC — so punches near midnight are filed under the day the
 // employee actually worked. Override per-deployment with NEXT_PUBLIC_BUSINESS_TZ
-// (an IANA name like 'Europe/Madrid'); it must be NEXT_PUBLIC_ so the same value
+// (an IANA name like 'Europe/Lisbon'); it must be NEXT_PUBLIC_ so the same value
 // is available on both the server (write path) and the client (report ranges).
 export const BUSINESS_TZ =
-  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_BUSINESS_TZ) || 'Europe/Madrid'
+  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_BUSINESS_TZ) || 'Europe/Lisbon'
 
 // Calendar date + wall-clock time of an instant, as seen in the business timezone.
 function tzParts(date: Date, timeZone: string = BUSINESS_TZ): { date: string; minutes: number } {
