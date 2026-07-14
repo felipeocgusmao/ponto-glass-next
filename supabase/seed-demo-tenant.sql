@@ -106,14 +106,14 @@ SELECT emp.tenant_id, emp.id, emp.name, r.type, r.ts, r.d
 FROM emp
 CROSS JOIN (
   VALUES
-    ('entrada',       ((CURRENT_DATE - 2) + TIME '09:00') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 2),
-    ('inicio_almoco', ((CURRENT_DATE - 2) + TIME '13:00') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 2),
-    ('fim_almoco',    ((CURRENT_DATE - 2) + TIME '14:00') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 2),
-    ('saída',         ((CURRENT_DATE - 2) + TIME '17:30') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 2),
-    ('entrada',       ((CURRENT_DATE - 1) + TIME '08:55') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 1),
-    ('inicio_almoco', ((CURRENT_DATE - 1) + TIME '12:58') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 1),
-    ('fim_almoco',    ((CURRENT_DATE - 1) + TIME '13:57') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 1),
-    ('saída',         ((CURRENT_DATE - 1) + TIME '17:41') AT TIME ZONE 'Europe/Madrid', CURRENT_DATE - 1)
+    ('entrada',       ((CURRENT_DATE - 2) + TIME '09:00') AT TIME ZONE 'Europe/Lisbon', CURRENT_DATE - 2),
+    ('inicio_almoco', ((CURRENT_DATE - 2) + TIME '13:00') AT TIME ZONE 'Europe/Lisbon', CURRENT_DATE - 2),
+    ('fim_almoco',    ((CURRENT_DATE - 2) + TIME '14:00') AT TIME ZONE 'Europe/Lisbon', CURRENT_DATE - 2),
+    ('saída',         ((CURRENT_DATE - 2) + TIME '17:30') AT TIME ZONE 'Europe/Lisbon', CURRENT_DATE - 2),
+    ('entrada',       ((CURRENT_DATE - 1) + TIME '08:55') AT TIME ZONE 'Europe/Lisbon', CURRENT_DATE - 1),
+    ('inicio_almoco', ((CURRENT_DATE - 1) + TIME '12:58') AT TIME ZONE 'Europe/Lisbon', CURRENT_DATE - 1),
+    ('fim_almoco',    ((CURRENT_DATE - 1) + TIME '13:57') AT TIME ZONE 'Europe/Lisbon', CURRENT_DATE - 1),
+    ('saída',         ((CURRENT_DATE - 1) + TIME '17:41') AT TIME ZONE 'Europe/Lisbon', CURRENT_DATE - 1)
 ) AS r(type, ts, d)
 WHERE NOT EXISTS (
   SELECT 1 FROM records rec WHERE rec.employee_id = emp.id

@@ -8,5 +8,5 @@
 // boundary and worked-minutes math agree with the web app.
 export const CONFIG = {
   baseUrl: 'https://ponto-glass-next.vercel.app',
-  businessTz: 'Europe/Madrid',
+  businessTz: 'Europe/Lisbon',
 }

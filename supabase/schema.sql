@@ -174,7 +174,7 @@ ALTER TABLE employees  ADD COLUMN IF NOT EXISTS shift_start    TIME NOT NULL DEF
 -- shift_start: LOCAL (business-timezone) time at which a new workday begins.
 -- '00:00' = normal day shift (work date = the local calendar day).
 -- '22:00' = night shift starting at 22:00 local — punches before 22:00 local belong to the previous day.
--- The business timezone is set via NEXT_PUBLIC_BUSINESS_TZ (default Europe/Madrid).
+-- The business timezone is set via NEXT_PUBLIC_BUSINESS_TZ (default Europe/Lisbon).
 
 -- v10.5: push subscriptions (Web Push / tokens nativos) — uma por funcionário.
 -- Estava apenas em migrations/20260522_push_subscriptions.sql; precisa existir

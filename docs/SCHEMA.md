@@ -220,7 +220,7 @@ right after the first login.**
 ## Time zone notes
 
 - `timestamp` columns are `TIMESTAMPTZ` — always stored in UTC
-- `date` columns are *business-tz* days (`NEXT_PUBLIC_BUSINESS_TZ`, default `Europe/Madrid`)
+- `date` columns are *business-tz* days (`NEXT_PUBLIC_BUSINESS_TZ`, default `Europe/Lisbon`)
 - For night-shift employees, `shift_start` shifts the business-day boundary
   (e.g. `'22:00'` means a punch at 23:30 local belongs to *that* calendar
   day, not the next morning)
