@@ -9,7 +9,7 @@ import { HistoricoTab } from './_components/HistoricoTab'
 import { BancoTab } from './_components/BancoTab'
 import { CorrecoesTab } from './_components/CorrecoesTab'
 import { PerfilTab } from './_components/PerfilTab'
-import { businessDate, empColor, avatarInitials, getWorkState, calcLiveMin } from '@/lib/utils'
+import { businessDate, empColor, avatarInitials, getWorkState, calcLiveMin, fmtMinutes } from '@/lib/utils'
 import { targetMinutesForDate } from '@/lib/schedule'
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
@@ -97,6 +97,9 @@ export function PontoClient({ initialUser, initialRecords }: PontoClientProps) {
 
   // reminder
   const [reminderDismissed, setReminderDismissed] = useState(false)
+
+  // #285 — rest-break warning (art. 213.º CT), dismissible per stretch
+  const [restDismissed, setRestDismissed] = useState<string | null>(null)
 
   const router = useRouter()
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -616,6 +619,42 @@ export function PontoClient({ initialUser, initialRecords }: PontoClientProps) {
             </button>
           </div>
         )}
+
+        {/* ── REST-BREAK WARNING (#285, art. 213.º CT) ───────────────────────
+            Shown when the company opted into PT compliance and the current
+            uninterrupted working stretch is close to the 5h legal limit.
+            `since` is the punch that started the stretch, so lunch/coffee
+            breaks reset it naturally. Dismissal is keyed to the stretch. */}
+        {tab === 'ponto' && state === 'working' && since && user.pt_compliance && restDismissed !== since && (() => {
+          const consecutiveMin = Math.round((Date.now() - new Date(since).getTime()) / 60_000)
+          if (consecutiveMin < 270) return null
+          const over = consecutiveMin >= 300
+          return (
+            <div style={{
+              background: over ? 'var(--danger-soft, rgba(239,68,68,0.12))' : 'var(--warning-soft, rgba(234,179,8,0.12))',
+              border: `1px solid ${over ? 'var(--danger-fg, #dc2626)' : 'var(--warning, #ca8a04)'}`,
+              borderRadius: 'var(--r-md)',
+              padding: '10px 14px',
+              display: 'flex', alignItems: 'center', gap: 10,
+              marginBottom: 8,
+            }}>
+              <span style={{ fontSize: 16 }}>☕</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{t('ponto.rest5h.title')}</div>
+                <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
+                  {t('ponto.rest5h.body').replace('{n}', fmtMinutes(consecutiveMin))}
+                </div>
+              </div>
+              <button
+                onClick={() => setRestDismissed(since)}
+                className="btn ghost sm"
+                style={{ flexShrink: 0, fontSize: 11 }}
+              >
+                {t('ponto.reminder.dismiss')}
+              </button>
+            </div>
+          )
+        })()}
 
         {/* ── TAB CONTENT (key forces remount for enter animation) ─────────── */}
         <div key={tab} className="tab-fade" role="tabpanel" id={`tabpanel-${tab}`} aria-label={t(TAB_TITLES[tab])}>

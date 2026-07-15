@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { businessDate, businessHourOfDay } from '@/lib/utils'
+import { businessDate, businessHourOfDay, fmtMinutes } from '@/lib/utils'
+import { longestContinuousWorkMin, restBetweenDaysMin } from '@/lib/schedule'
 import { activeTenantIds } from '@/lib/tenant'
 import { sendPendingRequestsEmail } from '@/lib/email'
 import webpush from 'web-push'
+import type { PunchRecord } from '@/lib/types'
 import type { TenantAlertSettings } from '../../tenant-settings/route'
 
 // Dual UTC hours in vercel.json + this guard = DST-stable local run time (#286).
@@ -21,11 +23,62 @@ async function runAlertCheck(tenantId: string) {
   const { data: tenant } = await supabase
     .from('tenants').select('alert_settings').eq('id', tenantId).maybeSingle()
   const settings = (tenant?.alert_settings ?? {}) as TenantAlertSettings
-  if (!settings.hour_bank_low_threshold && !settings.long_day_threshold) return 0
+  if (!settings.hour_bank_low_threshold && !settings.long_day_threshold && !settings.pt_compliance) return 0
 
   // Business-local day, not the UTC day — after 22:00/23:00 UTC they differ.
   const today = businessDate()
   let alertCount = 0
+
+  // ── PT labour-law rest checks (#285) — evaluated once per day at 21:00 local:
+  // yesterday's >5h-consecutive stretches (art. 213.º) and a daily rest under
+  // 11h between yesterday's last saída and today's first entrada (art. 214.º).
+  if (settings.pt_compliance) {
+    const prev = new Date(`${today}T12:00:00Z`)
+    prev.setUTCDate(prev.getUTCDate() - 1)
+    const yesterday = prev.toISOString().split('T')[0]
+
+    const { data: recs } = await supabase
+      .from('records')
+      .select('employee_id, employee_name, type, timestamp, date')
+      .eq('tenant_id', tenantId)
+      .in('date', [yesterday, today])
+      .order('timestamp', { ascending: true })
+
+    const byEmpDay = new Map<string, { name: string; days: Map<string, PunchRecord[]> }>()
+    for (const r of (recs ?? []) as PunchRecord[]) {
+      if (!byEmpDay.has(r.employee_id)) byEmpDay.set(r.employee_id, { name: r.employee_name, days: new Map() })
+      const days = byEmpDay.get(r.employee_id)!.days
+      if (!days.has(r.date)) days.set(r.date, [])
+      days.get(r.date)!.push(r)
+    }
+
+    for (const [empId, { name, days }] of Array.from(byEmpDay.entries())) {
+      const yRecs = days.get(yesterday) ?? []
+      const tRecs = days.get(today) ?? []
+
+      const stretch = longestContinuousWorkMin(yRecs)
+      if (stretch > 300) {
+        await notifyAdmins(tenantId, {
+          title: 'Mais de 5h sem pausa ⚠',
+          body: `${name} trabalhou ${fmtMinutes(stretch)} seguidas ontem sem intervalo (art. 213.º CT exige pausa antes das 5h).`,
+          url: '/admin',
+          tag: `rest5h-${yesterday}-${empId}`,
+        })
+        alertCount++
+      }
+
+      const rest = restBetweenDaysMin(yRecs, tRecs)
+      if (rest != null && rest < 660) {
+        await notifyAdmins(tenantId, {
+          title: 'Descanso diário insuficiente ⚠',
+          body: `${name} teve apenas ${fmtMinutes(rest)} de descanso entre ontem e hoje (mínimo legal: 11h, art. 214.º CT).`,
+          url: '/admin',
+          tag: `rest11h-${today}-${empId}`,
+        })
+        alertCount++
+      }
+    }
+  }
 
   // Check hour bank low threshold
   if (settings.hour_bank_low_threshold !== null) {

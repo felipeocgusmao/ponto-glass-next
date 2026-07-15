@@ -13,6 +13,11 @@ export interface TenantAlertSettings {
   // back to 8h / 60min.
   default_workday_hours: number | null       // hours/day, e.g. 8
   default_lunch_break_minutes: number | null // minutes, e.g. 60
+  // #285 — Portuguese labour-law opt-ins (Código do Trabalho). Same JSONB bag.
+  // pt_compliance: rest warnings (>5h consecutive, <11h daily rest — art. 213.º/214.º)
+  // overtime_multipliers: pay uplifts in reports/holerites (+25%/+37,5%/+50% — art. 268.º)
+  pt_compliance: boolean | null
+  overtime_multipliers: boolean | null
 }
 
 const EMPTY_SETTINGS: TenantAlertSettings = {
@@ -21,6 +26,8 @@ const EMPTY_SETTINGS: TenantAlertSettings = {
   hour_bank_max_positive: null,
   default_workday_hours: null,
   default_lunch_break_minutes: null,
+  pt_compliance: null,
+  overtime_multipliers: null,
 }
 
 // clamp a numeric input to [min, max]; null passes through (means "unset").
@@ -85,6 +92,8 @@ export async function PATCH(request: NextRequest) {
   // every future employee.
   if ('default_workday_hours' in body) merged.default_workday_hours = clampOrNull(body.default_workday_hours, 1, 24)
   if ('default_lunch_break_minutes' in body) merged.default_lunch_break_minutes = clampOrNull(body.default_lunch_break_minutes, 0, 240)
+  if ('pt_compliance' in body) merged.pt_compliance = body.pt_compliance === null ? null : Boolean(body.pt_compliance)
+  if ('overtime_multipliers' in body) merged.overtime_multipliers = body.overtime_multipliers === null ? null : Boolean(body.overtime_multipliers)
 
   const { error } = await supabase
     .from('tenants')
