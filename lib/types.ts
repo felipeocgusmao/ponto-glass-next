@@ -28,6 +28,9 @@ export interface Employee {
   workplace_lat?: number | null
   workplace_lng?: number | null
   max_distance_meters?: number | null
+  // #287 — per-weekday schedule; see lib/schedule.ts. null = legacy Mon–Fri week.
+  weekly_schedule?: import('./schedule').WeeklySchedule | null
+  works_holidays?: boolean
 }
 
 export interface PunchRecord {
@@ -75,6 +78,10 @@ export interface EmployeeProfile extends JWTUser {
   expected_start?: string | null
   expected_end?: string | null
   shift_start?: string | null
+  weekly_schedule?: import('./schedule').WeeklySchedule | null
+  works_holidays?: boolean
+  // #285 — company opted in to Portuguese labour-law compliance hints.
+  pt_compliance?: boolean
 }
 
 export interface AuditLog {

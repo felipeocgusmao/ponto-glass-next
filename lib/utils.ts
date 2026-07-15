@@ -44,6 +44,13 @@ export function businessMinutesOfDay(date: Date): number {
   return tzParts(date).minutes
 }
 
+// Local wall-clock hour (0–23) in the business timezone. Cron handlers use this
+// as a guard so a job scheduled at two UTC hours (to cover summer/winter time)
+// only runs on the invocation that matches the intended LOCAL hour (#286).
+export function businessHourOfDay(date: Date = new Date()): number {
+  return Math.floor(businessMinutesOfDay(date) / 60)
+}
+
 // Work date for a punch, honouring an employee's shift_start — the LOCAL
 // (business-timezone) time of day at which a new workday begins. For night shifts
 // (e.g. 22:00), punches before that local time belong to the previous calendar day.
@@ -191,7 +198,9 @@ export function calcOvertimeToday(
 
 export function calcOvertimePeriod(
   records: PunchRecord[],
-  workdayMinutes = WORKDAY_MINUTES,
+  // A number applies the same daily target to every day; a function receives
+  // the 'YYYY-MM-DD' date so weekly schedules can vary the target per weekday.
+  workdayMinutes: number | ((date: string) => number) = WORKDAY_MINUTES,
   lunchBreakMinutes = 0,
 ): number | null {
   const byDay = new Map<string, PunchRecord[]>()
@@ -201,11 +210,15 @@ export function calcOvertimePeriod(
   })
   if (byDay.size === 0) return null
   let totalNet = 0
+  let totalTarget = 0
   // Sum the *rounded* daily net so overtime is computed against the same values
   // the employee sees in reports and the hour bank (matches centesimal rules).
-  byDay.forEach((dayRecs) => { totalNet += calcDayRounded(dayRecs, lunchBreakMinutes) })
+  byDay.forEach((dayRecs, date) => {
+    totalNet += calcDayRounded(dayRecs, lunchBreakMinutes)
+    totalTarget += typeof workdayMinutes === 'function' ? workdayMinutes(date) : workdayMinutes
+  })
   if (!totalNet) return null
-  return totalNet - workdayMinutes * byDay.size
+  return totalNet - totalTarget
 }
 
 // Day-aware total worked minutes over a period: each day's net is computed (and its
@@ -251,10 +264,17 @@ export function avatarInitials(name: string): string {
   return name.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('')
 }
 
+// Optional per-day pay function (#285): callers can inject the labour-law
+// uplift maths (lib/schedule.ts calcDayPay) without utils importing schedule —
+// that would be a runtime import cycle. Default is the flat netMin/60 × rate.
+export type DayPayFn = (netMin: number, rate: number, date: string, empId: string) => number
+const flatDayPay: DayPayFn = (netMin, rate) => (netMin / 60) * rate
+
 export function exportCSV(
   records: PunchRecord[],
   filename: string,
   employees: { id: string; name?: string; hourly_rate: number | null; lunch_break_minutes: number }[] = [],
+  dayPay: DayPayFn = flatDayPay,
 ): void {
   const empMap = new Map(employees.map(e => [e.id, e]))
   const SEP = ';'
@@ -332,7 +352,7 @@ export function exportCSV(
       const exits = day.filter(r => r.type === 'saída')
         .map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
 
-      const dayEarnings = rate && netMin > 0 ? netMin / 60 * rate : 0
+      const dayEarnings = rate && netMin > 0 ? dayPay(netMin, rate, date, empId) : 0
 
       row(
         dateLabel,
@@ -375,6 +395,7 @@ export async function exportPDF(
   filename: string,
   employees: { id: string; name?: string; hourly_rate: number | null; lunch_break_minutes: number }[],
   period: string,
+  dayPay: DayPayFn = flatDayPay,
 ): Promise<void> {
   const { default: jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
@@ -442,7 +463,7 @@ export async function exportPDF(
       const dateLabel = `${String(dNum).padStart(2,'0')}/${String(m).padStart(2,'0')} (${dow})`
       const entries = day.filter(r => r.type === 'entrada').map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
       const exits   = day.filter(r => r.type === 'saída').map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
-      const dayEarnings = rate && netMin > 0 ? netMin / 60 * rate : 0
+      const dayEarnings = rate && netMin > 0 ? dayPay(netMin, rate, date, empId) : 0
 
       const row: (string | number)[] = [
         dateLabel,
@@ -509,6 +530,8 @@ function escapeHtml(s: string): string {
 export function openPayslip(
   empName: string, period: string, recs: PunchRecord[],
   workdayHours: number, lunchMin: number, hourlyRate: number | null,
+  // Per-day pay override (#285) — the employee is fixed here, so no empId param.
+  dayPay: (netMin: number, rate: number, date: string) => number = (n, r) => (n / 60) * r,
 ) {
   const safeName = escapeHtml(empName)
   const safePeriod = escapeHtml(period)
@@ -534,7 +557,7 @@ export function openPayslip(
     const dateLabel = `${String(dNum).padStart(2,'0')}/${String(m).padStart(2,'0')}/${y} (${dow})`
     const entries = day.filter(r => r.type === 'entrada').map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
     const exits = day.filter(r => r.type === 'saída').map(r => new Date(r.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
-    const earn = hourlyRate && netMin > 0 ? netMin / 60 * hourlyRate : 0
+    const earn = hourlyRate && netMin > 0 ? dayPay(netMin, hourlyRate, date) : 0
     totalMin += netMin; totalEarnings += earn
     const rateCell = hourlyRate != null ? `<td>${Number(hourlyRate).toFixed(2).replace('.', ',')} €</td>` : ''
     const earnCell = hourlyRate != null ? `<td>${earn.toFixed(2).replace('.', ',')} €</td>` : ''

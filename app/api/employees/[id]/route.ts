@@ -5,6 +5,7 @@ import { verifyApiAuth } from '@/lib/apiAuth'
 import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
+import { validateWeeklySchedule } from '@/lib/schedule'
 
 export async function PATCH(
   request: NextRequest,
@@ -19,7 +20,7 @@ export async function PATCH(
 
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { name: new_name, username: new_username, email, role, workday_hours, lunch_break_minutes, hourly_rate, new_password, geo_mode, lock_profile, expected_start, expected_end, shift_start, active, reset_totp } = await request.json()
+  const { name: new_name, username: new_username, email, role, workday_hours, lunch_break_minutes, hourly_rate, new_password, geo_mode, lock_profile, expected_start, expected_end, shift_start, weekly_schedule, works_holidays, active, reset_totp } = await request.json()
 
   const updates: Record<string, unknown> = {}
 
@@ -134,6 +135,16 @@ export async function PATCH(
     updates.shift_start = shift_start ?? '00:00'
   }
 
+  // #287 — per-weekday schedule (null clears it → legacy Mon–Fri behaviour).
+  if (weekly_schedule !== undefined) {
+    const wsError = validateWeeklySchedule(weekly_schedule)
+    if (wsError) return NextResponse.json({ error: wsError }, { status: 400 })
+    updates.weekly_schedule = weekly_schedule
+  }
+  if (works_holidays !== undefined) {
+    updates.works_holidays = Boolean(works_holidays)
+  }
+
   if (Object.keys(updates).length === 0)
     return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 })
 
@@ -144,7 +155,7 @@ export async function PATCH(
     .update(updates)
     .eq('tenant_id', user.tenant_id)
     .eq('id', params.id)
-    .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, lock_profile, expected_start, expected_end, shift_start')
+    .select('id, name, username, email, role, active, created_at, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, lock_profile, expected_start, expected_end, shift_start, weekly_schedule, works_holidays')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

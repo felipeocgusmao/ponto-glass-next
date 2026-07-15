@@ -9,6 +9,7 @@ import {
   isIncompleteDay,
 } from '@/lib/utils'
 import { sendMonthlyReportEmployeeEmail, sendMonthlyReportAdminEmail } from '@/lib/email'
+import { targetMinutesForDate } from '@/lib/schedule'
 import { activeTenantIds } from '@/lib/tenant'
 import type { Employee, PunchRecord } from '@/lib/types'
 
@@ -37,7 +38,7 @@ async function runReport(params: WeekParams) {
 
   const { data: employees } = await supabase
     .from('employees')
-    .select('id, name, email, role, workday_hours, lunch_break_minutes, hourly_rate, active')
+    .select('id, name, email, role, workday_hours, lunch_break_minutes, hourly_rate, active, weekly_schedule')
     .eq('tenant_id', tenantId)
     .eq('active', true)
 
@@ -73,10 +74,9 @@ async function runReport(params: WeekParams) {
     const recs = byEmp.get(emp.id) ?? []
     if (!recs.length) continue
     const lunch = emp.lunch_break_minutes
-    const wdMin = emp.workday_hours * 60
 
     const workedMin = calcWorkedMinutesPeriod(recs, lunch)
-    const overtimeMin = calcOvertimePeriod(recs, wdMin, lunch) ?? 0
+    const overtimeMin = calcOvertimePeriod(recs, d => targetMinutesForDate(emp, d), lunch) ?? 0
     const days = new Set(recs.map(r => r.date)).size
 
     const byDate = new Map<string, PunchRecord[]>()

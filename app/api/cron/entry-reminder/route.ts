@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { BUSINESS_TZ, businessDate } from '@/lib/utils'
 import { businessClockMinutes, dueEntryReminderIds, formatClock, parseTimeToMinutes } from '@/lib/entryReminder'
+import { expectedStartForDate, isScheduledWorkday } from '@/lib/schedule'
 import { activeTenantIds } from '@/lib/tenant'
 import webpush from 'web-push'
 
@@ -25,9 +26,9 @@ export async function GET(request: NextRequest) {
 
   const now = new Date()
   const today = businessDate(now)
-  const dow = new Date(`${today}T12:00:00Z`).getUTCDay()
-  if (dow === 0 || dow === 6)
-    return NextResponse.json({ notified: 0, due: 0, skipped: 'weekend' })
+  // No global weekend skip (#287): weekend workers get their reminder on the
+  // days their weekly schedule marks as working; everyone else is filtered
+  // per-employee by isScheduledWorkday in runTenant.
 
   // One pass per active tenant — each company has its own holiday calendar,
   // employees and subscriptions.
@@ -53,21 +54,29 @@ async function runTenant(tenantId: string, now: Date, today: string): Promise<{ 
     .eq('tenant_id', tenantId)
     .eq('date', today)
 
-  if ((exceptions ?? []).some(e => !e.employee_id)) return { notified: 0, due: 0 }
-
+  // Company-wide holiday only spares people who don't work holidays (#287).
+  const companyHoliday = (exceptions ?? []).some(e => !e.employee_id)
   const offIds = new Set((exceptions ?? []).map(e => e.employee_id).filter(Boolean))
   const nowMinutes = businessClockMinutes(now, BUSINESS_TZ)
 
   const { data: employees } = await supabase
     .from('employees')
-    .select('id, name, expected_start')
+    .select('id, name, expected_start, workday_hours, expected_end, weekly_schedule, works_holidays')
     .eq('tenant_id', tenantId)
     .eq('active', true)
     .eq('role', 'employee')
-    .not('expected_start', 'is', null)
 
-  const dueIds = dueEntryReminderIds(employees ?? [], nowMinutes, LOOK_AHEAD_MINUTES)
-  const dueEmployees = (employees ?? []).filter(employee => dueIds.has(employee.id) && !offIds.has(employee.id))
+  // Per-day expected start (#287): the weekly schedule's start for today wins,
+  // falling back to the single expected_start field.
+  const scheduled = (employees ?? [])
+    .filter(employee =>
+      isScheduledWorkday(employee, today) &&
+      (!companyHoliday || employee.works_holidays === true))
+    .map(employee => ({ ...employee, expected_start: expectedStartForDate(employee, today) }))
+    .filter(employee => employee.expected_start != null)
+
+  const dueIds = dueEntryReminderIds(scheduled, nowMinutes, LOOK_AHEAD_MINUTES)
+  const dueEmployees = scheduled.filter(employee => dueIds.has(employee.id) && !offIds.has(employee.id))
   if (!dueEmployees.length) return { notified: 0, due: 0 }
 
   const ids = dueEmployees.map(employee => employee.id)

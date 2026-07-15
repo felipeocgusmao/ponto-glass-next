@@ -225,6 +225,37 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
   )
 }
 
+// Display order Mon…Sun; stored keys are 0=Sunday…6=Saturday.
+const WEEK_DOWS = ['1', '2', '3', '4', '5', '6', '0'] as const
+type DayDraft = { off: boolean; hours: string; start: string; end: string }
+
+function draftFromSchedule(ws: Employee['weekly_schedule']): Record<string, DayDraft> {
+  const out: Record<string, DayDraft> = {}
+  for (const d of WEEK_DOWS) {
+    const entry = ws?.[d as keyof NonNullable<typeof ws>]
+    const weekend = d === '0' || d === '6'
+    out[d] = entry
+      ? { off: !!entry.off, hours: entry.hours != null ? String(entry.hours) : '', start: entry.start ?? '', end: entry.end ?? '' }
+      : { off: weekend, hours: '', start: '', end: '' }
+  }
+  return out
+}
+
+function scheduleFromDraft(draft: Record<string, DayDraft>): NonNullable<Employee['weekly_schedule']> {
+  const out: Record<string, unknown> = {}
+  for (const d of WEEK_DOWS) {
+    const w = draft[d]
+    out[d] = w.off
+      ? { off: true }
+      : {
+          ...(w.hours !== '' ? { hours: Number(w.hours) } : {}),
+          ...(w.start !== '' ? { start: w.start } : {}),
+          ...(w.end !== '' ? { end: w.end } : {}),
+        }
+  }
+  return out as NonNullable<Employee['weekly_schedule']>
+}
+
 function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }) {
   const { t } = useLang()
   const [name, setName] = useState(emp.name)
@@ -238,6 +269,9 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
   const [expectedStart, setExpectedStart] = useState(emp.expected_start ?? '')
   const [expectedEnd, setExpectedEnd] = useState(emp.expected_end ?? '')
   const [shiftStart, setShiftStart] = useState(emp.shift_start ?? '00:00')
+  const [useWeekly, setUseWeekly] = useState(!!emp.weekly_schedule)
+  const [weekly, setWeekly] = useState<Record<string, DayDraft>>(() => draftFromSchedule(emp.weekly_schedule ?? null))
+  const [worksHolidays, setWorksHolidays] = useState(!!emp.works_holidays)
   const [newPassword, setNewPassword] = useState('')
   const [showNewPwd, setShowNewPwd] = useState(false)
   const [err, setErr] = useState('')
@@ -255,6 +289,8 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
     if (expectedStart !== (emp.expected_start ?? '')) body.expected_start = expectedStart || null
     if (expectedEnd !== (emp.expected_end ?? '')) body.expected_end = expectedEnd || null
     if (shiftStart !== (emp.shift_start ?? '00:00')) body.shift_start = shiftStart
+    body.weekly_schedule = useWeekly ? scheduleFromDraft(weekly) : null
+    body.works_holidays = worksHolidays
     if (newPassword) body.new_password = newPassword
     const res = await fetch(`/api/employees/${emp.id}`, {
       method: 'PATCH',
@@ -334,6 +370,47 @@ function EmployeeSettings({ emp, onDone }: { emp: Employee; onDone: () => void }
             <label>{t('emp.expected_end')}</label>
             <input type="time" value={expectedEnd} onChange={e => setExpectedEnd(e.target.value)} className="input" />
           </div>
+        </div>
+        <div className="field" style={{ marginTop: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={useWeekly} onChange={e => setUseWeekly(e.target.checked)} />
+            {t('emp.weekly.enable')}
+          </label>
+          <div style={{ fontSize: 10, color: 'var(--fg-subtle)', marginTop: 3 }}>{t('emp.weekly.hint')}</div>
+        </div>
+        {useWeekly && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+            {WEEK_DOWS.map(d => {
+              const w = weekly[d]
+              const set = (patch: Partial<DayDraft>) => setWeekly(prev => ({ ...prev, [d]: { ...prev[d], ...patch } }))
+              return (
+                <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 32, fontSize: 12, color: 'var(--fg-muted)', flexShrink: 0 }}>{t(`day.short.${d}` as Parameters<typeof t>[0])}</span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--fg-muted)', cursor: 'pointer', flexShrink: 0 }}>
+                    <input type="checkbox" checked={w.off} onChange={e => set({ off: e.target.checked })} />
+                    {t('emp.weekly.off')}
+                  </label>
+                  {!w.off && (
+                    <>
+                      <select value={w.hours} onChange={e => set({ hours: e.target.value })} className="input" style={{ width: 88, height: 30, fontSize: 12 }} aria-label={t('emp.weekly.hours')}>
+                        <option value="">{t('emp.weekly.default')}</option>
+                        {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => <option key={h} value={h}>{h}h</option>)}
+                      </select>
+                      <input type="time" value={w.start} onChange={e => set({ start: e.target.value })} className="input" style={{ height: 30, fontSize: 12, minWidth: 0 }} aria-label={t('emp.expected_start')} />
+                      <input type="time" value={w.end} onChange={e => set({ end: e.target.value })} className="input" style={{ height: 30, fontSize: 12, minWidth: 0 }} aria-label={t('emp.expected_end')} />
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <div className="field">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={worksHolidays} onChange={e => setWorksHolidays(e.target.checked)} />
+            {t('emp.works_holidays')}
+          </label>
+          <div style={{ fontSize: 10, color: 'var(--fg-subtle)', marginTop: 3 }}>{t('emp.works_holidays.hint')}</div>
         </div>
         <div className="field">
           <label>{t('emp.shift_start')}</label>

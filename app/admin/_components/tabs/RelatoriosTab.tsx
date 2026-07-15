@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { exportCSV, exportPDF, fmtCentesimal, fmtCentesimalSigned, fmtEur, roundToQuarter, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, businessDate, isIncompleteDay, avatarInitials } from '@/lib/utils'
+import { targetMinutesForDate, isScheduledWorkday, calcPeriodPay, calcDayPay } from '@/lib/schedule'
 import { empColor, getWorkingDays, openPayslip } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import { IconDownload, IconRefresh } from '../icons'
@@ -212,8 +213,35 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
   const [error, setError] = useState('')
   const [truncated, setTruncated] = useState(false)
   const [dayExceptions, setDayExceptions] = useState<string[]>([])
+  // #285 — company holidays inside the period + the tenant's pay-uplift opt-in.
+  const [holidays, setHolidays] = useState<string[]>([])
+  const [otMultipliers, setOtMultipliers] = useState(false)
   const [emailSending, setEmailSending] = useState(false)
   const [emailMsg, setEmailMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  // Tenant pay-uplift opt-in loads once — it changes rarely and only in Ajustes.
+  useEffect(() => {
+    fetch('/api/tenant-settings')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) setOtMultipliers(Boolean(d.overtime_multipliers)) })
+      .catch(() => {})
+  }, [])
+
+  // Per-day pay with the art. 268.º uplifts, injected into exports/holerites so
+  // every money figure agrees with the summary column.
+  const dayPay = useMemo(() => {
+    if (!otMultipliers) return undefined
+    const holidaySet = new Set(holidays)
+    const byId = new Map(employees.map(e => [e.id, e]))
+    return (netMin: number, rate: number, date: string, empId: string) => {
+      const sched = byId.get(empId) ?? { workday_hours: 8 }
+      return calcDayPay(netMin, rate, {
+        targetMin: targetMinutesForDate(sched, date),
+        isRestDay: !isScheduledWorkday(sched, date),
+        isHoliday: holidaySet.has(date),
+      })
+    }
+  }, [otMultipliers, holidays, employees])
 
   const handleFromChange = (val: string) => { setFrom(val); if (val > to) setTo(val) }
   const handleToChange   = (val: string) => { setTo(val);   if (val < from) setFrom(val) }
@@ -246,8 +274,9 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
       setRecords(allData)
       setTruncated(false)
       if (excRes.ok) {
-        const exc: { date: string }[] = await excRes.json()
+        const exc: { date: string; type?: string; employee_id?: string | null }[] = await excRes.json()
         setDayExceptions(exc.map(e => e.date))
+        setHolidays(exc.filter(e => e.type === 'holiday' && !e.employee_id).map(e => e.date))
       }
       setLoaded(true)
     } catch { setError(t('error.connect')) }
@@ -287,26 +316,35 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
       const workdayHours = emp?.workday_hours ?? 8
       const workedMin = calcWorkedMinutesPeriod(recs, lunch)
       const expectedMin = workdayHours * 60
-      const overtime = calcOvertimePeriod(recs, expectedMin, lunch) ?? 0
+      // Per-weekday target (#287): a scheduled 7h Saturday counts 7h, days off 0h.
+      const schedEmp = emp ?? { workday_hours: workdayHours }
+      const overtime = calcOvertimePeriod(recs, d => targetMinutesForDate(schedEmp, d), lunch) ?? 0
       const days = new Set(recs.map(r => r.date)).size
-      const earnings = emp?.hourly_rate != null ? (workedMin / 60) * Number(emp.hourly_rate) : null
+      // Flat mode gives the same figure as the old (workedMin/60)×rate; with the
+      // tenant opt-in it applies the art. 268.º uplifts per day (#285).
+      const earnings = emp?.hourly_rate != null
+        ? calcPeriodPay(recs, { ...schedEmp, hourly_rate: Number(emp.hourly_rate) }, { multipliers: otMultipliers, holidays, lunchBreakMinutes: lunch })
+        : null
       const incompleteDays = (() => {
         const byDate = new Map<string, PunchRecord[]>()
         recs.forEach(r => { if (!byDate.has(r.date)) byDate.set(r.date, []); byDate.get(r.date)!.push(r) })
         let n = 0; byDate.forEach(d => { if (isIncompleteDay(d)) n++ })
         return n
       })()
-      return { empId, emp, name, workedMin, expectedMin, overtime, days, earnings, incompleteDays, recs }
+      // Sum of the per-day targets over recorded days (identity: net − overtime),
+      // so the 'Previsto' column agrees with schedule-aware overtime (#287).
+      const targetSum = workedMin - overtime
+      return { empId, emp, name, workedMin, expectedMin, targetSum, overtime, days, earnings, incompleteDays, recs }
     })
     rows.sort((a, b) => b.workedMin - a.workedMin)
     return rows
-  }, [byEmp, employees])
+  }, [byEmp, employees, otMultipliers, holidays])
 
   const totals = useMemo(() => {
     const t = { workedMin: 0, expectedMin: 0, overtime: 0, days: 0, earnings: 0, withRate: 0 }
     summary.forEach(r => {
       t.workedMin += r.workedMin
-      t.expectedMin += r.expectedMin * r.days
+      t.expectedMin += r.targetSum
       t.overtime += r.overtime
       t.days += r.days
       if (r.earnings != null) { t.earnings += r.earnings; t.withRate += 1 }
@@ -326,11 +364,11 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
           {loaded && records.length > 0 && (
             <>
               <button
-                onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })))}
+                onClick={() => exportCSV(records, `ponto_${from}_${to}.csv`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })), dayPay)}
                 className="btn"
               ><IconDownload size={13}/> CSV</button>
               <button
-                onClick={() => exportPDF(records, `ponto_${from}_${to}.pdf`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })), `${from} a ${to}`)}
+                onClick={() => exportPDF(records, `ponto_${from}_${to}.pdf`, employees.map(e => ({ id: e.id, name: e.name, hourly_rate: e.hourly_rate, lunch_break_minutes: e.lunch_break_minutes })), `${from} a ${to}`, dayPay)}
                 className="btn"
               ><IconDownload size={13}/> PDF</button>
               <a
@@ -455,7 +493,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                         </td>
                         <td className="right tnum">{r.days}</td>
                         <td className="right tnum" style={{ fontWeight: 500 }}>{fmtCentesimal(r.workedMin)}</td>
-                        <td className="right tnum muted">{fmtCentesimal(r.expectedMin * r.days)}</td>
+                        <td className="right tnum muted">{fmtCentesimal(r.targetSum)}</td>
                         <td className="right tnum" style={{ color: r.overtime >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
                           {fmtCentesimalSigned(r.overtime)}
                         </td>
@@ -463,7 +501,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                         {view === 'detailed' && (
                           <td className="right">
                             <button
-                              onClick={() => openPayslip(r.name, `${from} a ${to}`, r.recs, r.emp?.workday_hours ?? 8, r.emp?.lunch_break_minutes ?? 60, r.emp?.hourly_rate ?? null)}
+                              onClick={() => openPayslip(r.name, `${from} a ${to}`, r.recs, r.emp?.workday_hours ?? 8, r.emp?.lunch_break_minutes ?? 60, r.emp?.hourly_rate ?? null, dayPay ? (n, rt, d) => dayPay(n, rt, d, r.empId) : undefined)}
                               className="btn ghost sm"
                             >📄</button>
                           </td>

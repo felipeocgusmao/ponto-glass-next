@@ -171,6 +171,12 @@ ALTER TABLE records    ADD COLUMN IF NOT EXISTS comment TEXT;
 ALTER TABLE employees  ADD COLUMN IF NOT EXISTS expected_start TIME;
 ALTER TABLE employees  ADD COLUMN IF NOT EXISTS expected_end   TIME;
 ALTER TABLE employees  ADD COLUMN IF NOT EXISTS shift_start    TIME NOT NULL DEFAULT '00:00';
+-- v13 (#287): horário semanal por funcionário + trabalho em fins de semana/feriados.
+-- weekly_schedule: JSONB '0'(dom)…'6'(sáb) → { off?, hours?, start?, end? };
+-- NULL = comportamento antigo (semana seg–sex com os campos únicos acima).
+-- works_holidays: feriados de empresa não suprimem lembretes para este funcionário.
+ALTER TABLE employees  ADD COLUMN IF NOT EXISTS weekly_schedule JSONB;
+ALTER TABLE employees  ADD COLUMN IF NOT EXISTS works_holidays  BOOLEAN NOT NULL DEFAULT false;
 -- shift_start: LOCAL (business-timezone) time at which a new workday begins.
 -- '00:00' = normal day shift (work date = the local calendar day).
 -- '22:00' = night shift starting at 22:00 local — punches before 22:00 local belong to the previous day.
