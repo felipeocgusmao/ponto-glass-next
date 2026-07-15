@@ -1,0 +1,62 @@
+# Crons intradiários via GitHub Actions.
+#
+# O plano Hobby do Vercel só permite cron jobs UMA vez por dia, mas os lembretes
+# (entrada/saída) precisam de correr várias vezes, e os restantes precisam de
+# disparar em DUAS horas UTC para a hora LOCAL ser estável entre horário de
+# verão e inverno (#286) — o handler tem uma guarda de hora local e só executa
+# na invocação certa. Este workflow chama os endpoints; o vercel.json mantém
+# apenas os crons genuinamente diários (relatórios, hour-bank-cap).
+#
+# Setup (uma vez): Settings → Secrets and variables → Actions →
+#   - Secret  CRON_SECRET — o MESMO valor da env var CRON_SECRET no Vercel
+#   - Variable APP_URL (opcional) — URL da app; por omissão usa o domínio .vercel.app
+#
+# Nota: o agendamento do GitHub Actions pode atrasar alguns minutos em horas de
+# pico; os handlers têm dedup (audit log) ou guardas de hora, por isso chamadas
+# repetidas ou atrasadas são inofensivas.
+
+name: Crons
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Lembretes de entrada/saída — a cada 30 min; os handlers decidem quem está
+    # na janela (expected_start/expected_end por dia da semana) e dedupam.
+    - cron: '*/30 5-22 * * *'
+    # Verificação de ausências — guarda local: 10:00 (9 UTC no verão, 10 no inverno).
+    - cron: '0 9,10 * * *'
+    # Saídas em falta + alertas/conformidade — guarda local: 21:00.
+    - cron: '0 20,21 * * *'
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: ${{ vars.APP_URL || 'https://ponto-glass-next.vercel.app' }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Verificar segredo
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Secret CRON_SECRET não configurado (Settings → Secrets and variables → Actions). Use o mesmo valor da env var CRON_SECRET no Vercel."
+            exit 1
+          fi
+
+      - name: Lembretes (entrada + saída)
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/30 5-22 * * *'
+        run: |
+          curl -fsS -m 60 -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/entry-reminder"
+          echo
+          curl -fsS -m 60 -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/punch-out-reminder"
+
+      - name: Verificação de ausências
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 9,10 * * *'
+        run: |
+          curl -fsS -m 60 -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/absence-check"
+
+      - name: Saídas em falta + alertas
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 20,21 * * *'
+        run: |
+          curl -fsS -m 60 -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/missing-exit"
+          echo
+          curl -fsS -m 60 -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/alert-check"
