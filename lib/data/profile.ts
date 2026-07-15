@@ -9,13 +9,21 @@ import type { ApiUser, EmployeeProfile } from '@/lib/types'
 // migration hasn't been applied yet, falls back to the basic set so the user can
 // still load instead of being kicked into a logout loop.
 export async function getEmployeeProfile(user: ApiUser): Promise<EmployeeProfile | null> {
-  const ext = await supabase
-    .from('employees')
-    .select('id, name, username, role, super_admin, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, pending_email, lock_profile, theme, expected_start, expected_end, shift_start')
-    .eq('tenant_id', user.tenant_id)
-    .eq('id', user.id)
-    .maybeSingle()
-  if (ext.data) return ext.data as unknown as EmployeeProfile
+  const [ext, tenant] = await Promise.all([
+    supabase
+      .from('employees')
+      .select('id, name, username, role, super_admin, workday_hours, lunch_break_minutes, hourly_rate, geo_mode, email, pending_email, lock_profile, theme, expected_start, expected_end, shift_start, weekly_schedule, works_holidays')
+      .eq('tenant_id', user.tenant_id)
+      .eq('id', user.id)
+      .maybeSingle(),
+    // Company compliance opt-in (#285) rides along so /ponto can show the
+    // rest-break warning without an extra admin-only settings call.
+    supabase.from('tenants').select('alert_settings').eq('id', user.tenant_id).maybeSingle(),
+  ])
+  const ptCompliance = Boolean(
+    (tenant.data?.alert_settings as { pt_compliance?: boolean } | null)?.pt_compliance
+  )
+  if (ext.data) return { ...(ext.data as unknown as EmployeeProfile), pt_compliance: ptCompliance }
 
   const basic = await supabase
     .from('employees')
@@ -23,5 +31,6 @@ export async function getEmployeeProfile(user: ApiUser): Promise<EmployeeProfile
     .eq('tenant_id', user.tenant_id)
     .eq('id', user.id)
     .maybeSingle()
-  return (basic.data as unknown as EmployeeProfile) ?? null
+  if (!basic.data) return null
+  return { ...(basic.data as unknown as EmployeeProfile), pt_compliance: ptCompliance }
 }

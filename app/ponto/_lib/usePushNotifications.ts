@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import type { EmployeeProfile, PunchRecord } from '@/lib/types'
 import { getWorkState, calcLiveMin, businessDate } from '@/lib/utils'
+import { targetMinutesForDate } from '@/lib/schedule'
 
 type TFn = (key: string) => string
 
@@ -50,7 +51,7 @@ export function usePushNotifications({ user, records, t }: Options) {
       const { state } = getWorkState(myRecs)
       if (state !== 'working') return
       const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
-      const targetMin = user.workday_hours * 60
+      const targetMin = targetMinutesForDate(user, businessDate())
       const remaining = targetMin - liveMin
       const overtime = liveMin - targetMin
       const today = businessDate()
@@ -112,7 +113,7 @@ export function usePushNotifications({ user, records, t }: Options) {
       }
       const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
       const endMin = parseHM(user.expected_end)
-      const workdayMin = user.workday_hours * 60
+      const workdayMin = targetMinutesForDate(user, businessDate())
       const eligible = endMin != null ? nowMin >= endMin : liveMin >= workdayMin
       if (!eligible) return
       const key = `pg.notif.q.exit.${today}.${targetLabel}`

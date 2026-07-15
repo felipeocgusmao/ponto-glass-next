@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { EmployeeProfile, PunchRecord } from '@/lib/types'
 import { getWorkState, calcLiveMin, fmtMin, ProgressRing, getGeo } from '../../_lib/helpers'
 import { businessDate } from '@/lib/utils'
+import { targetMinutesForDate } from '@/lib/schedule'
 import { useLang } from '@/lib/LangContext'
 
 function PlayIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}><polygon points="5 3 19 12 5 21 5 3"/></svg> }
@@ -67,7 +68,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
     const { state: ws } = getWorkState(records)
     if (ws !== 'working') return
     const liveM = calcLiveMin(records, user.lunch_break_minutes)
-    const wMin = user.workday_hours * 60
+    const wMin = targetMinutesForDate(user, businessDate())
     const rem = wMin - liveM
     const ot = liveM - wMin
     const today = businessDate()
@@ -96,7 +97,7 @@ export function MeuPontoTab({ user }: { user: EmployeeProfile }) {
   const { state, since } = getWorkState(records)
   const isOut = state === 'off' && records.some(r => r.type === 'saída')
   const liveMin = calcLiveMin(records, user.lunch_break_minutes)
-  const workdayMin = user.workday_hours * 60
+  const workdayMin = targetMinutesForDate(user, businessDate())
   const pct = workdayMin > 0 ? Math.min(100, (liveMin / workdayMin) * 100) : 0
   const isOvertime = liveMin > workdayMin
   const remaining = Math.max(0, workdayMin - liveMin)

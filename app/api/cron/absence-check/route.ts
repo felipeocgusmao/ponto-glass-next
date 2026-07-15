@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { businessDate } from '@/lib/utils'
+import { businessDate, businessHourOfDay } from '@/lib/utils'
+import { isScheduledWorkday } from '@/lib/schedule'
 import { activeTenantIds } from '@/lib/tenant'
 import webpush from 'web-push'
+
+// The cron fires at two UTC hours (vercel.json) so one of them always lands on
+// this LOCAL hour, summer or winter time (#286).
+const TARGET_LOCAL_HOUR = 10
 
 // Guard so a deploy without VAPID keys doesn't crash this module at load
 // (web-push throws on an empty public key) — consistent with the other push routes.
@@ -21,11 +26,12 @@ export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const today = businessDate()
+  if (businessHourOfDay() !== TARGET_LOCAL_HOUR)
+    return NextResponse.json({ notified: 0, absent: 0, skipped: 'off-hour' })
 
-  // Never flag absences on weekends.
-  const dow = new Date(`${today}T12:00:00Z`).getUTCDay()
-  if (dow === 0 || dow === 6) return NextResponse.json({ notified: 0, absent: 0, skipped: 'weekend' })
+  const today = businessDate()
+  // No global weekend skip (#287): weekend workers are checked on their working
+  // days; everyone else is excluded per-employee by isScheduledWorkday below.
 
   // One pass per active tenant; each company gets its own holiday calendar,
   // employee list and admin notifications.
@@ -48,20 +54,21 @@ export async function GET(request: NextRequest) {
 async function runTenant(tenantId: string, today: string): Promise<{ notified: number; absent: number }> {
   const { data: employees } = await supabase
     .from('employees')
-    .select('id, name')
+    .select('id, name, workday_hours, expected_start, expected_end, weekly_schedule, works_holidays')
     .eq('tenant_id', tenantId)
     .eq('active', true)
     .eq('role', 'employee')
 
   if (!employees?.length) return { notified: 0, absent: 0 }
 
-  // Skip holidays (company-wide when employee_id is null) and per-employee days off.
+  // Company-wide holiday (employee_id null) only spares people who don't work
+  // holidays (#287); per-employee day_exceptions spare that person either way.
   const { data: exceptions } = await supabase
     .from('day_exceptions')
     .select('employee_id')
     .eq('tenant_id', tenantId)
     .eq('date', today)
-  if ((exceptions ?? []).some(e => !e.employee_id)) return { notified: 0, absent: 0 }
+  const companyHoliday = (exceptions ?? []).some(e => !e.employee_id)
   const offIds = new Set((exceptions ?? []).map(e => e.employee_id).filter(Boolean))
 
   const { data: entries } = await supabase
@@ -72,7 +79,12 @@ async function runTenant(tenantId: string, today: string): Promise<{ notified: n
     .eq('type', 'entrada')
 
   const presentIds = new Set((entries ?? []).map(r => r.employee_id))
-  const absent = employees.filter(e => !presentIds.has(e.id) && !offIds.has(e.id))
+  const absent = employees.filter(e =>
+    !presentIds.has(e.id) &&
+    !offIds.has(e.id) &&
+    isScheduledWorkday(e, today) &&
+    (!companyHoliday || e.works_holidays === true)
+  )
 
   if (!absent.length) return { notified: 0, absent: 0 }
 

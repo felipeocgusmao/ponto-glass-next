@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { businessDate, businessHourOfDay } from '@/lib/utils'
 import { activeTenantIds } from '@/lib/tenant'
 import { sendPendingRequestsEmail } from '@/lib/email'
 import webpush from 'web-push'
 import type { TenantAlertSettings } from '../../tenant-settings/route'
+
+// Dual UTC hours in vercel.json + this guard = DST-stable local run time (#286).
+const TARGET_LOCAL_HOUR = 21
 
 if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -19,7 +23,8 @@ async function runAlertCheck(tenantId: string) {
   const settings = (tenant?.alert_settings ?? {}) as TenantAlertSettings
   if (!settings.hour_bank_low_threshold && !settings.long_day_threshold) return 0
 
-  const today = new Date().toISOString().split('T')[0]
+  // Business-local day, not the UTC day — after 22:00/23:00 UTC they differ.
+  const today = businessDate()
   let alertCount = 0
 
   // Check hour bank low threshold
@@ -155,6 +160,9 @@ export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization')
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (businessHourOfDay() !== TARGET_LOCAL_HOUR)
+    return NextResponse.json({ alerts: 0, digestEmails: 0, skipped: 'off-hour' })
 
   let totalAlerts = 0
   let digestEmails = 0

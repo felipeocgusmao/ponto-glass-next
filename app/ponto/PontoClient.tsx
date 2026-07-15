@@ -10,6 +10,7 @@ import { BancoTab } from './_components/BancoTab'
 import { CorrecoesTab } from './_components/CorrecoesTab'
 import { PerfilTab } from './_components/PerfilTab'
 import { businessDate, empColor, avatarInitials, getWorkState, calcLiveMin } from '@/lib/utils'
+import { targetMinutesForDate } from '@/lib/schedule'
 import { useLang } from '@/lib/LangContext'
 import { getQueue, enqueue, flushQueue } from '@/lib/punchQueue'
 import { apiFetch } from '@/lib/apiFetch'
@@ -449,7 +450,7 @@ export function PontoClient({ initialUser, initialRecords }: PontoClientProps) {
   const state = stateMemo
   const since = sinceMemo
   const liveMin = calcLiveMin(myRecs, user.lunch_break_minutes)
-  const targetMin = user.workday_hours * 60
+  const targetMin = targetMinutesForDate(user, businessDate())
   const pct = Math.min(100, (liveMin / targetMin) * 100)
   const remaining = Math.max(0, targetMin - liveMin)
   const overtime = Math.max(0, liveMin - targetMin)

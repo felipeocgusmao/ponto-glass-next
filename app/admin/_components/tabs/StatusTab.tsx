@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { avatarInitials, fmtMinutes, calcNetMinutes, calcTimeBreakdown, calcOvertimePeriod, WORKING_TYPES, EXPLICIT_BREAK_TYPES, businessDate } from '@/lib/utils'
+import { targetMinutesForDate } from '@/lib/schedule'
 import { empColor } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import { IconRefresh } from '../icons'
@@ -248,7 +249,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
                 </div>
               </div>
             ) : filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, stateFromPriorDay, lastRecord }) => {
-              const targetMin = emp.workday_hours * 60
+              const targetMin = targetMinutesForDate(emp, businessDate())
               const pct = Math.min(100, targetMin > 0 ? (liveNetMin / targetMin) * 100 : 0)
               return (
                 <div key={emp.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -318,7 +319,7 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
             <div className="empty"><div className="desc">{t('status.none_in_state')}</div></div>
           )}
           {filteredStatuses.map(({ emp, isWorking, isOnLunch, isOnCafe, isIn, liveNetMin, liveEarnings, weekTotal, stateFromPriorDay, lastRecord }) => {
-            const targetMin = emp.workday_hours * 60
+            const targetMin = targetMinutesForDate(emp, businessDate())
             const pct = Math.min(100, targetMin > 0 ? (liveNetMin / targetMin) * 100 : 0)
             return (
               <div key={emp.id} className="status-row">

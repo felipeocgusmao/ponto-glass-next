@@ -44,6 +44,13 @@ export function businessMinutesOfDay(date: Date): number {
   return tzParts(date).minutes
 }
 
+// Local wall-clock hour (0–23) in the business timezone. Cron handlers use this
+// as a guard so a job scheduled at two UTC hours (to cover summer/winter time)
+// only runs on the invocation that matches the intended LOCAL hour (#286).
+export function businessHourOfDay(date: Date = new Date()): number {
+  return Math.floor(businessMinutesOfDay(date) / 60)
+}
+
 // Work date for a punch, honouring an employee's shift_start — the LOCAL
 // (business-timezone) time of day at which a new workday begins. For night shifts
 // (e.g. 22:00), punches before that local time belong to the previous calendar day.
@@ -191,7 +198,9 @@ export function calcOvertimeToday(
 
 export function calcOvertimePeriod(
   records: PunchRecord[],
-  workdayMinutes = WORKDAY_MINUTES,
+  // A number applies the same daily target to every day; a function receives
+  // the 'YYYY-MM-DD' date so weekly schedules can vary the target per weekday.
+  workdayMinutes: number | ((date: string) => number) = WORKDAY_MINUTES,
   lunchBreakMinutes = 0,
 ): number | null {
   const byDay = new Map<string, PunchRecord[]>()
@@ -201,11 +210,15 @@ export function calcOvertimePeriod(
   })
   if (byDay.size === 0) return null
   let totalNet = 0
+  let totalTarget = 0
   // Sum the *rounded* daily net so overtime is computed against the same values
   // the employee sees in reports and the hour bank (matches centesimal rules).
-  byDay.forEach((dayRecs) => { totalNet += calcDayRounded(dayRecs, lunchBreakMinutes) })
+  byDay.forEach((dayRecs, date) => {
+    totalNet += calcDayRounded(dayRecs, lunchBreakMinutes)
+    totalTarget += typeof workdayMinutes === 'function' ? workdayMinutes(date) : workdayMinutes
+  })
   if (!totalNet) return null
-  return totalNet - workdayMinutes * byDay.size
+  return totalNet - totalTarget
 }
 
 // Day-aware total worked minutes over a period: each day's net is computed (and its

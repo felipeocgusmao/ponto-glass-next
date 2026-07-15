@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { Employee, PunchRecord, DayException } from '@/lib/types'
 import { fmtMinutes, businessDate, businessMinutesOfDay, BUSINESS_TZ } from '@/lib/utils'
+import { targetMinutesForDate } from '@/lib/schedule'
 import type { DashboardSeed } from '../../_lib/types'
 import { empColor, getWorkState, calcLiveMin, fmtMin, getWorkingDays } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
@@ -134,7 +135,7 @@ export function DashboardTab({ employees, initialData }: { employees: Employee[]
     const stateFromPriorDay = state !== 'off' && latestRec != null && latestRec.date !== todayStr
     // ...but only today's records contribute to today's worked minutes
     const liveMin = calcLiveMin(todayRecsEmp, emp.lunch_break_minutes ?? 60, nowMs)
-    const targetMin = emp.workday_hours * 60
+    const targetMin = targetMinutesForDate(emp, todayStr)
     const earnings = emp.hourly_rate ? (liveMin / 60) * emp.hourly_rate : null
     // Use todayRecsEmp for `recs` so downstream displays (count, history) still reflect today.
     return { emp, recs: todayRecsEmp, state, since, liveMin, targetMin, earnings, stateFromPriorDay, latestRec }

@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { businessDate } from '@/lib/utils'
+import { businessDate, businessHourOfDay } from '@/lib/utils'
 import { activeTenantIds } from '@/lib/tenant'
 import webpush from 'web-push'
+
+// Late-evening local hour: after every schedule's expected end (incl. 19:30
+// exits), before midnight rolls the business day. Dual UTC hours in vercel.json
+// + this guard keep it DST-stable (#286).
+const TARGET_LOCAL_HOUR = 21
 
 if (process.env.VAPID_EMAIL && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -19,10 +24,12 @@ export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  if (businessHourOfDay() !== TARGET_LOCAL_HOUR)
+    return NextResponse.json({ notified: 0, missing: 0, skipped: 'off-hour' })
+
+  // Runs every day (#287): whoever clocked in — weekend or holiday — and has no
+  // clock-out deserves the admin heads-up; people who didn't work have no entrada.
   const today = businessDate()
-  const dow = new Date(`${today}T12:00:00Z`).getUTCDay()
-  if (dow === 0 || dow === 6)
-    return NextResponse.json({ notified: 0, missing: 0, skipped: 'weekend' })
 
   // One pass per active tenant; holidays and notifications are per-company.
   let notified = 0
@@ -41,11 +48,12 @@ export async function GET(request: NextRequest) {
 }
 
 async function runTenant(tenantId: string, today: string): Promise<{ notified: number; missing: number }> {
+  // Per-employee day off still spares that person; a company-wide holiday no
+  // longer short-circuits the tenant — anyone who actually punched in on the
+  // holiday (works_holidays crew) still gets checked (#287).
   const { data: exceptions } = await supabase
     .from('day_exceptions').select('employee_id')
     .eq('tenant_id', tenantId).eq('date', today)
-  if ((exceptions ?? []).some(e => !e.employee_id)) return { notified: 0, missing: 0 }
-
   const offIds = new Set((exceptions ?? []).map(e => e.employee_id).filter(Boolean))
 
   const { data: entries } = await supabase

@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
 import { exportCSV, exportPDF, fmtCentesimal, fmtCentesimalSigned, fmtEur, roundToQuarter, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, businessDate, isIncompleteDay, avatarInitials } from '@/lib/utils'
+import { targetMinutesForDate, calcPeriodPay } from '@/lib/schedule'
 import { empColor, getWorkingDays, openPayslip } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
 import { IconDownload, IconRefresh } from '../icons'
@@ -287,7 +288,9 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
       const workdayHours = emp?.workday_hours ?? 8
       const workedMin = calcWorkedMinutesPeriod(recs, lunch)
       const expectedMin = workdayHours * 60
-      const overtime = calcOvertimePeriod(recs, expectedMin, lunch) ?? 0
+      // Per-weekday target (#287): a scheduled 7h Saturday counts 7h, days off 0h.
+      const schedEmp = emp ?? { workday_hours: workdayHours }
+      const overtime = calcOvertimePeriod(recs, d => targetMinutesForDate(schedEmp, d), lunch) ?? 0
       const days = new Set(recs.map(r => r.date)).size
       const earnings = emp?.hourly_rate != null ? (workedMin / 60) * Number(emp.hourly_rate) : null
       const incompleteDays = (() => {

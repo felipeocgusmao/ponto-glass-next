@@ -5,6 +5,7 @@ import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { calcDayRounded, businessDate } from '@/lib/utils'
+import { targetMinutesForDate } from '@/lib/schedule'
 import type { PunchRecord } from '@/lib/types'
 
 export async function GET(request: NextRequest) {
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     const today = businessDate()
 
     const [{ data: emps }, { data: records }, { data: adjustments }] = await Promise.all([
-      supabase.from('employees').select('id, workday_hours, lunch_break_minutes')
+      supabase.from('employees').select('id, workday_hours, lunch_break_minutes, weekly_schedule')
         .eq('tenant_id', user.tenant_id).eq('active', true),
       supabase.from('records').select('*')
         .eq('tenant_id', user.tenant_id)
@@ -53,12 +54,12 @@ export async function GET(request: NextRequest) {
 
     const balances: Record<string, number> = {}
     empMap.forEach((emp, empId) => {
-      const workdayMin = emp.workday_hours * 60
       const lunchMin = emp.lunch_break_minutes
       let raw = 0
-      byEmpDay.get(empId)?.forEach(dayRecs => {
+      byEmpDay.get(empId)?.forEach((dayRecs, date) => {
         if (!dayRecs.some(r => r.type === 'saída')) return
-        raw += calcDayRounded(dayRecs, lunchMin) - workdayMin
+        // Per-weekday target (#287): a 7h Saturday debits 7h, not the weekday 8h30.
+        raw += calcDayRounded(dayRecs, lunchMin) - targetMinutesForDate(emp, date)
       })
       balances[empId] = Math.round(raw + (adjByEmp.get(empId) ?? 0))
     })
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
 
   const { data: emp } = await supabase
     .from('employees')
-    .select('workday_hours, lunch_break_minutes')
+    .select('workday_hours, lunch_break_minutes, weekly_schedule')
     .eq('tenant_id', user.tenant_id)
     .eq('id', empId)
     .single()
@@ -99,15 +100,15 @@ export async function GET(request: NextRequest) {
     byDay.get(r.date)!.push(r)
   })
 
-  const workdayMin = emp.workday_hours * 60
   const lunchMin = emp.lunch_break_minutes
   let rawBalanceMin = 0
 
-  byDay.forEach((dayRecs) => {
+  byDay.forEach((dayRecs, date) => {
     if (!dayRecs.some(r => r.type === 'saída')) return
     // Hour bank operates on the *rounded* (centesimal-friendly) daily total so the
     // balance the employee sees matches the value printed on holerites/relatórios.
-    rawBalanceMin += calcDayRounded(dayRecs, lunchMin) - workdayMin
+    // Target is per-weekday (#287) so short Saturdays don't read as negative.
+    rawBalanceMin += calcDayRounded(dayRecs, lunchMin) - targetMinutesForDate(emp, date)
   })
 
   const { data: adjustments } = await supabase

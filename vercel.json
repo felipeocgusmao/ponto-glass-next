@@ -3,15 +3,19 @@
   "crons": [
     {
       "path": "/api/cron/absence-check",
-      "schedule": "0 9 * * 1-5"
+      "schedule": "0 9,10 * * *"
     },
     {
       "path": "/api/cron/missing-exit",
-      "schedule": "0 17 * * 1-5"
+      "schedule": "0 20,21 * * *"
     },
     {
       "path": "/api/cron/punch-out-reminder",
-      "schedule": "45 17 * * 1-5"
+      "schedule": "*/30 16-21 * * *"
+    },
+    {
+      "path": "/api/cron/entry-reminder",
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/monthly-report",
@@ -23,7 +27,7 @@
     },
     {
       "path": "/api/cron/alert-check",
-      "schedule": "0 18 * * 1-5"
+      "schedule": "0 20,21 * * *"
     },
     {
       "path": "/api/cron/hour-bank-cap",
