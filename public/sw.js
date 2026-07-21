@@ -1,4 +1,4 @@
-const CACHE = 'pontoglass-v6'
+const CACHE = 'pontoglass-v7'
 const STATIC_PRECACHE = ['/login', '/offline']
 
 self.addEventListener('install', e => {
@@ -7,7 +7,14 @@ self.addEventListener('install', e => {
     caches.open(CACHE)
       .then(c => c.addAll(STATIC_PRECACHE.map(url => new Request(url, { cache: 'reload' }))))
       .catch(() => {}) // /offline may not exist yet — fail silently
-      .then(() => self.skipWaiting())
+    // No self.skipWaiting() here (#290): a new worker now waits for the page
+    // to ask for it (see the 'message' listener below), driven by the
+    // "Nova versão disponível" banner in ServiceWorkerRegistration.tsx. Without
+    // this, the previous unconditional skipWaiting()+clients.claim() combo
+    // swapped the active worker under an open tab's feet with no visible
+    // signal — the tab kept running old JS/CSS until the user happened to
+    // fully close and reopen it (twice), which is exactly what looked like
+    // "the update never arrived".
   )
 })
 
@@ -17,6 +24,12 @@ self.addEventListener('activate', e => {
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   )
+})
+
+// Lets the page trigger the waiting worker's activation once the user accepts
+// the "update available" prompt, instead of it happening silently.
+self.addEventListener('message', e => {
+  if (e.data === 'SKIP_WAITING') self.skipWaiting()
 })
 
 self.addEventListener('fetch', e => {
