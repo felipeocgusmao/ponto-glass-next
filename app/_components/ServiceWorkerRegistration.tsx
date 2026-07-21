@@ -11,7 +11,6 @@ import { useEffect, useRef, useState } from 'react'
 export function ServiceWorkerRegistration() {
   const [updateReady, setUpdateReady] = useState(false)
   const waitingWorker = useRef<ServiceWorker | null>(null)
-  const reloading = useRef(false)
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
@@ -44,26 +43,29 @@ export function ServiceWorkerRegistration() {
       document.addEventListener('visibilitychange', onVisible)
       return () => document.removeEventListener('visibilitychange', onVisible)
     }).catch(() => {})
-
-    const onControllerChange = () => {
-      if (reloading.current) return
-      reloading.current = true
-      window.location.reload()
-    }
-    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
-    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
   }, [])
+
+  // Deliberately NOT a bare navigator.serviceWorker.addEventListener('controllerchange', reload)
+  // wired up on mount: 'controllerchange' also fires the very FIRST time a
+  // worker ever claims an until-then-uncontrolled page (clients.claim() in
+  // sw.js runs on every fresh visit, not just on updates) — an unconditional
+  // listener reloads every brand-new visitor's first page load for no reason.
+  // Arming it here, only once the user asks for the update, means it fires
+  // solely for a real update.
+  const applyUpdate = () => {
+    if (!waitingWorker.current) return
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload()
+    }, { once: true })
+    waitingWorker.current.postMessage('SKIP_WAITING')
+  }
 
   if (!updateReady) return null
 
   return (
     <div className="sw-update-banner" role="status">
       <span>Nova versão disponível</span>
-      <button
-        type="button"
-        className="btn"
-        onClick={() => waitingWorker.current?.postMessage('SKIP_WAITING')}
-      >
+      <button type="button" className="btn" onClick={applyUpdate}>
         Atualizar
       </button>
     </div>
