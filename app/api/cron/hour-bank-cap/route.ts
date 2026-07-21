@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { activeTenantIds } from '@/lib/tenant'
+import { getHourBankBalances } from '@/lib/data/hourBank'
+import { recordCronRun } from '@/lib/cronHealth'
 import webpush from 'web-push'
 import type { TenantAlertSettings } from '../../tenant-settings/route'
 
@@ -49,32 +51,27 @@ async function runHourBankCap(tenantId: string): Promise<number> {
   const max = settings.hour_bank_max_positive
   if (!max || max <= 0) return 0
 
-  const { data: balances, error } = await supabase
-    .from('hour_bank_balances')
-    .select('employee_id, balance_minutes')
-    .eq('tenant_id', tenantId)
-
-  if (error?.code === '42P01') return 0
-  if (!balances?.length) return 0
+  // #289 — was reading a `hour_bank_balances` table that was never created;
+  // the cap silently never fired. Now uses the same calc as /api/hour-bank.
+  const balances = await getHourBankBalances(tenantId)
 
   const today = new Date().toISOString().split('T')[0]
   let capped = 0
 
-  for (const row of balances as { employee_id: string; balance_minutes: number }[]) {
-    if (row.balance_minutes <= max) continue
+  for (const [employeeId, balanceMin] of Object.entries(balances)) {
+    if (balanceMin <= max) continue
 
-    const excess = row.balance_minutes - max
+    const excess = balanceMin - max
     const { error: insErr } = await supabase
       .from('hour_bank_adjustments')
       .insert({
         tenant_id: tenantId,
-        employee_id: row.employee_id,
+        employee_id: employeeId,
         minutes: -excess,
         reason: 'Cap automático de banco de horas',
         date: today,
       })
 
-    if (insErr?.code === '42P01') continue
     if (insErr) continue
 
     const h = Math.floor(max / 60)
@@ -97,9 +94,12 @@ export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const tenantIds = await activeTenantIds()
+  await recordCronRun('hour-bank-cap', tenantIds)
+
   let totalCapped = 0
   let failures = 0
-  for (const tenantId of await activeTenantIds()) {
+  for (const tenantId of tenantIds) {
     try {
       totalCapped += await runHourBankCap(tenantId)
     } catch { failures++ }

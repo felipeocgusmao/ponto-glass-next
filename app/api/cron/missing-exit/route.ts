@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { businessDate, businessHourOfDay } from '@/lib/utils'
 import { activeTenantIds } from '@/lib/tenant'
+import { recordCronRun } from '@/lib/cronHealth'
 import webpush from 'web-push'
 
 // Late-evening local hour: after every schedule's expected end (incl. 19:30
@@ -32,10 +33,13 @@ export async function GET(request: NextRequest) {
   const today = businessDate()
 
   // One pass per active tenant; holidays and notifications are per-company.
+  const tenantIds = await activeTenantIds()
+  await recordCronRun('missing-exit', tenantIds)
+
   let notified = 0
   let missingTotal = 0
   let failures = 0
-  for (const tenantId of await activeTenantIds()) {
+  for (const tenantId of tenantIds) {
     // One tenant erroring must not starve the remaining tenants.
     try {
       const r = await runTenant(tenantId, today)

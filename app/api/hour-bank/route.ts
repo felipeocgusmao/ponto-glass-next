@@ -4,9 +4,8 @@ import { verifyApiAuth } from '@/lib/apiAuth'
 import type { ApiUser } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
-import { calcDayRounded, businessDate } from '@/lib/utils'
-import { targetMinutesForDate } from '@/lib/schedule'
-import type { PunchRecord } from '@/lib/types'
+import { businessDate } from '@/lib/utils'
+import { getHourBankBalances, getHourBankBalance } from '@/lib/data/hourBank'
 
 export async function GET(request: NextRequest) {
   const token = cookies().get('ponto_token')?.value
@@ -23,47 +22,7 @@ export async function GET(request: NextRequest) {
   if (searchParams.get('all') === 'true') {
     if (!isPrivileged) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const today = businessDate()
-
-    const [{ data: emps }, { data: records }, { data: adjustments }] = await Promise.all([
-      supabase.from('employees').select('id, workday_hours, lunch_break_minutes, weekly_schedule')
-        .eq('tenant_id', user.tenant_id).eq('active', true),
-      supabase.from('records').select('*')
-        .eq('tenant_id', user.tenant_id)
-        .lt('date', today).order('timestamp', { ascending: true }),
-      supabase.from('hour_bank_adjustments').select('employee_id, minutes')
-        .eq('tenant_id', user.tenant_id),
-    ])
-
-    const empMap = new Map((emps ?? []).map(e => [e.id, e]))
-
-    // Group records by employee → date
-    const byEmpDay = new Map<string, Map<string, PunchRecord[]>>()
-    for (const r of (records ?? []) as PunchRecord[]) {
-      if (!byEmpDay.has(r.employee_id)) byEmpDay.set(r.employee_id, new Map())
-      const dm = byEmpDay.get(r.employee_id)!
-      if (!dm.has(r.date)) dm.set(r.date, [])
-      dm.get(r.date)!.push(r)
-    }
-
-    // Sum adjustments per employee
-    const adjByEmp = new Map<string, number>()
-    for (const a of (adjustments ?? []) as { employee_id: string; minutes: number }[]) {
-      adjByEmp.set(a.employee_id, (adjByEmp.get(a.employee_id) ?? 0) + a.minutes)
-    }
-
-    const balances: Record<string, number> = {}
-    empMap.forEach((emp, empId) => {
-      const lunchMin = emp.lunch_break_minutes
-      let raw = 0
-      byEmpDay.get(empId)?.forEach((dayRecs, date) => {
-        if (!dayRecs.some(r => r.type === 'saída')) return
-        // Per-weekday target (#287): a 7h Saturday debits 7h, not the weekday 8h30.
-        raw += calcDayRounded(dayRecs, lunchMin) - targetMinutesForDate(emp, date)
-      })
-      balances[empId] = Math.round(raw + (adjByEmp.get(empId) ?? 0))
-    })
-
+    const balances = await getHourBankBalances(user.tenant_id)
     return NextResponse.json(balances, {
       headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
     })
@@ -75,41 +34,8 @@ export async function GET(request: NextRequest) {
   if (empId !== user.id && !isPrivileged)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: emp } = await supabase
-    .from('employees')
-    .select('workday_hours, lunch_break_minutes, weekly_schedule')
-    .eq('tenant_id', user.tenant_id)
-    .eq('id', empId)
-    .single()
-
-  if (!emp) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
-
-  const today = businessDate()
-
-  const { data: records } = await supabase
-    .from('records')
-    .select('*')
-    .eq('tenant_id', user.tenant_id)
-    .eq('employee_id', empId)
-    .lt('date', today)
-    .order('timestamp', { ascending: true })
-
-  const byDay = new Map<string, PunchRecord[]>()
-  ;(records ?? []).forEach((r: PunchRecord) => {
-    if (!byDay.has(r.date)) byDay.set(r.date, [])
-    byDay.get(r.date)!.push(r)
-  })
-
-  const lunchMin = emp.lunch_break_minutes
-  let rawBalanceMin = 0
-
-  byDay.forEach((dayRecs, date) => {
-    if (!dayRecs.some(r => r.type === 'saída')) return
-    // Hour bank operates on the *rounded* (centesimal-friendly) daily total so the
-    // balance the employee sees matches the value printed on holerites/relatórios.
-    // Target is per-weekday (#287) so short Saturdays don't read as negative.
-    rawBalanceMin += calcDayRounded(dayRecs, lunchMin) - targetMinutesForDate(emp, date)
-  })
+  const balanceMin = await getHourBankBalance(user.tenant_id, empId)
+  if (balanceMin === null) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
 
   const { data: adjustments } = await supabase
     .from('hour_bank_adjustments')
@@ -118,9 +44,8 @@ export async function GET(request: NextRequest) {
     .eq('employee_id', empId)
     .order('date', { ascending: false })
 
-  const adjustmentsTotal = (adjustments ?? []).reduce((s: number, a: { minutes: number }) => s + a.minutes, 0)
   return NextResponse.json({
-    balanceMin: Math.round(rawBalanceMin + adjustmentsTotal),
+    balanceMin,
     adjustments: isPrivileged ? (adjustments ?? []) : [],
   }, {
     headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },

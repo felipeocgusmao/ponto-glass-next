@@ -4,6 +4,7 @@ import { BUSINESS_TZ, businessDate } from '@/lib/utils'
 import { businessClockMinutes, dueEntryReminderIds, formatClock, parseTimeToMinutes } from '@/lib/entryReminder'
 import { expectedStartForDate, isScheduledWorkday } from '@/lib/schedule'
 import { activeTenantIds } from '@/lib/tenant'
+import { recordCronRun } from '@/lib/cronHealth'
 import webpush from 'web-push'
 
 const LOOK_AHEAD_MINUTES = 60
@@ -32,10 +33,13 @@ export async function GET(request: NextRequest) {
 
   // One pass per active tenant — each company has its own holiday calendar,
   // employees and subscriptions.
+  const tenantIds = await activeTenantIds()
+  await recordCronRun('entry-reminder', tenantIds)
+
   let notified = 0
   let due = 0
   let failures = 0
-  for (const tenantId of await activeTenantIds()) {
+  for (const tenantId of tenantIds) {
     // One tenant erroring must not starve the remaining tenants.
     try {
       const r = await runTenant(tenantId, now, today)
