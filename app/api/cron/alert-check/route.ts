@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { businessDate, businessHourOfDay, fmtMinutes } from '@/lib/utils'
 import { longestContinuousWorkMin, restBetweenDaysMin } from '@/lib/schedule'
+import { getHourBankBalances, getAnnualOvertimeMinutes } from '@/lib/data/hourBank'
 import { activeTenantIds } from '@/lib/tenant'
+import { recordCronRun } from '@/lib/cronHealth'
 import { sendPendingRequestsEmail } from '@/lib/email'
 import webpush from 'web-push'
 import type { PunchRecord } from '@/lib/types'
@@ -23,7 +25,7 @@ async function runAlertCheck(tenantId: string) {
   const { data: tenant } = await supabase
     .from('tenants').select('alert_settings').eq('id', tenantId).maybeSingle()
   const settings = (tenant?.alert_settings ?? {}) as TenantAlertSettings
-  if (!settings.hour_bank_low_threshold && !settings.long_day_threshold && !settings.pt_compliance) return 0
+  if (!settings.hour_bank_low_threshold && !settings.long_day_threshold && !settings.pt_compliance && !settings.annual_overtime_limit) return 0
 
   // Business-local day, not the UTC day — after 22:00/23:00 UTC they differ.
   const today = businessDate()
@@ -80,25 +82,75 @@ async function runAlertCheck(tenantId: string) {
     }
   }
 
-  // Check hour bank low threshold
+  // Check hour bank low threshold (#289 — was reading a `hour_bank_balances`
+  // table that was never created; now uses the same calc as /api/hour-bank).
   if (settings.hour_bank_low_threshold !== null) {
     const threshold = settings.hour_bank_low_threshold
+    const balances = await getHourBankBalances(tenantId)
 
-    const { data: balances } = await supabase
-      .from('hour_bank_balances')
-      .select('employee_id, balance_minutes')
-      .eq('tenant_id', tenantId)
-
-    for (const row of (balances ?? []) as { employee_id: string; balance_minutes: number }[]) {
-      if (row.balance_minutes <= threshold) {
-        const h = Math.abs(Math.floor(row.balance_minutes / 60))
-        const m = Math.abs(row.balance_minutes % 60)
+    for (const [employeeId, balanceMin] of Object.entries(balances)) {
+      if (balanceMin <= threshold) {
+        const h = Math.abs(Math.floor(balanceMin / 60))
+        const m = Math.abs(balanceMin % 60)
         const label = `${h}h${m > 0 ? String(m).padStart(2,'0') : ''}`
         await notifyAdmins(tenantId, {
           title: 'Banco de horas negativo ⚠',
           body: `Um funcionário tem saldo de -${label}. Verifique no painel.`,
           url: '/admin',
-          tag: `bank-low-${row.employee_id}`,
+          tag: `bank-low-${employeeId}`,
+        })
+        alertCount++
+      }
+    }
+  }
+
+  // Annual overtime cap (#291, art. 228.º CT: 150h/175h por ano civil). Fires
+  // once when an employee CROSSES 80% and once at 100% — deduped via
+  // audit_logs (a "crossing" only needs reporting once per employee/year/level,
+  // not every day it stays over) rather than the plain re-fire the other
+  // alerts above use.
+  if (settings.annual_overtime_limit) {
+    const limitMin = settings.annual_overtime_limit
+    const year = Number(today.slice(0, 4))
+    const overtimeByEmp = await getAnnualOvertimeMinutes(tenantId, year)
+    const employeeIds = Object.keys(overtimeByEmp)
+
+    if (employeeIds.length) {
+      const { data: names } = await supabase
+        .from('employees').select('id, name')
+        .eq('tenant_id', tenantId).in('id', employeeIds)
+      const nameById = new Map((names ?? []).map((e: { id: string; name: string }) => [e.id, e.name]))
+
+      for (const [employeeId, minutes] of Object.entries(overtimeByEmp)) {
+        if (minutes <= 0) continue
+        const pct = minutes / limitMin
+        const level: 80 | 100 | null = pct >= 1 ? 100 : pct >= 0.8 ? 80 : null
+        if (!level) continue
+
+        const tag = `annual-ot-${level}-${year}-${employeeId}`
+        const { data: already } = await supabase
+          .from('audit_logs').select('id')
+          .eq('tenant_id', tenantId).eq('action', 'annual_overtime_alert')
+          .contains('details', { tag }).limit(1)
+        if (already?.length) continue
+
+        const name = nameById.get(employeeId) ?? 'Funcionário'
+        const h = Math.floor(minutes / 60)
+        const limitH = Math.floor(limitMin / 60)
+        await notifyAdmins(tenantId, {
+          title: level === 100 ? 'Limite anual de horas extra excedido ⚠' : 'A aproximar do limite anual de horas extra',
+          body: `${name} acumulou ${h}h de trabalho suplementar em ${year} (limite: ${limitH}h/ano, art. 228.º CT).`,
+          url: '/admin',
+          tag,
+        })
+        await supabase.from('audit_logs').insert({
+          tenant_id: tenantId,
+          actor_id: null,
+          actor_name: 'cron:alert-check',
+          action: 'annual_overtime_alert',
+          target_id: employeeId,
+          target_name: name,
+          details: { tag, year, level, minutes, limitMin },
         })
         alertCount++
       }
@@ -217,10 +269,13 @@ export async function GET(request: NextRequest) {
   if (businessHourOfDay() !== TARGET_LOCAL_HOUR)
     return NextResponse.json({ alerts: 0, digestEmails: 0, skipped: 'off-hour' })
 
+  const tenantIds = await activeTenantIds()
+  await recordCronRun('alert-check', tenantIds)
+
   let totalAlerts = 0
   let digestEmails = 0
   let failures = 0
-  for (const tenantId of await activeTenantIds()) {
+  for (const tenantId of tenantIds) {
     try {
       totalAlerts += await runAlertCheck(tenantId)
       digestEmails += await runPendingDigest(tenantId)

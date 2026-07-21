@@ -339,6 +339,11 @@ CREATE TABLE IF NOT EXISTS shift_templates (
   created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_shift_templates_tenant ON shift_templates(tenant_id);
+-- v14 (#292): horário semanal completo no template (mesma estrutura de
+-- employees.weekly_schedule) + works_holidays, para aplicar a uma equipa
+-- inteira de uma vez em vez de configurar funcionário a funcionário.
+ALTER TABLE shift_templates ADD COLUMN IF NOT EXISTS weekly_schedule JSONB;
+ALTER TABLE shift_templates ADD COLUMN IF NOT EXISTS works_holidays  BOOLEAN NOT NULL DEFAULT false;
 
 -- Aprovação de semana (timesheet lock) por funcionário.
 CREATE TABLE IF NOT EXISTS timesheet_approvals (

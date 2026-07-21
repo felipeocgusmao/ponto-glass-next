@@ -43,6 +43,11 @@ export async function POST(request: NextRequest) {
       expected_start: template.expected_start,
       expected_end: template.expected_end,
       shift_start: template.shift_start,
+      // #292 — carries the full weekly schedule (folgas/horas por dia) and
+      // works_holidays when the template has them; null clears any custom
+      // per-employee schedule so the template becomes the single source.
+      weekly_schedule: template.weekly_schedule ?? null,
+      works_holidays: Boolean(template.works_holidays),
     })
     .eq('tenant_id', user.tenant_id)
     .in('id', employeeIds)

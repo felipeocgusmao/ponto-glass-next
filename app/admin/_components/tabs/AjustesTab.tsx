@@ -2,6 +2,76 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
+// #292 — one heartbeat entry per cron (lib/cronHealth.ts); maxAgeHours is a
+// generous multiple of each cron's expected cadence (vercel.json + the GitHub
+// Actions workflow) so a genuinely stuck secret/workflow reads red without
+// false alarms from ordinary scheduling jitter.
+const CRON_HEALTH: { key: string; label: string; maxAgeHours: number }[] = [
+  { key: 'entry-reminder',      label: 'Lembrete de entrada',        maxAgeHours: 20 },
+  { key: 'punch-out-reminder',  label: 'Lembrete de saída',          maxAgeHours: 20 },
+  { key: 'absence-check',       label: 'Verificação de ausências',   maxAgeHours: 30 },
+  { key: 'missing-exit',        label: 'Saídas em falta',            maxAgeHours: 30 },
+  { key: 'alert-check',         label: 'Alertas e conformidade',     maxAgeHours: 30 },
+  { key: 'hour-bank-cap',       label: 'Cap do banco de horas',      maxAgeHours: 24 * 33 },
+]
+
+function cronTimeAgo(iso: string | null): string {
+  if (!iso) return 'nunca'
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 2) return 'agora'
+  if (m < 60) return `${m}m atrás`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h atrás`
+  return `${Math.floor(h / 24)}d atrás`
+}
+
+function CronHealthCard() {
+  const [lastRun, setLastRun] = useState<Record<string, string> | null>(null)
+
+  useEffect(() => {
+    fetch('/api/cron-health')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) setLastRun(d) })
+      .catch(() => {})
+  }, [])
+
+  return (
+    <div className="card" style={{ maxWidth: 560 }}>
+      <div className="card-head">
+        <div>
+          <div className="card-title">Lembretes automáticos</div>
+          <div className="card-sub">Última execução de cada verificação (entrada, saída, ausências, alertas).</div>
+        </div>
+      </div>
+      <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {lastRun === null ? (
+          <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>A carregar…</div>
+        ) : CRON_HEALTH.map(({ key, label, maxAgeHours }) => {
+          const iso = lastRun[key] ?? null
+          const ageHours = iso ? (Date.now() - new Date(iso).getTime()) / 3_600_000 : Infinity
+          const healthy = ageHours <= maxAgeHours
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                background: healthy ? 'var(--success-fg)' : 'var(--danger-fg)',
+              }} />
+              <span style={{ flex: 1 }}>{label}</span>
+              <span className="muted" style={{ fontSize: 12 }}>{cronTimeAgo(iso)}</span>
+            </div>
+          )
+        })}
+        <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 4 }}>
+          Os lembretes correm via GitHub Actions (plano Hobby do Vercel não permite crons intradiários).
+          Um ponto vermelho persistente costuma indicar o secret <code>CRON_SECRET</code> desalinhado ou o
+          workflow pausado no repositório.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Company-wide settings, admin only. Currently the default work journey that
 // pre-fills the form when creating a new employee. Persisted via
 // /api/tenant-settings (stored in tenants.alert_settings JSONB).
@@ -14,6 +84,7 @@ export function AjustesTab() {
   const [lunch, setLunch] = useState('60')
   const [ptCompliance, setPtCompliance] = useState(false)
   const [otMultipliers, setOtMultipliers] = useState(false)
+  const [annualLimit, setAnnualLimit] = useState('') // '' = off, else minutes as string
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -25,6 +96,7 @@ export function AjustesTab() {
         if (d.default_lunch_break_minutes != null) setLunch(String(d.default_lunch_break_minutes))
         setPtCompliance(Boolean(d.pt_compliance))
         setOtMultipliers(Boolean(d.overtime_multipliers))
+        setAnnualLimit(d.annual_overtime_limit != null ? String(d.annual_overtime_limit) : '')
       }
     } catch { /* silent */ }
     finally { setLoading(false) }
@@ -43,6 +115,7 @@ export function AjustesTab() {
           default_lunch_break_minutes: lunch === '' ? null : Number(lunch),
           pt_compliance: ptCompliance,
           overtime_multipliers: otMultipliers,
+          annual_overtime_limit: annualLimit === '' ? null : Number(annualLimit),
         }),
       })
       if (res.ok) {
@@ -51,6 +124,7 @@ export function AjustesTab() {
         if (d.default_lunch_break_minutes != null) setLunch(String(d.default_lunch_break_minutes))
         setPtCompliance(Boolean(d.pt_compliance))
         setOtMultipliers(Boolean(d.overtime_multipliers))
+        setAnnualLimit(d.annual_overtime_limit != null ? String(d.annual_overtime_limit) : '')
         setMsg({ ok: true, text: 'Guardado.' })
       } else {
         const d = await res.json().catch(() => ({}))
@@ -131,6 +205,18 @@ export function AjustesTab() {
                       </span>
                     </span>
                   </label>
+                  <div className="field" style={{ marginTop: 4 }}>
+                    <label>Limite anual de trabalho suplementar</label>
+                    <select className="input" value={annualLimit} onChange={e => setAnnualLimit(e.target.value)}>
+                      <option value="">Desligado</option>
+                      <option value="10500">175h/ano (micro/pequenas empresas)</option>
+                      <option value="9000">150h/ano (médias/grandes empresas)</option>
+                    </select>
+                    <div style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 3 }}>
+                      Acompanha o suplementar acumulado no ano civil na aba Banco de Horas e avisa o
+                      admin ao atingir 80% e 100% do limite (art. 228.º CT).
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -148,6 +234,8 @@ export function AjustesTab() {
           )}
         </div>
       </div>
+
+      <CronHealthCard />
     </>
   )
 }

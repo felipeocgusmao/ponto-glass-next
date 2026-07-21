@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { businessDate, businessHourOfDay } from '@/lib/utils'
 import { isScheduledWorkday } from '@/lib/schedule'
 import { activeTenantIds } from '@/lib/tenant'
+import { recordCronRun } from '@/lib/cronHealth'
 import webpush from 'web-push'
 
 // The cron fires at two UTC hours (vercel.json) so one of them always lands on
@@ -35,10 +36,13 @@ export async function GET(request: NextRequest) {
 
   // One pass per active tenant; each company gets its own holiday calendar,
   // employee list and admin notifications.
+  const tenantIds = await activeTenantIds()
+  await recordCronRun('absence-check', tenantIds)
+
   let notified = 0
   let absentTotal = 0
   let failures = 0
-  for (const tenantId of await activeTenantIds()) {
+  for (const tenantId of tenantIds) {
     // One tenant erroring (DB hiccup, bad subscription payload) must not
     // starve the remaining tenants of their notifications.
     try {

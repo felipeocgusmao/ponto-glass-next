@@ -17,6 +17,8 @@ interface ShiftTemplate {
   expected_start: string | null
   expected_end: string | null
   shift_start: string
+  weekly_schedule?: Employee['weekly_schedule']
+  works_holidays?: boolean
 }
 
 function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
@@ -29,6 +31,11 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
   const [expectedStart, setExpectedStart] = useState('')
   const [expectedEnd, setExpectedEnd] = useState('')
   const [shiftStart, setShiftStart] = useState('00:00')
+  // #292 — same weekly-schedule grid used on the individual employee form,
+  // so a template can carry per-weekday hours/off-days for a whole team.
+  const [useWeekly, setUseWeekly] = useState(false)
+  const [weekly, setWeekly] = useState<Record<string, DayDraft>>(() => draftFromSchedule(null))
+  const [worksHolidays, setWorksHolidays] = useState(false)
   const [creating, setCreating] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [applyModal, setApplyModal] = useState<ShiftTemplate | null>(null)
@@ -67,10 +74,16 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
       const res = await fetch('/api/shift-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, workday_hours: workdayHours, lunch_break_minutes: lunchMin, expected_start: expectedStart || null, expected_end: expectedEnd || null, shift_start: shiftStart }),
+        body: JSON.stringify({
+          name, workday_hours: workdayHours, lunch_break_minutes: lunchMin,
+          expected_start: expectedStart || null, expected_end: expectedEnd || null, shift_start: shiftStart,
+          weekly_schedule: useWeekly ? scheduleFromDraft(weekly) : null,
+          works_holidays: worksHolidays,
+        }),
       })
       if (res.ok) {
         setName(''); setExpectedStart(''); setExpectedEnd(''); setShiftStart('00:00')
+        setUseWeekly(false); setWeekly(draftFromSchedule(null)); setWorksHolidays(false)
         setShowCreate(false)
         await load()
       } else {
@@ -109,9 +122,14 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
               {t('tmpl.modal_hint')}
-              <strong> {applyModal.workday_hours}h/dia, {applyModal.lunch_break_minutes}min almoço</strong>
-              {applyModal.expected_start && `, entrada ${applyModal.expected_start}`}
-              {applyModal.expected_end && `, saída ${applyModal.expected_end}`}
+              {applyModal.weekly_schedule ? (
+                <strong> horário semanal personalizado</strong>
+              ) : (
+                <strong> {applyModal.workday_hours}h/dia, {applyModal.lunch_break_minutes}min almoço</strong>
+              )}
+              {!applyModal.weekly_schedule && applyModal.expected_start && `, entrada ${applyModal.expected_start}`}
+              {!applyModal.weekly_schedule && applyModal.expected_end && `, saída ${applyModal.expected_end}`}
+              {applyModal.works_holidays && ' · trabalha feriados'}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 260, overflowY: 'auto' }}>
               {employees.filter(e => e.active !== false).map(emp => (
@@ -181,13 +199,55 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
               <div className="form-grid-2">
                 <div className="field">
                   <label>{t('tmpl.exp_in_label')}</label>
-                  <input type="time" value={expectedStart} onChange={e => setExpectedStart(e.target.value)} className="input" />
+                  <input type="time" value={expectedStart} onChange={e => setExpectedStart(e.target.value)} className="input" disabled={useWeekly} />
                 </div>
                 <div className="field">
                   <label>{t('tmpl.exp_out_label')}</label>
-                  <input type="time" value={expectedEnd} onChange={e => setExpectedEnd(e.target.value)} className="input" />
+                  <input type="time" value={expectedEnd} onChange={e => setExpectedEnd(e.target.value)} className="input" disabled={useWeekly} />
                 </div>
               </div>
+
+              <div className="field" style={{ marginTop: 4 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={useWeekly} onChange={e => setUseWeekly(e.target.checked)} />
+                  {t('emp.weekly.enable')}
+                </label>
+                <div style={{ fontSize: 10, color: 'var(--fg-subtle)', marginTop: 3 }}>{t('emp.weekly.hint')}</div>
+              </div>
+              {useWeekly && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 4 }}>
+                  {WEEK_DOWS.map(d => {
+                    const w = weekly[d]
+                    const set = (patch: Partial<DayDraft>) => setWeekly(prev => ({ ...prev, [d]: { ...prev[d], ...patch } }))
+                    return (
+                      <div key={d} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 32, fontSize: 12, color: 'var(--fg-muted)', flexShrink: 0 }}>{t(`day.short.${d}` as Parameters<typeof t>[0])}</span>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--fg-muted)', cursor: 'pointer', flexShrink: 0 }}>
+                          <input type="checkbox" checked={w.off} onChange={e => set({ off: e.target.checked })} />
+                          {t('emp.weekly.off')}
+                        </label>
+                        {!w.off && (
+                          <>
+                            <select value={w.hours} onChange={e => set({ hours: e.target.value })} className="input" style={{ width: 88, height: 30, fontSize: 12 }} aria-label={t('emp.weekly.hours')}>
+                              <option value="">{t('emp.weekly.default')}</option>
+                              {[4, 5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 10].map(h => <option key={h} value={h}>{h}h</option>)}
+                            </select>
+                            <input type="time" value={w.start} onChange={e => set({ start: e.target.value })} className="input" style={{ height: 30, fontSize: 12, minWidth: 0 }} aria-label={t('emp.expected_start')} />
+                            <input type="time" value={w.end} onChange={e => set({ end: e.target.value })} className="input" style={{ height: 30, fontSize: 12, minWidth: 0 }} aria-label={t('emp.expected_end')} />
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              <div className="field">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={worksHolidays} onChange={e => setWorksHolidays(e.target.checked)} />
+                  {t('emp.works_holidays')}
+                </label>
+              </div>
+
               {err && <div className="alert-inline err">{err}</div>}
               <button type="submit" disabled={creating} className="btn primary" style={{ alignSelf: 'flex-start' }}>
                 {creating ? t('tmpl.creating') : t('tmpl.create_btn')}
@@ -208,9 +268,14 @@ function ShiftTemplatesCard({ employees }: { employees: Employee[] }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{tmpl.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
-                      {tmpl.workday_hours}h · {tmpl.lunch_break_minutes}min almoço
-                      {tmpl.expected_start && ` · entrada ${tmpl.expected_start}`}
-                      {tmpl.expected_end && ` · saída ${tmpl.expected_end}`}
+                      {tmpl.weekly_schedule ? 'horário semanal personalizado' : (
+                        <>
+                          {tmpl.workday_hours}h · {tmpl.lunch_break_minutes}min almoço
+                          {tmpl.expected_start && ` · entrada ${tmpl.expected_start}`}
+                          {tmpl.expected_end && ` · saída ${tmpl.expected_end}`}
+                        </>
+                      )}
+                      {tmpl.works_holidays && ' · trabalha feriados'}
                     </div>
                   </div>
                   <button className="btn ghost sm" onClick={() => { setApplyModal(tmpl); setSelectedEmps([]); setApplyMsg(null) }}>{t('tmpl.apply_btn')}</button>

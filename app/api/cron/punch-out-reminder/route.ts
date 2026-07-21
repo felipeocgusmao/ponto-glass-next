@@ -4,6 +4,7 @@ import { businessDate, businessMinutesOfDay } from '@/lib/utils'
 import { expectedEndForDate } from '@/lib/schedule'
 import { parseTimeToMinutes } from '@/lib/entryReminder'
 import { activeTenantIds } from '@/lib/tenant'
+import { recordCronRun } from '@/lib/cronHealth'
 import webpush from 'web-push'
 
 // Schedule-aware (#287): the cron runs every 30 min across the evening window
@@ -35,9 +36,12 @@ export async function GET(request: NextRequest) {
   const today = businessDate(now)
   const nowMinutes = businessMinutesOfDay(now)
 
+  const tenantIds = await activeTenantIds()
+  await recordCronRun('punch-out-reminder', tenantIds)
+
   let notified = 0
   let failures = 0
-  for (const tenantId of await activeTenantIds()) {
+  for (const tenantId of tenantIds) {
     try { notified += await runTenant(tenantId, today, nowMinutes) }
     catch { failures++ }
   }

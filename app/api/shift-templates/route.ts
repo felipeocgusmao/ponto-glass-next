@@ -4,6 +4,7 @@ import { verifyApiAuth } from '@/lib/apiAuth'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/audit'
 import { isCsrfSafe } from '@/lib/csrf'
+import { validateWeeklySchedule } from '@/lib/schedule'
 
 export async function GET() {
   const token = cookies().get('ponto_token')?.value
@@ -37,9 +38,13 @@ export async function POST(request: NextRequest) {
   if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json().catch(() => ({}))
-  const { name, workday_hours, lunch_break_minutes, expected_start, expected_end, shift_start } = body
+  const { name, workday_hours, lunch_break_minutes, expected_start, expected_end, shift_start, weekly_schedule, works_holidays } = body
 
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
+
+  // #292 — optional full weekly schedule (same shape as employees.weekly_schedule).
+  const wsError = validateWeeklySchedule(weekly_schedule ?? null)
+  if (wsError) return NextResponse.json({ error: wsError }, { status: 400 })
 
   const { data, error } = await supabase
     .from('shift_templates')
@@ -51,6 +56,8 @@ export async function POST(request: NextRequest) {
       expected_start: expected_start || null,
       expected_end: expected_end || null,
       shift_start: shift_start || '00:00',
+      weekly_schedule: weekly_schedule ?? null,
+      works_holidays: Boolean(works_holidays),
     })
     .select()
     .single()

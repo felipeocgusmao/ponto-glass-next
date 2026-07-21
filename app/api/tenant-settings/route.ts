@@ -18,6 +18,10 @@ export interface TenantAlertSettings {
   // overtime_multipliers: pay uplifts in reports/holerites (+25%/+37,5%/+50% — art. 268.º)
   pt_compliance: boolean | null
   overtime_multipliers: boolean | null
+  // #291 — annual overtime cap (art. 228.º CT: 150h médias/grandes, 175h micro/
+  // pequenas empresas), in MINUTES for consistency with the other thresholds
+  // above. null = feature off (no tracking, no alerts).
+  annual_overtime_limit: number | null
 }
 
 const EMPTY_SETTINGS: TenantAlertSettings = {
@@ -28,6 +32,7 @@ const EMPTY_SETTINGS: TenantAlertSettings = {
   default_lunch_break_minutes: null,
   pt_compliance: null,
   overtime_multipliers: null,
+  annual_overtime_limit: null,
 }
 
 // clamp a numeric input to [min, max]; null passes through (means "unset").
@@ -94,6 +99,9 @@ export async function PATCH(request: NextRequest) {
   if ('default_lunch_break_minutes' in body) merged.default_lunch_break_minutes = clampOrNull(body.default_lunch_break_minutes, 0, 240)
   if ('pt_compliance' in body) merged.pt_compliance = body.pt_compliance === null ? null : Boolean(body.pt_compliance)
   if ('overtime_multipliers' in body) merged.overtime_multipliers = body.overtime_multipliers === null ? null : Boolean(body.overtime_multipliers)
+  // Only 150h/175h/off are offered in the UI, but clamp defensively rather
+  // than trust the client for an arbitrary number.
+  if ('annual_overtime_limit' in body) merged.annual_overtime_limit = clampOrNull(body.annual_overtime_limit, 60, 20000)
 
   const { error } = await supabase
     .from('tenants')

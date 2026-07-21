@@ -23,6 +23,10 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
   const [ok, setOk] = useState('')
   const [saving, setSaving] = useState(false)
   const [loadingBalances, setLoadingBalances] = useState(false)
+  // #291 — annual overtime cap (art. 228.º CT). annualLimit stays null when
+  // the company hasn't opted in (Ajustes → Lei laboral); the column is hidden.
+  const [annualOvertime, setAnnualOvertime] = useState<Record<string, number>>({})
+  const [annualLimit, setAnnualLimit] = useState<number | null>(null)
 
   const loadAll = useCallback(async () => {
     setLoadingBalances(true)
@@ -35,6 +39,14 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
     }))
     setBalances(new Map(map))
     setLoadingBalances(false)
+    try {
+      const res = await fetch('/api/hour-bank/annual-overtime')
+      if (res.ok) {
+        const d = await res.json()
+        setAnnualLimit(d.limitMin ?? null)
+        setAnnualOvertime(d.minutes ?? {})
+      }
+    } catch { /* silent — annual indicator is a bonus, not core to the tab */ }
   }, [employees])
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -136,6 +148,7 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
                 <th>Funcionário</th>
                 <th className="right">Saldo</th>
                 <th>Tendência</th>
+                {annualLimit != null && <th className="right">Suplementar no ano</th>}
                 <th className="right">Última alteração</th>
                 <th style={{ width: 90 }}></th>
               </tr>
@@ -173,6 +186,19 @@ export function BancoHorasTab({ employees }: { employees: Employee[] }) {
                         </div>
                       </div>
                     </td>
+                    {annualLimit != null && (() => {
+                      const ot = annualOvertime[emp.id] ?? 0
+                      const pct = Math.min(100, (ot / annualLimit) * 100)
+                      const level = pct >= 100 ? 'danger' : pct >= 80 ? 'warn' : 'muted'
+                      return (
+                        <td className="right tnum" style={{ fontSize: 12 }}>
+                          <span style={{ color: level === 'danger' ? 'var(--danger-fg)' : level === 'warn' ? 'var(--warning-fg)' : 'var(--fg-muted)', fontWeight: level === 'muted' ? 400 : 600 }}>
+                            {Math.floor(ot / 60)}h
+                          </span>
+                          <span className="muted"> / {Math.floor(annualLimit / 60)}h</span>
+                        </td>
+                      )
+                    })()}
                     <td className="right muted" style={{ fontSize: 12 }}>
                       {last
                         ? <span>{last.date} <span style={{ color: last.minutes > 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>({fmtCentesimalSigned(last.minutes)})</span></span>
