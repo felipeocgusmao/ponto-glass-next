@@ -153,11 +153,9 @@ export function fmtMinutes(min: number): string {
   return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`
 }
 
-// ── Centesimal hours (base 100) + quarter-hour rounding ─────────────────────────
-// In "industrial" / centesimal hour notation each hour is split into 100 units
-// instead of 60. So 7h45m → 7,75 and 7h13m → 7,21. The system rounds *worked
-// minutes per day* to the nearest 15-minute mark first, so reported values always
-// land on .00 / .25 / .50 / .75 — never a fractional centesimal like 7,21.
+// ── Quarter-hour rounding + hours:minutes formatting ─────────────────────────
+// Worked minutes per day are rounded to the nearest 15-minute mark first, so
+// reported values always land on a quarter hour (:00 / :15 / :30 / :45).
 
 /** Round minutes to the nearest 15-minute mark. Negative values round in magnitude. */
 export function roundToQuarter(min: number): number {
@@ -167,16 +165,18 @@ export function roundToQuarter(min: number): number {
   return rounded === 0 ? 0 : rounded
 }
 
-/** Format minutes as centesimal hours, e.g. 45 → "0,75", 465 → "7,75", -60 → "1,00". */
-export function fmtCentesimal(min: number): string {
-  const abs = Math.abs(min)
-  return (abs / 60).toFixed(2).replace('.', ',')
+/** Format minutes as "Xh Ym", e.g. 45 → "0h 45m", 465 → "7h 45m", -60 → "1h 00m". */
+export function fmtHM(min: number): string {
+  const abs = Math.round(Math.abs(min))
+  const h = Math.floor(abs / 60)
+  const m = abs % 60
+  return `${h}h ${String(m).padStart(2, '0')}m`
 }
 
-/** Like fmtCentesimal but with a leading + / − sign — used for hour-bank deltas. */
-export function fmtCentesimalSigned(min: number): string {
+/** Like fmtHM but with a leading + / − sign — used for hour-bank deltas and overtime. */
+export function fmtHMSigned(min: number): string {
   const sign = min < 0 ? '−' : '+'
-  return sign + fmtCentesimal(min)
+  return sign + fmtHM(min)
 }
 
 /** Daily net minutes rounded to the nearest 15-min mark. The canonical
@@ -290,7 +290,7 @@ export function exportCSV(
     empDays.get(r.date)!.push(r)
   })
 
-  const COL_HEADERS = ['Data', 'Entrada', 'Saida', 'Almoco (min)', 'Cafe (min)', 'Horas (centesimal)', 'Valor/h (EUR)', 'Ganhos (EUR)']
+  const COL_HEADERS = ['Data', 'Entrada', 'Saida', 'Almoco (min)', 'Cafe (min)', 'Horas trabalhadas', 'Valor/h (EUR)', 'Ganhos (EUR)']
   const NCOLS = COL_HEADERS.length
   const fmtEur = (val: number) => val.toFixed(2).replace('.', ',')
 
@@ -360,7 +360,7 @@ export function exportCSV(
         exits.join(' / ')   || '-',
         String(dispLunch),
         String(dispCoffee),
-        incomplete ? 'INCOMPLETO (sem saida)' : (netMin > 0 ? fmtCentesimal(netMin) : '-'),
+        incomplete ? 'INCOMPLETO (sem saida)' : (netMin > 0 ? fmtHM(netMin) : '-'),
         rate != null ? rate.toFixed(2).replace('.', ',') : '-',
         rate != null ? fmtEur(dayEarnings) : '-',
       )
@@ -369,14 +369,14 @@ export function exportCSV(
       empTotalEarnings += dayEarnings
     })
 
-    row(`SUBTOTAL ${empName.toUpperCase()}`, '', '', '', '', fmtCentesimal(empTotalMin), '', rate != null ? fmtEur(empTotalEarnings) : '-')
+    row(`SUBTOTAL ${empName.toUpperCase()}`, '', '', '', '', fmtHM(empTotalMin), '', rate != null ? fmtEur(empTotalEarnings) : '-')
     blankRow()
 
     grandTotalMin += empTotalMin
     grandTotalEarnings += empTotalEarnings
   })
 
-  row('TOTAL GERAL', '', '', '', '', fmtCentesimal(grandTotalMin), '', fmtEur(grandTotalEarnings))
+  row('TOTAL GERAL', '', '', '', '', fmtHM(grandTotalMin), '', fmtEur(grandTotalEarnings))
 
   const csv = `sep=${SEP}\n` + lines.join('\n')
   const encoder = new TextEncoder()
@@ -471,7 +471,7 @@ export async function exportPDF(
         exits.join(' / ') || '-',
         dispLunch > 0 ? String(dispLunch) : '-',
         dispCoffee > 0 ? String(dispCoffee) : '-',
-        incomplete ? 'Incompleto' : (netMin > 0 ? fmtCentesimal(netMin) : '-'),
+        incomplete ? 'Incompleto' : (netMin > 0 ? fmtHM(netMin) : '-'),
       ]
       if (hasRate) {
         row.push(rate!.toFixed(2))
@@ -482,10 +482,10 @@ export async function exportPDF(
       empTotalEarnings += dayEarnings
     })
 
-    const totalRow: (string | number)[] = ['TOTAL', '', '', '', '', fmtCentesimal(empTotalMin)]
+    const totalRow: (string | number)[] = ['TOTAL', '', '', '', '', fmtHM(empTotalMin)]
     if (hasRate) { totalRow.push(''); totalRow.push(empTotalEarnings.toFixed(2) + ' €') }
 
-    const head: string[] = ['Data', 'Entrada', 'Saída', 'Almoço (min)', 'Café (min)', 'Horas (centesimal)']
+    const head: string[] = ['Data', 'Entrada', 'Saída', 'Almoço (min)', 'Café (min)', 'Horas trabalhadas']
     if (hasRate) { head.push('€/hora'); head.push('Ganhos (€)') }
 
     if (yPos > 240) { doc.addPage(); yPos = 20 }
@@ -517,7 +517,7 @@ export async function exportPDF(
     if (yPos > 250) { doc.addPage(); yPos = 20 }
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
-    doc.text(`TOTAL GERAL: ${fmtCentesimal(grandTotalMin)}${grandTotalEarnings > 0 ? ` · ${grandTotalEarnings.toFixed(2)} €` : ''}`, 14, yPos)
+    doc.text(`TOTAL GERAL: ${fmtHM(grandTotalMin)}${grandTotalEarnings > 0 ? ` · ${grandTotalEarnings.toFixed(2)} €` : ''}`, 14, yPos)
   }
 
   doc.save(filename)
@@ -561,7 +561,7 @@ export function openPayslip(
     totalMin += netMin; totalEarnings += earn
     const rateCell = hourlyRate != null ? `<td>${Number(hourlyRate).toFixed(2).replace('.', ',')} €</td>` : ''
     const earnCell = hourlyRate != null ? `<td>${earn.toFixed(2).replace('.', ',')} €</td>` : ''
-    const totalCell = incomplete ? '<span style="color:#c00;font-weight:600">Incompleto</span>' : (netMin > 0 ? fmtCentesimal(netMin) : '-')
+    const totalCell = incomplete ? '<span style="color:#c00;font-weight:600">Incompleto</span>' : (netMin > 0 ? fmtHM(netMin) : '-')
     return `<tr><td>${dateLabel}</td><td>${entries.join(' / ') || '-'}</td><td>${exits.join(' / ') || '-'}</td><td>${dispLunch}</td><td>${dispCoffee}</td><td>${totalCell}</td>${rateCell}${earnCell}</tr>`
   }).join('')
   const rateHeader = hourlyRate != null ? '<th>€/hora</th>' : ''
@@ -577,8 +577,8 @@ td{border:1px solid #ddd;padding:7px 10px;font-size:12px}.total-row{font-weight:
 @media print{.btn{display:none}}</style></head><body>
 <h1>Holerite — ${safeName}</h1>
 <div class="sub">Período: ${safePeriod} · Jornada: ${workdayHours}h · Almoço: ${lunchMin > 0 ? lunchMin + 'min' : 'sem desconto'}${hourlyRate != null ? ` · €${Number(hourlyRate).toFixed(2)}/h` : ''}</div>
-<table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Almoço (min)</th><th>Café (min)</th><th>Horas (centesimal)</th>${rateHeader}${earnHeader}</tr></thead>
-<tbody>${rows}<tr class="total-row"><td colspan="5">TOTAL</td><td>${fmtCentesimal(totalMin)}</td>${rateTotal}${earnTotal}</tr></tbody></table>
+<table><thead><tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Almoço (min)</th><th>Café (min)</th><th>Horas trabalhadas</th>${rateHeader}${earnHeader}</tr></thead>
+<tbody>${rows}<tr class="total-row"><td colspan="5">TOTAL</td><td>${fmtHM(totalMin)}</td>${rateTotal}${earnTotal}</tr></tbody></table>
 <button class="btn" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
 </body></html>`
   const win = window.open('', '_blank')

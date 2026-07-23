@@ -744,6 +744,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
             <div className="desc">Tente ajustar os filtros ou a busca.</div>
           </div>
         ) : (
+          <div className="table-scroll">
           <table className="table">
             <thead>
               <tr>
@@ -811,6 +812,7 @@ export function FuncionariosTab({ employees, onRefresh }: { employees: Employee[
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </>

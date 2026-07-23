@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import type { EmployeeProfile, PunchRecord, DayException } from '@/lib/types'
-import { calcNetMinutes, fmtCentesimal, roundToQuarter, openPayslip, exportPunchCsv, businessDate } from '@/lib/utils'
+import { calcNetMinutes, fmtHM, roundToQuarter, openPayslip, exportPunchCsv, businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 import { CalendarView } from './CalendarView'
 
@@ -129,7 +129,7 @@ export const HistoricoTab = memo(function HistoricoTab({
         </div>
         {!calendarView && totalMonthMin > 0 && (
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--fg)' }} title={`${Math.floor(totalMonthMin/60)}h${totalMonthMin%60}min`}>{fmtCentesimal(totalMonthMin)}</span>
+            <span style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--fg)' }} title={`${Math.floor(totalMonthMin/60)}h${totalMonthMin%60}min`}>{fmtHM(totalMonthMin)}</span>
             <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{t('history.worked_month')}</span>
           </div>
         )}
@@ -202,7 +202,7 @@ export const HistoricoTab = memo(function HistoricoTab({
                     {isToday && <span className="chip accent" style={{ fontSize: 9, marginLeft: 6 }}>{t('emp.today_chip')}</span>}
                   </div>
                   <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-mono)', color: dayMin > 0 ? 'var(--fg)' : 'var(--fg-subtle)' }}>
-                    {dayMin > 0 ? fmtCentesimal(dayMin) : '—'}
+                    {dayMin > 0 ? fmtHM(dayMin) : '—'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

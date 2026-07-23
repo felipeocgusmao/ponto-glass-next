@@ -102,12 +102,13 @@
 /* Dense tables overflow horizontally on narrow screens — wrap them so they scroll
    instead of breaking the card layout. */
 .card > .table { display: table; }
+/* Scoped scroll wrapper: only the TABLE scrolls horizontally, never the whole
+   card. Scrolling the card itself dragged the card-head — title, the
+   Resumo/Detalhado toggle, any buttons — off-screen along with the table,
+   which is exactly what a horizontal scroll on a phone should not do. */
+.table-scroll { overflow-x: auto; }
 @media (max-width: 768px) {
-  /* Only cards that directly wrap a dense table scroll horizontally. Applying
-     this to every .card made any slightly-too-wide filter/settings card scroll
-     and clip its content against the left edge on phones. */
-  .card:has(> .table) { overflow-x: auto; }
-  .card > .table { min-width: 560px; }
+  .table-scroll > .table { min-width: 560px; }
 }
 .table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .table thead th {

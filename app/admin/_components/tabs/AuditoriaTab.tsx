@@ -179,6 +179,7 @@ export function AuditoriaTab() {
             {logs.length > 0 && <div className="desc">{t('audit.filter_hint')}</div>}
           </div>
         ) : (
+          <div className="table-scroll">
           <table className="table">
             <thead>
               <tr>
@@ -222,6 +223,7 @@ export function AuditoriaTab() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </>
