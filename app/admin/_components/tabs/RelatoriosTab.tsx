@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import type { Employee, PunchRecord } from '@/lib/types'
-import { exportCSV, exportPDF, fmtCentesimal, fmtCentesimalSigned, fmtEur, roundToQuarter, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, businessDate, isIncompleteDay, avatarInitials } from '@/lib/utils'
+import { exportCSV, exportPDF, fmtHM, fmtHMSigned, fmtEur, roundToQuarter, calcOvertimePeriod, calcWorkedMinutesPeriod, calcNetMinutes, businessDate, isIncompleteDay, avatarInitials } from '@/lib/utils'
 import { targetMinutesForDate, isScheduledWorkday, calcPeriodPay, calcDayPay } from '@/lib/schedule'
 import { empColor, getWorkingDays, openPayslip } from '../../_lib/helpers'
 import { useLang } from '@/lib/LangContext'
@@ -433,13 +433,13 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
               <div className="kpi-grid">
                 <div className="kpi">
                   <div className="kpi-label">Total de horas</div>
-                  <div className="kpi-value tnum">{fmtCentesimal(totals.workedMin)}</div>
+                  <div className="kpi-value tnum">{fmtHM(totals.workedMin)}</div>
                   <div className="kpi-delta">{summary.length} {summary.length === 1 ? 'pessoa' : 'pessoas'} · {totals.days} dias</div>
                 </div>
                 <div className="kpi">
                   <div className="kpi-label">Horas extras</div>
                   <div className={`kpi-value tnum`} style={{ color: totals.overtime >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
-                    {fmtCentesimalSigned(totals.overtime)}
+                    {fmtHMSigned(totals.overtime)}
                   </div>
                   <div className="kpi-delta">vs. jornada esperada</div>
                 </div>
@@ -451,7 +451,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                 <div className="kpi">
                   <div className="kpi-label">Custo médio / dia</div>
                   <div className="kpi-value tnum">{totals.days > 0 ? fmtEur(totals.earnings / totals.days) : '—'}</div>
-                  <div className="kpi-delta">{summary.length > 0 ? `${fmtCentesimal(Math.round(totals.workedMin / summary.length))} média / pessoa` : ''}</div>
+                  <div className="kpi-delta">{summary.length > 0 ? `${fmtHM(Math.round(totals.workedMin / summary.length))} média / pessoa` : ''}</div>
                 </div>
               </div>
 
@@ -464,6 +464,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                     <button className={view === 'detailed' ? 'active' : ''} onClick={() => setView('detailed')}>Detalhado</button>
                   </div>
                 </div>
+                <div className="table-scroll">
                 <table className="table">
                   <thead>
                     <tr>
@@ -492,10 +493,10 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                           </div>
                         </td>
                         <td className="right tnum">{r.days}</td>
-                        <td className="right tnum" style={{ fontWeight: 500 }}>{fmtCentesimal(r.workedMin)}</td>
-                        <td className="right tnum muted">{fmtCentesimal(r.targetSum)}</td>
+                        <td className="right tnum" style={{ fontWeight: 500 }}>{fmtHM(r.workedMin)}</td>
+                        <td className="right tnum muted">{fmtHM(r.targetSum)}</td>
                         <td className="right tnum" style={{ color: r.overtime >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
-                          {fmtCentesimalSigned(r.overtime)}
+                          {fmtHMSigned(r.overtime)}
                         </td>
                         <td className="right tnum">{r.earnings != null ? fmtEur(r.earnings) : <span className="muted">—</span>}</td>
                         {view === 'detailed' && (
@@ -513,16 +514,17 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                     <tr style={{ background: 'var(--surface-2)', fontWeight: 600 }}>
                       <td style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>Total</td>
                       <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{totals.days}</td>
-                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{fmtCentesimal(totals.workedMin)}</td>
-                      <td className="right tnum muted" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{fmtCentesimal(totals.expectedMin)}</td>
+                      <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{fmtHM(totals.workedMin)}</td>
+                      <td className="right tnum muted" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{fmtHM(totals.expectedMin)}</td>
                       <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--divider)', color: totals.overtime >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)' }}>
-                        {fmtCentesimalSigned(totals.overtime)}
+                        {fmtHMSigned(totals.overtime)}
                       </td>
                       <td className="right tnum" style={{ padding: 12, borderTop: '1px solid var(--divider)' }}>{fmtEur(totals.earnings)}</td>
                       {view === 'detailed' && <td style={{ borderTop: '1px solid var(--divider)' }}></td>}
                     </tr>
                   </tfoot>
                 </table>
+                </div>
               </div>
 
               {/* Daily chart */}
@@ -560,7 +562,7 @@ export function RelatoriosTab({ employees }: { employees: Employee[] }) {
                         {chartData.map(({ date, min }) => {
                           const pct = Math.min(100, (min / maxMin) * 100)
                           const d = new Date(date + 'T12:00:00')
-                          const label = `${pad(d.getDate())}/${pad(d.getMonth()+1)}: ${min > 0 ? fmtCentesimal(min) : t('relat.no_records')}`
+                          const label = `${pad(d.getDate())}/${pad(d.getMonth()+1)}: ${min > 0 ? fmtHM(min) : t('relat.no_records')}`
                           return (
                             <div key={date} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} title={label}>
                               <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: pct > 0 ? `${pct}%` : 3, background: min === 0 ? 'var(--border)' : 'var(--accent)', opacity: min === 0 ? 1 : 0.7 }} />
