@@ -10,36 +10,40 @@ html, body { height: 100%; }
    under the sidebar) picks up a saturated hue the rest of the page lacks. The
    goal is one soft ambient wash, not three distinct colour zones
    (#requested: "padrão nas cores, sem diferença drástica"). */
-/* Solid base colour on html AND body so any safe-area / overscroll region is
-   the app's base tone, never a black fallback (iOS standalone paints the
+/* Solid base colour on html as the canvas fallback for any safe-area /
+   overscroll region, never a black fallback (iOS standalone paints the
    home-indicator area with the body background). */
-html, body { background-color: var(--bg); }
-html[data-theme="dark"], html[data-theme="dark"] body { background-color: #08090b; }
+html { background-color: var(--bg); }
+html[data-theme="dark"] { background-color: #08090b; }
 
-/* The ambient gradient wash is a SINGLE fixed, full-viewport layer behind
-   everything — not painted on html+body separately, which left a visible seam
-   between the scrollable content and the bottom safe area on iOS. One surface =
-   continuous edge-to-edge, no division. pointer-events:none so it never eats
-   taps; z-index:-1 keeps it behind the app; the scroll container is a separate
-   element so this fixed layer never repaints on scroll. */
-/* Intensity: a midpoint between the near-invisible wash (#272 flattened it to
+/* The ambient wash is painted as BODY'S OWN background (color + gradients in
+   one shorthand), not a `body::before` layer: a fixed, z-index:-1 pseudo-
+   element paints in the negative-z-index step of the stacking order, which
+   comes *before* an in-flow element's own background paint step — so body's
+   opaque background-color was completely hiding the wash underneath it,
+   making the whole effect invisible regardless of gradient intensity. Body
+   itself never scrolls (overflow:hidden below; the .main/.page content
+   scrolls in its own inner container), so a plain background here stays
+   static without needing position:fixed.
+   Intensity: a midpoint between the near-invisible wash (#272 flattened it to
    0.20/0.16 and users stopped noticing any effect) and the original saturated
    blobs (0.5/0.4, which read as three distinct colour zones). Alphas ~0.3 with
    wide overlapping ellipses keep it one continuous ambient wash — noticeable
    through the glass surfaces, but still subtle (#requested: "de forma sutil,
    sem muita intensidade"). */
-body::before {
-  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+body {
   background:
     radial-gradient(ellipse 100% 95% at 12% 0%, rgba(94,106,210,0.32) 0%, transparent 62%),
     radial-gradient(ellipse 100% 95% at 92% 100%, rgba(124,58,237,0.26) 0%, transparent 64%),
-    radial-gradient(ellipse 90% 75% at 50% 50%, rgba(8,145,178,0.12) 0%, transparent 68%);
+    radial-gradient(ellipse 90% 75% at 50% 50%, rgba(8,145,178,0.12) 0%, transparent 68%),
+    var(--bg);
 }
-html[data-theme="dark"] body::before {
+html[data-theme="dark"] body {
   background:
     radial-gradient(ellipse 100% 95% at 12% 0%, rgba(124,140,248,0.32) 0%, transparent 62%),
     radial-gradient(ellipse 100% 95% at 92% 100%, rgba(167,139,250,0.24) 0%, transparent 64%),
-    radial-gradient(ellipse 90% 75% at 50% 50%, rgba(34,211,238,0.11) 0%, transparent 68%);
+    radial-gradient(ellipse 90% 75% at 50% 50%, rgba(34,211,238,0.11) 0%, transparent 68%),
+    #08090b;
 }
 
 /* ─── Mobile performance ─── On phones the glass is expensive: a fixed
