@@ -262,7 +262,7 @@ describe('calcEarnings', () => {
   })
 })
 
-import { roundToQuarter, fmtCentesimal, fmtCentesimalSigned, calcDayRounded } from '../lib/utils'
+import { roundToQuarter, fmtHM, fmtHMSigned, calcDayRounded } from '../lib/utils'
 
 describe('roundToQuarter', () => {
   it('snaps to the nearest 15-min mark (down then up)', () => {
@@ -285,26 +285,26 @@ describe('roundToQuarter', () => {
   })
 })
 
-describe('fmtCentesimal', () => {
-  it('formats whole hours and quarters', () => {
-    expect(fmtCentesimal(0)).toBe('0,00')
-    expect(fmtCentesimal(15)).toBe('0,25')
-    expect(fmtCentesimal(30)).toBe('0,50')
-    expect(fmtCentesimal(45)).toBe('0,75')
-    expect(fmtCentesimal(60)).toBe('1,00')
-    expect(fmtCentesimal(465)).toBe('7,75')  // 7h45m
+describe('fmtHM', () => {
+  it('formats whole hours and quarters as Xh Ym', () => {
+    expect(fmtHM(0)).toBe('0h 00m')
+    expect(fmtHM(15)).toBe('0h 15m')
+    expect(fmtHM(30)).toBe('0h 30m')
+    expect(fmtHM(45)).toBe('0h 45m')
+    expect(fmtHM(60)).toBe('1h 00m')
+    expect(fmtHM(465)).toBe('7h 45m')
   })
   it('treats negatives as magnitudes (no sign)', () => {
-    expect(fmtCentesimal(-60)).toBe('1,00')
+    expect(fmtHM(-60)).toBe('1h 00m')
   })
 })
 
-describe('fmtCentesimalSigned', () => {
+describe('fmtHMSigned', () => {
   it('prefixes + for credit and − for debit', () => {
-    expect(fmtCentesimalSigned(60)).toBe('+1,00')
-    expect(fmtCentesimalSigned(-60)).toBe('−1,00')
-    expect(fmtCentesimalSigned(0)).toBe('+0,00')
-    expect(fmtCentesimalSigned(-15)).toBe('−0,25')
+    expect(fmtHMSigned(60)).toBe('+1h 00m')
+    expect(fmtHMSigned(-60)).toBe('−1h 00m')
+    expect(fmtHMSigned(0)).toBe('+0h 00m')
+    expect(fmtHMSigned(-15)).toBe('−0h 15m')
   })
 })
 

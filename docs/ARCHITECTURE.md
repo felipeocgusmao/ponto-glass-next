@@ -62,7 +62,7 @@ lib/
 ├─ punchQueue.ts               fila offline (localStorage + flush ao reconectar)
 ├─ voice.ts                    parseVoiceCommand / getSpeechRecognition / speak (TTS)
 ├─ entryReminder.ts            seleciona quem precisa de lembrete (chamado pelo cron server-side)
-└─ utils.ts                    calcHours / calcNetMinutes / fmtCentesimal / roundToQuarter / exportCSV / exportPDF
+└─ utils.ts                    calcHours / calcNetMinutes / fmtHM / roundToQuarter / exportCSV / exportPDF
 
 middleware.ts                  edge: signature-only auth + role-based redirects
 public/sw.js                   service worker (cache + web push + Background Sync da fila offline)
@@ -271,7 +271,7 @@ As batidas no banco continuam intactas (timestamps em UTC, precisão de milisseg
 flowchart LR
   R[records] --> CD[calcDayRounded<br/>por dia]
   CD --> RQ[roundToQuarter<br/>para múltiplo de 15min mais próximo]
-  RQ --> FC[fmtCentesimal<br/>7h45 → '7,75']
+  RQ --> FC[fmtHM<br/>465min → '7h 45m']
   FC --> UI[Relatórios / Banco / Payslip / CSV / PDF]
   R --> CR[calcLiveMin<br/>cronómetro ao vivo]
   CR --> RAW[mm:ss exato no /ponto]

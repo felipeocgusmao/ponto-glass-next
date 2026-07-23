@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer'
-import { fmtCentesimal, fmtCentesimalSigned } from './utils'
+import { fmtHM, fmtHMSigned } from './utils'
 
 // ── Retry helper ────────────────────────────────────────────────────────────────
 // Retries an async operation up to `attempts` times with exponential backoff.
@@ -157,11 +157,10 @@ export async function sendMonthlyReportEmployeeEmail(opts: {
   dailyRows?: { date: string; netMin: number; incomplete: boolean }[]
 }): Promise<boolean> {
   const subject = `Relatório de ponto — ${opts.period}`
-  // Relatórios usam horas centesimais (base 100): 45min → "0,75", 7h30 → "7,50".
   // Os totais já chegam arredondados ao quarto de hora (lib/utils.calcWorkedMinutesPeriod).
-  const fmtH = fmtCentesimal
+  const fmtH = fmtHM
   const overtimeColor = opts.overtimeMin >= 0 ? '#22c55e' : '#ef4444'
-  const overtimeLabel = fmtCentesimalSigned(opts.overtimeMin)
+  const overtimeLabel = fmtHMSigned(opts.overtimeMin)
   const incompleteRow = opts.incompleteDays > 0
     ? `<tr><td style="padding:10px 16px;color:#6b7280;border-bottom:1px solid #e5e7eb">Dias incompletos</td><td style="padding:10px 16px;text-align:right;font-weight:600;color:#ef4444;border-bottom:1px solid #e5e7eb">⚠ ${opts.incompleteDays}</td></tr>`
     : ''
@@ -235,11 +234,10 @@ export async function sendMonthlyReportAdminEmail(opts: {
   attachments?: EmailAttachment[]
 }): Promise<boolean> {
   const subject = `Relatório consolidado — ${opts.period}`
-  // Relatórios consolidados usam horas centesimais (base 100): 7h45 → "7,75".
-  const fmtH = fmtCentesimal
+  const fmtH = fmtHM
   const tableRows = opts.rows.map(r => {
     const otColor = r.overtimeMin >= 0 ? '#22c55e' : '#ef4444'
-    const otLabel = fmtCentesimalSigned(r.overtimeMin)
+    const otLabel = fmtHMSigned(r.overtimeMin)
     const earnCell = r.earnings != null ? r.earnings.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' }) : '—'
     const incCell = r.incompleteDays > 0 ? `<span style="color:#ef4444">⚠ ${r.incompleteDays}</span>` : '—'
     return `<tr>

@@ -564,7 +564,7 @@ ponto_glass_next/
 │   ├── punchQueue.ts         ← fila offline de batidas (localStorage + flush ao reconectar)
 │   ├── punchValidation.ts    ← validateGeofence, isDuplicatePunch, isValidPunchType (puras + testáveis)
 │   ├── voice.ts              ← parseVoiceCommand, getSpeechRecognition, speak (TTS)
-│   └── utils.ts              ← calcHours, calcNetMinutes, calcEarnings, fmtCentesimal, roundToQuarter…
+│   └── utils.ts              ← calcHours, calcNetMinutes, calcEarnings, fmtHM, roundToQuarter…
 │
 ├── middleware.ts              ← RBAC: protege rotas por role (admin/manager/employee)
 ├── public/sw.js               ← Service Worker (cache + push + Background Sync da fila offline)

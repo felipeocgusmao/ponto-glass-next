@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { fmtCentesimalSigned, businessDate } from '@/lib/utils'
+import { fmtHMSigned, businessDate } from '@/lib/utils'
 import { useLang } from '@/lib/LangContext'
 
 type CorrectionStatus = 'pending' | 'approved' | 'rejected'
@@ -45,7 +45,7 @@ export const BancoTab = memo(function BancoTab({
             color: bankBalance >= 0 ? 'var(--success-fg)' : 'var(--danger-fg)',
             letterSpacing: '-0.03em',
           }}>
-            {fmtCentesimalSigned(bankBalance)}
+            {fmtHMSigned(bankBalance)}
           </div>
           <div style={{ fontSize: 13, color: 'var(--fg-muted)', marginTop: 8 }}>
             {bankBalance >= 0 ? t('bank.surplus') : t('bank.deficit')}
