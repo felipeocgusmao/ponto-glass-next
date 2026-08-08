@@ -164,10 +164,9 @@ export function StatusTab({ employees, currentUserId }: { employees: Employee[];
     } else {
       const lastEntry = isWorking && !stateFromPriorDay ? sortedToday.slice().reverse().find(r => r.type === 'entrada') : undefined
       const currentSessionMin = lastEntry ? (liveMs - new Date(lastEntry.timestamp).getTime()) / 60_000 : 0
-      // Show gross elapsed time while the worker is still IN; only subtract the
-      // assumed lunch once they've punched out (matches reports/payslip logic).
-      const lunchDeduction = isWorking ? 0 : emp.lunch_break_minutes
-      liveNetMin = Math.max(0, calcNetMinutes(empToday, 0) + currentSessionMin - lunchDeduction)
+      // No inicio_almoco/fim_almoco punches today, so no lunch was taken —
+      // emp.lunch_break_minutes must not be auto-deducted.
+      liveNetMin = Math.max(0, calcNetMinutes(empToday, 0) + currentSessionMin)
     }
     const liveEarnings = emp.hourly_rate && liveNetMin > 0
       ? ((liveNetMin / 60) * emp.hourly_rate).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })

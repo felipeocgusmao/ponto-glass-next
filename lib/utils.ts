@@ -135,7 +135,11 @@ export function calcNetMinutes(records: PunchRecord[], lunchBreakMinutes = 0): n
     const { workedMin, coffeeMin } = calcTimeBreakdown(records)
     return Math.max(0, workedMin + coffeeMin)
   }
-  return Math.max(0, pairMinutes(records) - lunchBreakMinutes)
+  // No inicio_almoco/fim_almoco punches were recorded, so no lunch was taken —
+  // the configured lunch_break_minutes only applies once an actual break is
+  // punched. Auto-deducting it here would silently shrink a straight-through
+  // shift's worked time.
+  return pairMinutes(records)
 }
 
 export function calcHours(records: PunchRecord[], lunchBreakMinutes = 0): string {
@@ -335,12 +339,13 @@ export function exportCSV(
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       )
       const explicit = hasExplicitBreaks(day)
-      const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
-      const exactNet   = explicit ? workedMin : Math.max(0, pairMinutes(day) - autoLunch)
+      const { lunchMin, coffeeMin } = calcTimeBreakdown(day)
+      const exactNet   = calcNetMinutes(day, autoLunch)
       // Round each day to the nearest 15-min mark so the CSV total = sum of displayed rows.
       const netMin     = roundToQuarter(exactNet)
       const incomplete = isIncompleteDay(day)
-      const dispLunch  = explicit ? lunchMin  : autoLunch
+      // No auto-lunch deduction without an actual lunch punch, so nothing to display either.
+      const dispLunch  = explicit ? lunchMin  : 0
       const dispCoffee = explicit ? coffeeMin : 0
 
       const [year, month, dayNum] = date.split('-').map(Number)
@@ -450,12 +455,13 @@ export async function exportPDF(
     Array.from(empDays.keys()).sort().forEach(date => {
       const day = [...empDays.get(date)!].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       const explicit = day.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
-      const { workedMin, lunchMin, coffeeMin } = calcTimeBreakdown(day)
+      const { lunchMin, coffeeMin } = calcTimeBreakdown(day)
       const exactNet = Math.max(0, calcNetMinutes(day, autoLunch))
       // Round each day to the nearest 15-min mark so the PDF total = sum of displayed rows.
       const netMin = roundToQuarter(exactNet)
       const incomplete = isIncompleteDay(day)
-      const dispLunch = explicit ? lunchMin : autoLunch
+      // No auto-lunch deduction without an actual lunch punch, so nothing to display either.
+      const dispLunch = explicit ? lunchMin : 0
       const dispCoffee = explicit ? coffeeMin : 0
 
       const [y, m, dNum] = date.split('-').map(Number)
@@ -546,11 +552,13 @@ export function openPayslip(
     const day = [...byDate.get(date)!].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     const explicit = day.some(r => ['inicio_almoco','fim_almoco','pausa_cafe','retorno_cafe'].includes(r.type))
     const { workedMin, lunchMin: lMin, coffeeMin } = calcTimeBreakdown(day)
-    const exactNet = explicit ? workedMin : Math.max(0, day.filter(r => r.type === 'entrada').length > 0 ? workedMin - lunchMin : 0)
+    // No auto-lunch deduction without an actual lunch punch — workedMin already
+    // excludes explicit lunch/coffee state time via calcTimeBreakdown.
+    const exactNet = workedMin
     // Round each day to the nearest 15-min mark so the holerite total = sum of displayed rows.
     const netMin = roundToQuarter(exactNet)
     const incomplete = isIncompleteDay(day)
-    const dispLunch = explicit ? lMin : lunchMin
+    const dispLunch = explicit ? lMin : 0
     const dispCoffee = explicit ? coffeeMin : 0
     const [y, m, dNum] = date.split('-').map(Number)
     const dow = DAYS_PT[new Date(y, m - 1, dNum).getDay()]
