@@ -38,12 +38,12 @@ describe('calcWorkDate', () => {
 })
 
 describe('calcNetMinutes', () => {
-  it('simple 8h day with paired entrada/saída', () => {
+  it('no lunch punched: full span counts, auto-lunch is NOT deducted', () => {
     const records = [
       rec('entrada', '2026-05-28T08:00:00Z'),
-      rec('saída',   '2026-05-28T17:00:00Z'),
+      rec('saída',   '2026-05-28T17:00:00Z'), // 9h straight through, no break punches
     ]
-    expect(calcNetMinutes(records, 60)).toBe(480)
+    expect(calcNetMinutes(records, 60)).toBe(540)
   })
 
   it('zero with no records', () => {
@@ -59,6 +59,16 @@ describe('calcNetMinutes', () => {
     ]
     // 5h worked before lunch + 3h after = 8h = 480min (lunch is unpaid, excluded)
     expect(calcNetMinutes(records, 60)).toBe(480)
+  })
+
+  it('regression: entrada 07:00 → saída 14:00 with no lunch punches credits the full 7h', () => {
+    const records = [
+      rec('entrada', '2026-08-08T07:00:00Z'),
+      rec('saída',   '2026-08-08T14:00:00Z'),
+    ]
+    // Employee worked straight through with no lunch break punched. Even though
+    // lunch_break_minutes is configured (90), it must not be silently subtracted.
+    expect(calcNetMinutes(records, 90)).toBe(420)
   })
 })
 
@@ -166,15 +176,15 @@ describe('businessDate', () => {
 import { getWorkState, calcLiveMin, calcWorkedMinutesPeriod, calcOvertimePeriod, calcOvertimeToday, calcHours, calcEarnings } from '../lib/utils'
 
 describe('calcWorkedMinutesPeriod', () => {
-  it('sums net minutes across multiple days (deducts lunch per day)', () => {
+  it('sums net minutes across multiple days (no lunch punched → not deducted)', () => {
     const records = [
       rec('entrada', '2026-05-26T08:00:00Z'),
       rec('saída',   '2026-05-26T17:00:00Z'),
       rec('entrada', '2026-05-27T08:00:00Z'),
       rec('saída',   '2026-05-27T17:00:00Z'),
     ]
-    // each day: 9h - 60min lunch = 480min; total = 960
-    expect(calcWorkedMinutesPeriod(records, 60)).toBe(960)
+    // each day: 9h straight through, no break punches; total = 1080
+    expect(calcWorkedMinutesPeriod(records, 60)).toBe(1080)
   })
 
   it('returns 0 for empty records', () => {
@@ -187,7 +197,7 @@ describe('calcWorkedMinutesPeriod', () => {
       rec('saída',   '2026-05-26T17:00:00Z'),
       rec('entrada', '2026-05-27T08:00:00Z'), // no saída
     ]
-    expect(calcWorkedMinutesPeriod(records, 60)).toBe(480)
+    expect(calcWorkedMinutesPeriod(records, 60)).toBe(540)
   })
 })
 
@@ -195,17 +205,17 @@ describe('calcOvertimePeriod', () => {
   it('positive overtime when worked more than workday', () => {
     const records = [
       rec('entrada', '2026-05-26T08:00:00Z'),
-      rec('saída',   '2026-05-26T18:00:00Z'), // 10h - 60min lunch = 540min vs 480min target → +60min
+      rec('saída',   '2026-05-26T18:00:00Z'), // 10h, no lunch punched, vs 480min target → +120min
     ]
-    expect(calcOvertimePeriod(records, 480, 60)).toBe(60)
+    expect(calcOvertimePeriod(records, 480, 60)).toBe(120)
   })
 
   it('negative overtime when worked less than workday', () => {
     const records = [
       rec('entrada', '2026-05-26T09:00:00Z'),
-      rec('saída',   '2026-05-26T15:00:00Z'), // 6h - 60min lunch = 300min vs 480min → -180min
+      rec('saída',   '2026-05-26T15:00:00Z'), // 6h, no lunch punched, vs 480min → -120min
     ]
-    expect(calcOvertimePeriod(records, 480, 60)).toBe(-180)
+    expect(calcOvertimePeriod(records, 480, 60)).toBe(-120)
   })
 
   it('returns null for empty records', () => {
@@ -217,9 +227,9 @@ describe('calcOvertimeToday', () => {
   it('returns overtime for a completed day', () => {
     const records = [
       rec('entrada', '2026-05-26T08:00:00Z'),
-      rec('saída',   '2026-05-26T17:00:00Z'), // 9h - 60min = 480min → 0 overtime
+      rec('saída',   '2026-05-26T17:00:00Z'), // 9h, no lunch punched → +60min overtime
     ]
-    expect(calcOvertimeToday(records, 480, 60)).toBe(0)
+    expect(calcOvertimeToday(records, 480, 60)).toBe(60)
   })
 
   it('returns null when no work recorded', () => {
@@ -231,9 +241,9 @@ describe('calcHours', () => {
   it('formats a worked period correctly', () => {
     const records = [
       rec('entrada', '2026-05-26T08:00:00Z'),
-      rec('saída',   '2026-05-26T16:30:00Z'), // 8.5h - 60min = 450min = 7h30m
+      rec('saída',   '2026-05-26T16:30:00Z'), // 8.5h, no lunch punched = 8h30m
     ]
-    expect(calcHours(records, 60)).toBe('7h 30m')
+    expect(calcHours(records, 60)).toBe('8h 30m')
   })
 
   it('returns — for no records', () => {
@@ -249,11 +259,11 @@ describe('calcEarnings', () => {
   it('computes earnings from worked minutes and hourly rate', () => {
     const records = [
       rec('entrada', '2026-05-26T08:00:00Z'),
-      rec('saída',   '2026-05-26T16:00:00Z'), // 8h - 60min = 420min = 7h
+      rec('saída',   '2026-05-26T16:00:00Z'), // 8h, no lunch punched
     ]
-    // 7h × 10€/h = 70€
+    // 8h × 10€/h = 80€
     const result = calcEarnings(records, 10, 60)
-    expect(result).toContain('70')
+    expect(result).toContain('80')
   })
 
   it('returns 0€ for no records', () => {
@@ -309,14 +319,14 @@ describe('fmtHMSigned', () => {
 })
 
 describe('calcDayRounded', () => {
-  it('rounds the day net to the nearest quarter (with auto-lunch)', () => {
-    // entrada 08:00 → saída 17:13 → 9h13 gross. Auto-lunch 60min → 8h13 net (493 min).
-    // Rounded to nearest 15-min = 495 min.
+  it('rounds the day net to the nearest quarter (no lunch punched → not deducted)', () => {
+    // entrada 08:00 → saída 17:13 → 9h13 gross (553min), no break punches so no auto-lunch.
+    // Rounded to nearest 15-min = 555 min.
     const records: PunchRecord[] = [
       rec('entrada', '2026-05-26T08:00:00Z'),
       rec('saída',   '2026-05-26T17:13:00Z'),
     ]
-    expect(calcDayRounded(records, 60)).toBe(495)
+    expect(calcDayRounded(records, 60)).toBe(555)
   })
   it('returns 0 for empty records', () => {
     expect(calcDayRounded([], 60)).toBe(0)
@@ -371,12 +381,12 @@ describe('calcLiveMin', () => {
     expect(calcLiveMin([], 60)).toBe(0)
   })
 
-  it('returns elapsed minutes for a completed shift', () => {
+  it('returns elapsed minutes for a completed shift (no lunch punched → not deducted)', () => {
     const records = [
       rec('entrada', '2026-05-28T08:00:00Z'),
-      rec('saída',   '2026-05-28T17:00:00Z'), // 9h - 60min auto-lunch = 480min
+      rec('saída',   '2026-05-28T17:00:00Z'), // 9h straight through
     ]
-    expect(calcLiveMin(records, 60)).toBe(480)
+    expect(calcLiveMin(records, 60)).toBe(540)
   })
 
   it('counts coffee as paid time but excludes lunch when explicit breaks are used', () => {
